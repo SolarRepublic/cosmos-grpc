@@ -12,16 +12,6 @@ copy wasmd/third_party/proto proto
 # copy cosmos-proto/proto
 # copy cosmos-sdk/proto
 
-
-PROTO_PATH=""
-function push() {
-	PROTO_PATH="$PROTO_PATH${PROTO_PATH:+/}$1"
-}
-
-function pop() {
-	PROTO_PATH="${PROTO_PATH%/*}"
-}
-
 function gen_proto() {
 	file="$1"
 	echo "building $file..."
