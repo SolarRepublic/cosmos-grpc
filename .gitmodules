@@ -1,0 +1,16 @@
+[submodule "submodules/cosmos-sdk"]
+	path = submodules/cosmos-sdk
+	url = https://github.com/cosmos/cosmos-sdk.git
+[submodule "submodules/cosmos-proto"]
+	path = submodules/cosmos-proto
+	url = https://github.com/cosmos/cosmos-proto.git
+[submodule "submodules/googleapis"]
+	path = submodules/googleapis
+	url = https://github.com/googleapis/googleapis.git
+[submodule "submodules/protobuf"]
+	path = submodules/protobuf
+	url = https://github.com/regen-network/protobuf.git
+	branch = cosmos
+[submodule "submodules/wasmd"]
+	path = submodules/wasmd
+	url = https://github.com/CosmWasm/wasmd
