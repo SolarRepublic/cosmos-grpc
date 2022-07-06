@@ -13,7 +13,7 @@ copy wasmd/third_party/proto proto
 # copy cosmos-sdk/proto
 
 function gen_proto() {
-	file="$1"
+	file="${1#proto/}"
 	echo "building $file..."
 	protoc -I=proto \
 		--ts_out=lib \
@@ -26,7 +26,7 @@ function gen_proto() {
 }
 
 function gen_all() {
-	find "$1" -type f -name *.proto -exec bash -c "gen_proto \"{}\"" \;
+	find "proto/$1" -type f -name *.proto -exec bash -c "gen_proto \"{}\"" \;
 }
 
 mkdir -p lib
@@ -34,7 +34,7 @@ mkdir -p lib
 
 export -f gen_proto
 
-gen_all proto/cosmos
-gen_all proto/cosmwasm
+gen_all cosmos
+gen_all cosmwasm
 
 tsc
