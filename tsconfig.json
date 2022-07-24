@@ -1,65 +1,23 @@
 {
-	// custom options for this project
 	"compilerOptions": {
 		"outDir": "dist",
 		"declaration": true,
-		"moduleResolution": "node",
+		"declarationMap": true,
 
 		// downleveling ES features can have very nasty side effects
 		"target": "es2022",
 		"module": "es2022",
+		"moduleResolution": "node",
 		"sourceMap": true,
-
-		// for explicit posterity, this is true anyway with "es2022
-		"useDefineForClassFields": true,
-
-		// ensure certain coding styles are not mishandled by compiler
-		"exactOptionalPropertyTypes": true,
-		"noPropertyAccessFromIndexSignature": false,
-
-		// type checking and type safety
-		"noImplicitOverride": true,
-		"strictNullChecks": true,
-		// "suppressExcessPropertyErrors": true,
-		// "noStrictGenericChecks": true,
+		"esModuleInterop": true,
 
 		// ensure consistent build outputs for code hashes
 		"newLine": "lf",
-		"removeComments": true,
 
- 		// convenient preferences for development sake
-		"allowSyntheticDefaultImports": true,
-
-		// 
-		"isolatedModules": false,
-
-		// // define convenient "home" path alias to src directory
-		// "baseUrl": ".",
-		// "paths": {
-		// 	"#/*": [
-		// 		"src/*"
-		// 	],
-		// 	"##/*": [
-		// 		"src/app/*"
-		// 	],
-		// 	"$/*": [
-		// 		"public/*"
-		// 	]
-		// },
-
-		// anywhere js is used/imported, perform type checking on it
-		"allowJs": true,
-		"checkJs": true,
-
-		// "types": [
-		// 	"chrome"
-		// 	// "vite/client"
-		// ]
+		"forceConsistentCasingInFileNames": true,
+		"strict": true,
+		"useUnknownInCatchVariables": false,
+		"skipLibCheck": true
 	},
-
-	// 
-	"include": [
-		"lib/**/*.ts",
-	],
-	"exclude": ["node_modules", "dist"],
-}
+	"exclude": ["node_modules", "dist", "proto", "scrap"],
+ }
