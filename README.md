@@ -4,6 +4,7 @@ Produces gRPC-web capable TypeScript/JavaScript code for CosmWasm+ chains.
 
 ## Install
 ```shell
+git submodule update --init
 yarn install
 yarn build
 ```
