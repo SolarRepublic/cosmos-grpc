@@ -1,7 +1,10 @@
 {
   "name": "@solar-republic/cosmos-grpc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "dist/main.js",
+  "files": [
+    "dist/"
+  ],
   "author": "Blake Regalia <blake.regalia@gmail.com>",
   "license": "MIT",
   "scripts": {

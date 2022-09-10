@@ -14,3 +14,6 @@
 [submodule "submodules/wasmd"]
 	path = submodules/wasmd
 	url = https://github.com/CosmWasm/wasmd
+[submodule "submodules/secret"]
+	path = submodules/secret
+	url = https://github.com/scrtlabs/SecretNetwork
