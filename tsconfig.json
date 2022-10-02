@@ -19,5 +19,5 @@
 		"useUnknownInCatchVariables": false,
 		"skipLibCheck": true
 	},
-	"exclude": ["node_modules", "dist", "proto", "scrap"],
+	"exclude": ["node_modules", "dist", "proto", "scrap", "submodules"],
  }
