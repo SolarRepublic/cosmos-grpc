@@ -5,8 +5,11 @@ function copy() {
 	rsync -a submodules/$1/ proto
 }
 
+copy protobuf proto
+copy googleapis proto
+copy cosmos-proto/proto proto
+copy cosmos-sdk/proto proto
 copy wasmd/proto proto
-copy wasmd/third_party/proto proto
 copy secret/proto proto
 
 function gen_proto() {
