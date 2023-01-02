@@ -30,5 +30,7 @@ gen_proto cosmwasm
 gen_proto secret
 
 find lib -name '*.ts' | xargs -n 1 perl -i -pe 's/import _m0 from/import * as _m0 from/g'
+find lib -name '*.ts' | xargs -n 1 perl -i -pe 's/\@improbable-eng\/grpc-web/\@solar-republic\/grpc-web/g'
+find lib -name '*.ts' | xargs -n 1 perl -i -pe 's/"browser-headers"/"\@solar-republic\/js-browser-headers"/g'
 
 tsc
