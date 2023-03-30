@@ -10,9 +10,7 @@
   "scripts": {
     "clean": "rm -rf dist lib proto",
     "build": "./build.sh",
-    "bazel": "bazelisk",
-    "grpc:client": "bazel run :client",
-    "grpc:server": "bazel run :server"
+    "rebuild": "yarn clean && yarn build"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.8.13",

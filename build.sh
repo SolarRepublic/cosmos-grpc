@@ -2,15 +2,17 @@
 mkdir -p proto
 
 function copy() {
-	rsync -a submodules/$1/ proto
+	dst=${2:-proto}
+	rsync -a submodules/$1/ $dst
 }
 
-copy protobuf proto
-copy googleapis proto
-copy cosmos-proto/proto proto
-copy cosmos-sdk/proto proto
-copy wasmd/proto proto
-copy secret/proto proto
+copy protobuf
+copy googleapis
+copy cosmos-proto/proto
+copy cosmos-sdk/proto
+copy wasmd/proto
+copy secret/third_party/proto/cosmos proto/cosmos
+copy secret/proto
 
 function gen_proto() {
 	dir=$1
