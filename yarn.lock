@@ -47,10 +47,10 @@
   dependencies:
     bn.js "^5.2.0"
 
-"@grpc/grpc-js@^1.8.0":
-  version "1.8.0"
-  resolved "https://registry.yarnpkg.com/@grpc/grpc-js/-/grpc-js-1.8.0.tgz#ebfbeff2b76e2991f2831e46cad27fa573396555"
-  integrity sha512-ySMTXQuMvvswoobvN+0LsaPf7ITO2JVfJmHxQKI4cGehNrrUms+n81BlHEX7Hl/LExji6XE3fnI9U04GSkRruA==
+"@grpc/grpc-js@^1.8.13":
+  version "1.8.13"
+  resolved "https://registry.yarnpkg.com/@grpc/grpc-js/-/grpc-js-1.8.13.tgz#e775685962909b76f8d4b813833c3d123867165b"
+  integrity sha512-iY3jsdfbc0ARoCLFvbvUB8optgyb0r1XLPb142u+QtgBcKJYkCIFt3Fd/881KqjLYWjsBJF57N3b8Eop9NDfUA==
   dependencies:
     "@grpc/proto-loader" "^0.7.0"
     "@types/node" ">=12.12.47"
@@ -180,17 +180,17 @@
   resolved "https://registry.yarnpkg.com/@sinonjs/text-encoding/-/text-encoding-0.7.2.tgz#5981a8db18b56ba38ef0efb7d995b12aa7b51918"
   integrity sha512-sXXKG+uL9IrKqViTtao2Ws6dy0znu9sOaP1di/jKGW1M6VssO8vlpXCQcpZ+jisQ1tTFAC5Jo/EOzFbggBagFQ==
 
-"@solar-republic/grpc-web@^0.15.0-fix.1":
-  version "0.15.0-fix.1"
-  resolved "https://registry.yarnpkg.com/@solar-republic/grpc-web/-/grpc-web-0.15.0-fix.1.tgz#f32210b7bf42cc134a20d328404369433d1fe98b"
-  integrity sha512-wrv8cYhwWzun+jYGSzrIuktD/ggEqLgcgVshy3JA1RIsT1p58w1/qewriH/YHiObWZYwwIo1Iesn1n0Nad0/9A==
+"@solar-republic/grpc-web@^0.15.0-fix.3":
+  version "0.15.0-fix.3"
+  resolved "https://registry.yarnpkg.com/@solar-republic/grpc-web/-/grpc-web-0.15.0-fix.3.tgz#ecb1325bc3d65c492cc74a474de29e2307ba5e80"
+  integrity sha512-x4MW3Ge6GgSr+dnhvakPZW0aD+ttD3rT2FidOEb6n4wRrODbbYY3Nmvry8gpmJQFJ+jHU81ik7ZlvP1NBr8SUg==
   dependencies:
-    "@solar-republic/js-browser-headers" "^0.4.2-fix.2"
+    "@solar-republic/js-browser-headers" "^0.4.2-fix.6"
 
-"@solar-republic/js-browser-headers@^0.4.2-fix.2":
-  version "0.4.2-fix.2"
-  resolved "https://registry.yarnpkg.com/@solar-republic/js-browser-headers/-/js-browser-headers-0.4.2-fix.2.tgz#6872b148c9bb8e1c72785faf26ed4e19703af4c2"
-  integrity sha512-pTUDNLA+iBispqwkmHr3XOgKkdeYUSDUEjKC0WFIcRAxMteC1fKkRp5QUDbpNRTEGffm8YdqjUvWoTQ9wddf8w==
+"@solar-republic/js-browser-headers@^0.4.2-fix.6":
+  version "0.4.2-fix.6"
+  resolved "https://registry.yarnpkg.com/@solar-republic/js-browser-headers/-/js-browser-headers-0.4.2-fix.6.tgz#724b574a458812dafe3dc9649a4c3814eaec179e"
+  integrity sha512-R3PO5zfhzIij7rlCFqKVp8IEYpQxyjVP7T4PJ1TmIlLFde9uybGd4cKqRacty6tRFa2PUr/x1lFuuh1faNTCAA==
 
 "@types/google-protobuf@^3.15.6":
   version "3.15.6"
@@ -217,10 +217,10 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-18.11.9.tgz#02d013de7058cea16d36168ef2fc653464cfbad4"
   integrity sha512-CRpX21/kGdzjOpFsZSkcrXMGIBWMGNIHXXBVFSH+ggkftxg+XYP20TESbh+zFvFj3EQOl5byk0HTRn1IL6hbqg==
 
-"@types/node@^18.11.18":
-  version "18.11.18"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.11.18.tgz#8dfb97f0da23c2293e554c5a50d61ef134d7697f"
-  integrity sha512-DHQpWGjyQKSHj3ebjFI/wRKcqQcdR+MoFBygntYOZytCqNfkd2ZC4ARDJ2DQqhjH5p85Nnd3jhUJIXrszFX/JA==
+"@types/node@^18.15.11":
+  version "18.15.11"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.15.11.tgz#b3b790f09cb1696cffcec605de025b088fa4225f"
+  integrity sha512-E5Kwq2n4SbMzQOn6wnmBjuK9ouqlURrcZDVfbo9ftDDTFt3nk7ZKK4GMOzoYgnpQJKcxwQw+lGaBvvlMo0qN/Q==
 
 "@types/object-hash@^1.3.0":
   version "1.3.4"
@@ -641,7 +641,7 @@ protobufjs@6.11.3, protobufjs@^6.11.3, protobufjs@^6.8.8:
     "@types/node" ">=13.7.0"
     long "^4.0.0"
 
-protobufjs@^7.0.0, protobufjs@^7.1.2:
+protobufjs@^7.0.0:
   version "7.1.2"
   resolved "https://registry.yarnpkg.com/protobufjs/-/protobufjs-7.1.2.tgz#a0cf6aeaf82f5625bffcf5a38b7cd2a7de05890c"
   integrity sha512-4ZPTPkXCdel3+L81yw3dG6+Kq3umdWKh7Dc7GW/CpNk4SX3hK58iPCWeCyhVTDrbkNeKrYNZ7EojM5WDaEWTLQ==
@@ -659,10 +659,28 @@ protobufjs@^7.0.0, protobufjs@^7.1.2:
     "@types/node" ">=13.7.0"
     long "^5.0.0"
 
-protoc-gen-ts@^0.8.5:
-  version "0.8.5"
-  resolved "https://registry.yarnpkg.com/protoc-gen-ts/-/protoc-gen-ts-0.8.5.tgz#5c277ff90b6b38f52313b1b0ad69e6c825305b29"
-  integrity sha512-LHZ+w/+DqmdgnhPtShgqtPtdv+hJ9bAXEIqNU0kkY2bPcCVIEWz5seOv20FCw6gbKorriTGP8xgz2RsIcrRvVw==
+protobufjs@^7.2.3:
+  version "7.2.3"
+  resolved "https://registry.yarnpkg.com/protobufjs/-/protobufjs-7.2.3.tgz#01af019e40d9c6133c49acbb3ff9e30f4f0f70b2"
+  integrity sha512-TtpvOqwB5Gdz/PQmOjgsrGH1nHjAQVCN7JG4A6r1sXRWESL5rNMAiRcBQlCAdKxZcAbstExQePYG8xof/JVRgg==
+  dependencies:
+    "@protobufjs/aspromise" "^1.1.2"
+    "@protobufjs/base64" "^1.1.2"
+    "@protobufjs/codegen" "^2.0.4"
+    "@protobufjs/eventemitter" "^1.1.0"
+    "@protobufjs/fetch" "^1.1.0"
+    "@protobufjs/float" "^1.0.2"
+    "@protobufjs/inquire" "^1.1.0"
+    "@protobufjs/path" "^1.1.2"
+    "@protobufjs/pool" "^1.1.0"
+    "@protobufjs/utf8" "^1.1.0"
+    "@types/node" ">=13.7.0"
+    long "^5.0.0"
+
+protoc-gen-ts@^0.8.6:
+  version "0.8.6"
+  resolved "https://registry.yarnpkg.com/protoc-gen-ts/-/protoc-gen-ts-0.8.6.tgz#e789a6fc3fbe09bdc119acecc349b9554ec5940e"
+  integrity sha512-66oeorGy4QBvYjQGd/gaeOYyFqKyRmRgTpofmnw8buMG0P7A0jQjoKSvKJz5h5tNUaVkIzvGBUTRVGakrhhwpA==
 
 randombytes@^2.0.1:
   version "2.1.0"
@@ -708,10 +726,10 @@ safe-buffer@^5.0.1, safe-buffer@^5.1.0, safe-buffer@^5.1.2, safe-buffer@^5.2.0, 
   resolved "https://registry.yarnpkg.com/safe-buffer/-/safe-buffer-5.2.1.tgz#1eaf9fa9bdb1fdd4ec75f58f9cdb4e6b7827eec6"
   integrity sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==
 
-secretjs@^1.6.6:
-  version "1.6.6"
-  resolved "https://registry.yarnpkg.com/secretjs/-/secretjs-1.6.6.tgz#7369fe9d8c619f4d8f5e39c62701272b31a90a4e"
-  integrity sha512-CHS1xhdvQKpnXO0889RMDKS0jJ66pfIYj3wUGEdbcfFE2FHMHt5qIi13oFSH08AW07q+iwDVXBKeBDTq6zYwxA==
+secretjs@^1.8.1:
+  version "1.8.1"
+  resolved "https://registry.yarnpkg.com/secretjs/-/secretjs-1.8.1.tgz#0f9b054c8a2f55567be2566c482e06b9e15bd4c9"
+  integrity sha512-Yx+iPE5EkOPpP1cwHhVso+8A+3v34qGVWLi5uHps8nJFPa60n3h/QI0NAnn4OmXcQ24s287mYUdVzLZiAemq1w==
   dependencies:
     "@cosmjs/encoding" "0.27.1"
     "@cosmjs/math" "0.27.1"
@@ -821,33 +839,33 @@ tr46@~0.0.3:
   resolved "https://registry.yarnpkg.com/tr46/-/tr46-0.0.3.tgz#8184fd347dac9cdc185992f3a6622e14b9d9ab6a"
   integrity sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==
 
-ts-poet@^6.2.0:
-  version "6.3.0"
-  resolved "https://registry.yarnpkg.com/ts-poet/-/ts-poet-6.3.0.tgz#954f2a6923ccaa2d4cdf55979f2e991d440e30a3"
-  integrity sha512-RjS37SnXMa9En8xvQf//+rvNNNCB7x2TKP/ZfsiQFidtfN3A6FYgPDESe4r7YA3F663XO2ozx+2buQItGOLMxg==
+ts-poet@^6.4.1:
+  version "6.4.1"
+  resolved "https://registry.yarnpkg.com/ts-poet/-/ts-poet-6.4.1.tgz#e68d314a07cf9c0d568a3bfd87023ec91ff77964"
+  integrity sha512-AjZEs4h2w4sDfwpHMxQKHrTlNh2wRbM5NRXmLz0RiH+yPGtSQFbe9hBpNocU8vqVNgfh0BIOiXR80xDz3kKxUQ==
   dependencies:
     dprint-node "^1.0.7"
 
-ts-proto-descriptors@1.7.1:
-  version "1.7.1"
-  resolved "https://registry.yarnpkg.com/ts-proto-descriptors/-/ts-proto-descriptors-1.7.1.tgz#685d00305b06adfa929fd5a016a419382cd64c50"
-  integrity sha512-oIKUh3K4Xts4v29USGLfUG+2mEk32MsqpgZAOUyUlkrcIdv34yE+k2oZ2Nzngm6cV/JgFdOxRCqeyvmWHuYAyw==
+ts-proto-descriptors@1.8.0:
+  version "1.8.0"
+  resolved "https://registry.yarnpkg.com/ts-proto-descriptors/-/ts-proto-descriptors-1.8.0.tgz#ba4a26c156a77f76c68d7dac0d049bd2aa3f0920"
+  integrity sha512-iV20plcI8+GRkeZIAygxOOH0p2xpOsKfw9kI1W20NCwawi1/4bG/YRd9rQY9XSJP+lD9j7XbSy3tFFuikfsljw==
   dependencies:
     long "^4.0.0"
     protobufjs "^6.8.8"
 
-ts-proto@^1.137.0:
-  version "1.137.0"
-  resolved "https://registry.yarnpkg.com/ts-proto/-/ts-proto-1.137.0.tgz#505d8df002a6898c7ed1d80ca51e3b47a5af31f8"
-  integrity sha512-9+j/Z8DdnVGIyFHxg35nmVYx1dnY8Ig5zYKpvRRQphjTch7i2sPYDEmITkPC2KFNTFCezLX0xzKTelomrek9xw==
+ts-proto@^1.145.0:
+  version "1.145.0"
+  resolved "https://registry.yarnpkg.com/ts-proto/-/ts-proto-1.145.0.tgz#569a7709a06a6533ff1af05eb1dd936038bc8e22"
+  integrity sha512-th0T5BN8Ytl//6L5ea5nbxtlcGQaqPP9MVm0lxT+t1Mn3Np0g/GMR1VUiOwZhtAo5N7xfuaX4AppWELR5rCF7g==
   dependencies:
     "@types/object-hash" "^1.3.0"
     case-anything "^2.1.10"
     dataloader "^1.4.0"
     object-hash "^1.3.1"
     protobufjs "^6.11.3"
-    ts-poet "^6.2.0"
-    ts-proto-descriptors "1.7.1"
+    ts-poet "^6.4.1"
+    ts-proto-descriptors "1.8.0"
 
 tslib@^1.8.1:
   version "1.14.1"
@@ -871,10 +889,10 @@ typeforce@^1.11.5:
   resolved "https://registry.yarnpkg.com/typeforce/-/typeforce-1.18.0.tgz#d7416a2c5845e085034d70fcc5b6cc4a90edbfdc"
   integrity sha512-7uc1O8h1M1g0rArakJdf0uLRSSgFcYexrVoKo+bzJd32gd4gDy2L/Z+8/FjPnU9ydY3pEnVPtr9FyscYY60K1g==
 
-typescript@^4.9.4:
-  version "4.9.4"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.9.4.tgz#a2a3d2756c079abda241d75f149df9d561091e78"
-  integrity sha512-Uz+dTXYzxXXbsFpM86Wh3dKCxrQqUcVMxwU54orwlJjOpO3ao8L7j5lH+dWfTwgCwIuM9GQ2kvVotzYJMXTBZg==
+typescript@^5.0.3:
+  version "5.0.3"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.0.3.tgz#fe976f0c826a88d0a382007681cbb2da44afdedf"
+  integrity sha512-xv8mOEDnigb/tN9PSMTwSEqAnUvkoXMQlicOb0IUVDBSQCgBSaAAROUZYy2IcUy5qU6XajK5jjjO7TMWqBTKZA==
 
 util-deprecate@^1.0.1:
   version "1.0.2"

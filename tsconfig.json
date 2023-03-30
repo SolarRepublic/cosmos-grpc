@@ -14,6 +14,8 @@
 		// ensure consistent build outputs for code hashes
 		"newLine": "lf",
 
+		"disableSizeLimit": true,
+
 		"forceConsistentCasingInFileNames": true,
 		"strict": true,
 		"useUnknownInCatchVariables": false,

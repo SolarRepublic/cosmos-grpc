@@ -1,6 +1,6 @@
 {
   "name": "@solar-republic/cosmos-grpc",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "main": "dist/main.js",
   "files": [
     "dist/"
@@ -15,21 +15,21 @@
     "grpc:server": "bazel run :server"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.8.0",
+    "@grpc/grpc-js": "^1.8.13",
     "add": "^2.0.6",
     "google-protobuf": "^3.21.2",
-    "protobufjs": "^7.1.2",
-    "protoc-gen-ts": "^0.8.5",
-    "secretjs": "^1.6.6"
+    "protobufjs": "^7.2.3",
+    "protoc-gen-ts": "^0.8.6",
+    "secretjs": "^1.8.1"
   },
   "devDependencies": {
     "@bazel/bazelisk": "^1.12.1",
     "@bazel/typescript": "^5.7.3",
-    "@solar-republic/grpc-web": "^0.15.0-fix.1",
+    "@solar-republic/grpc-web": "^0.15.0-fix.3",
     "@types/google-protobuf": "^3.15.6",
-    "@types/node": "^18.11.18",
+    "@types/node": "^18.15.11",
     "grpc-web": "^1.4.2",
-    "ts-proto": "^1.137.0",
-    "typescript": "^4.9.4"
+    "ts-proto": "^1.145.0",
+    "typescript": "^5.0.3"
   }
 }
