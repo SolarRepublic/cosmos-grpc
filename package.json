@@ -1,33 +1,51 @@
 {
   "name": "@solar-republic/cosmos-grpc",
   "version": "0.6.3",
+  "type": "module",
   "main": "dist/main.js",
   "files": [
     "dist/"
   ],
+  "bin": {
+    "protoc-gen-secret": "./build/gen.js"
+  },
   "author": "Blake Regalia <blake.regalia@gmail.com>",
   "license": "MIT",
   "scripts": {
     "clean": "rm -rf dist lib proto",
     "build": "./build.sh",
-    "rebuild": "yarn clean && yarn build"
+    "rebuild": "yarn clean && yarn build",
+    "build-plugin": "tsc && chmod u+x ./build/gen.js && yarn tsc-esm-fix --target=build",
+    "run-plugin": "./run-plugin.sh",
+    "debug-plugin": "yarn build-plugin && yarn run-plugin"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.8.13",
+    "@grpc/grpc-js": "^1.9.5",
     "add": "^2.0.6",
     "google-protobuf": "^3.21.2",
-    "protobufjs": "^7.2.3",
-    "protoc-gen-ts": "^0.8.6",
-    "secretjs": "^1.8.1"
+    "protobufjs": "^7.2.5",
+    "protoc-gen-ts": "^0.8.7",
+    "secretjs": "^1.11.1"
   },
   "devDependencies": {
-    "@bazel/bazelisk": "^1.12.1",
+    "@bazel/bazelisk": "^1.18.0",
     "@bazel/typescript": "^5.7.3",
+    "@blake.regalia/belt": "^0.16.1",
+    "@blake.regalia/eslint-config-elite": "^0.3.3",
+    "@blake.regalia/tsconfig": "^0.1.2",
     "@solar-republic/grpc-web": "^0.15.0-fix.3",
-    "@types/google-protobuf": "^3.15.6",
-    "@types/node": "^18.15.11",
+    "@types/google-protobuf": "^3.15.7",
+    "@types/node": "^20.8.6",
+    "@types/protoc-plugin": "^0.0.2",
+    "@typescript-eslint/parser": "^6.7.5",
+    "eslint": "^8.51.0",
     "grpc-web": "^1.4.2",
-    "ts-proto": "^1.145.0",
-    "typescript": "^5.0.3"
+    "protoc-plugin": "^0.0.6",
+    "ts-morph": "^20.0.0",
+    "ts-node": "^10.9.1",
+    "ts-proto": "^1.162.1",
+    "ts-toolbelt": "^9.6.0",
+    "tsc-esm-fix": "^2.20.17",
+    "typescript": "^5.2.2"
   }
 }
