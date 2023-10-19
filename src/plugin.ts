@@ -11,6 +11,7 @@ import pluginPb from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 import '../lib/annotations/gogoproto/gogo_pb.cjs';
 import '../lib/annotations/google/api/annotations_pb.cjs';
 import '../lib/annotations/cosmos_proto/cosmos_pb.cjs';
+import '../lib/annotations/amino/amino_pb.cjs';
 
 const {
 	CodeGeneratorRequest,
@@ -80,14 +81,14 @@ export const plugin = async(
  * [6, s, 2, r] - rpc comments in service
  */
 export const findCommentByPath = (
-	a_path: [4 | 5 | 6, number] | [4 | 5 | 6, number, 2, number],
+	a_path: number[],
 	g_proto: FileDescriptorProto.AsObject
 ) => ((g_proto.sourceCodeInfo?.locationList || []).filter((g_loc) => {
 	if(g_loc.pathList.length !== a_path.length) return false;
 	let b_ans = true;
 
-	for(const i in a_path) {
-		b_ans = b_ans && a_path[i] === g_loc.pathList[i];
+	for(let i_path=0; i_path<a_path.length; i_path++) {
+		b_ans = b_ans && a_path[i_path] === g_loc.pathList[i_path];
 	}
 
 	return b_ans;

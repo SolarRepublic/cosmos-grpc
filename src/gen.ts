@@ -4,9 +4,10 @@ import type {O} from 'ts-toolbelt';
 
 import type {MethodOptionsWithCosmosExtension, MethodOptionsWithHttp} from './env';
 
+import type {AugmentedDescriptor, RpcImplementor} from './rpc-impl';
 import type {Dict} from '@blake.regalia/belt';
 
-import type {MessageOptions, MethodDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
+import type {DescriptorProto, FileDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 
 import type {Statement} from 'typescript';
 
@@ -15,6 +16,32 @@ import {__UNDEFINED, ode, oderac} from '@blake.regalia/belt';
 import {NeutrinoImpl} from './impl-neutrino';
 import {findCommentByPath, plugin} from './plugin';
 import {importModule, print} from './ts-factory';
+
+const capture_messages = (
+	k_impl: RpcImplementor,
+	g_proto: FileDescriptorProto.AsObject,
+	sr_package: string,
+	a_path: number[]=[]
+) => (g_msg: DescriptorProto.AsObject, i_msg: number) => {
+	// skip anonymous
+	const si_msg = g_msg.name;
+	if(!si_msg) return;
+
+	const p_msg = `${sr_package}.${si_msg}`;
+
+	// append to path
+	const a_local = [...a_path, 4, i_msg];
+
+	// save to global lookup
+	k_impl.msg(p_msg, Object.assign(g_msg, {
+		source: g_proto,
+		index: i_msg,
+		comments: findCommentByPath(a_local, g_proto),
+	}));
+
+	// capture nested types
+	g_msg.nestedTypeList.forEach(capture_messages(k_impl, g_proto, p_msg, a_local));
+};
 
 void plugin((a_protos, h_inputs) => {
 	// new impl
@@ -29,18 +56,7 @@ void plugin((a_protos, h_inputs) => {
 		if(!si_package) continue;
 
 		// each message type
-		g_proto.messageTypeList.forEach((g_msg, i_msg) => {
-			// skip anonymous
-			const si_msg = g_msg.name;
-			if(!si_msg) return;
-
-			// save to global lookup
-			k_impl.msg(`.${si_package}.${si_msg}`, Object.assign(g_msg, {
-				source: g_proto,
-				index: i_msg,
-				comments: findCommentByPath([4, i_msg], g_proto),
-			}));
-		});
+		g_proto.messageTypeList.forEach(capture_messages(k_impl, g_proto, '.'+si_package));
 
 		// each enum
 		g_proto.enumTypeList.forEach((g_enum, i_enum) => {
@@ -57,6 +73,9 @@ void plugin((a_protos, h_inputs) => {
 		});
 	}
 
+	// global queue of outputs gathered from service response types
+	const a_decoders: AugmentedDescriptor[] = [];
+
 	// each proto file
 	for(const g_proto of a_protos) {
 		const a_methods = k_impl.file();
@@ -70,6 +89,7 @@ void plugin((a_protos, h_inputs) => {
 		let s_version = '';
 		let s_purpose = '';
 
+		// determine separation between parts
 		for(let i_part=2; i_part<a_path.length-1; i_part++) {
 			const s_part = a_path[i_part];
 
@@ -83,10 +103,6 @@ void plugin((a_protos, h_inputs) => {
 			// part of module
 			si_module += '/'+s_part;
 		}
-
-
-		// // e.g., 'queryCompute'
-		// const si_group_prefix = a_path[3] + proper(a_path[1]);
 
 		// services
 		g_proto.serviceList.forEach((g_service, i_service) => {
@@ -137,7 +153,12 @@ void plugin((a_protos, h_inputs) => {
 				}
 				// otherwise, create encoder/decoder
 				else {
-					// k_impl.encoderDecoder();
+					k_impl.msgEncoder(g_method, g_input, g_output);
+
+					// add decoder to queue
+					if(g_output.fieldList.length) {
+						a_decoders.push(g_output);
+					}
 				}
 			});
 		});
@@ -153,17 +174,12 @@ void plugin((a_protos, h_inputs) => {
 
 			// implements interface; generate 'any' encoder
 			if(g_opts?.implementsInterfaceList) {
-				a_encoders.push(k_impl.encoderDecoder(g_msg)!);
+				a_encoders.push(k_impl.anyEncoder(g_msg)!);
 			}
 		});
 
-		if(a_encoders.length) {
-			const sx_encoders = a_encoders.map(w => print(w)).join('\n\n');
-			console.warn(sx_encoders);
-			debugger;
-		}
 
-		if(a_methods.length) {
+		if(a_methods.length + a_encoders.length) {
 			// create file
 			const a_parts = [
 				`/*
@@ -192,10 +208,17 @@ void plugin((a_protos, h_inputs) => {
 				].map(print),
 				...k_impl.lines(),
 				...a_methods,
+				...a_encoders.map(yn => print(yn)),
 			];
 
 			const si_file = s_purpose.split('.')[0]+'/'+si_module.replace(/\//g, '_')+'.ts';
 			const sx_contents = a_parts.join('\n\n');
+
+			// if(a_encoders.length) {
+			// 	// const sx_encoders = a_encoders.map(w => print(w)).join('\n\n');
+			// 	console.warn(sx_contents);
+			// 	debugger;
+			// }
 
 			// file already in output; merge contents
 			if(si_file in h_outputs) {
@@ -212,6 +235,17 @@ void plugin((a_protos, h_inputs) => {
 		}
 	}
 
+	// build decoder file
+	const a_lines_decoder: string[] = [];
+	for(const g_output of a_decoders) {
+		const yn_decoder = k_impl.msgDecoder(g_output);
+
+		if(yn_decoder) {
+			a_lines_decoder.push(print(yn_decoder));
+		}
+	}
+
+	console.warn(a_lines_decoder.join('\n\n'));
 
 	debugger;
 

@@ -4,10 +4,10 @@ import type {RpcImplementor} from './rpc-impl';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
 
-import {__UNDEFINED, snake} from '@blake.regalia/belt';
+import {__UNDEFINED, snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {access, arrayLit, call, castAs, ident, ternary, type, typeRef} from './ts-factory';
+import {access, arrayLit, call, castAs, ident, ternary, type, typeRef, union} from './ts-factory';
 
 // destructure members from protobuf
 const {
@@ -19,18 +19,23 @@ const {
 export type TsThingBare = {
 	name: string;
 	type: TypeNode;
+
+	proto_name?: string;
+	proto_type?: TypeNode;
+
 	to_wire?: Expression;
 	from_wire?: (yn_expr: Expression) => Expression;
+
 	write?: string;
-	// encode_type?: TypeNode;
 	to_proto?: Expression;
+
+	nests?: boolean;  // the field uses some other message for its type (for decoding)
 };
 
 export type TsThing = O.Compulsory<TsThingBare> & {
 	field: FieldDescriptorProto.AsObject;
 	id: Identifier;
 	optional: boolean;
-	to_proto?: Expression;
 };
 
 const route_not_impl = (si_field: string) => {
@@ -50,6 +55,51 @@ const A_SEMANTIC_ACCOUNT = [
 	'granter',
 	'grantee',
 ];
+
+const temporal = (g_field: FieldDescriptorProto.AsObject, k_impl: RpcImplementor): Partial<TsThingBare> => {
+	const s_ident = `xt_${snake(g_field.name!)}`;
+	return {
+		name: s_ident,
+		type: type('number'),
+		to_proto: call('timestamp', __UNDEFINED, [ident(s_ident)]),
+		write: 'b',
+	};
+};
+
+// special overrides
+const H_OVERRIDE_MIXINS: Dict<(g_field: FieldDescriptorProto.AsObject, k_impl: RpcImplementor) => Partial<TsThingBare> | undefined> = {
+	// Coin
+	'.cosmos.base.v1beta1.Coin'(g_field, k_impl) {
+		const s_ident = `a_${snake(g_field.name!)}`;
+		return {
+			name: s_ident,
+			type: k_impl.importType('../_core', 'SlimCoin'),
+			to_proto: call('coin', __UNDEFINED, [ident(s_ident)]),
+			write: 'b',
+		};
+	},
+
+	// Timestamp
+	'.google.protobuf.Timestamp': temporal,
+
+	// Duration
+	'.google.protobuf.Duration': temporal,
+
+	// Any
+	'.google.protobuf.Any'(g_field, k_impl) {
+		const g_opts = g_field.options as {acceptsInterface?: string} | undefined;
+		if(g_opts?.acceptsInterface) {
+			return {
+				name: `atu8_${g_field.name!}`,
+				// type: union(g_opts.acceptsInterfaceList.map(si => k_impl.importType('../type/_interfaces.ts', `Any${si}`))),
+				type: k_impl.importType('../type/_interfaces.ts', `Any${g_opts.acceptsInterface}`),
+				write: 'b',
+			};
+		}
+
+		return {};
+	},
+};
 
 // field transformers
 export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
@@ -142,6 +192,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		return {
 			name: `sc_${snake(si_field)}`,
 			type: k_impl.importType(`../types/${sr_path}`, si_ref),
+			nests: true,
 		};
 	},
 
@@ -153,27 +204,16 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		// extract type reference ident
 		const si_ref = g_field.typeName!.split('.').at(-1)!;
 
-		// special override
-		let g_mix = {};
-		if('.cosmos.base.v1beta1.Coin' === g_field.typeName) {
-			const s_ident = `a_${snake(si_field)}`;
-			g_mix = {
-				name: s_ident,
-				type: k_impl.importType('../_core', 'SlimCoin'),
-				to_proto: call('coin', __UNDEFINED, [ident(s_ident)]),
-				// from_wire: yn_data => arrayLit([
-				// 	access(s_ident, ''),
-				// ]),
-				write: 'b',
-			};
-		}
-
 		// construct ts field
 		return {
 			name: `g_${snake(si_field)}`,
 			type: k_impl.importType(`../types/${sr_path}`, si_ref),
-			write: 'v',
-			...g_mix,
+			write: 'b',
+			nests: true,
+			...H_OVERRIDE_MIXINS[g_field.typeName!]?.(g_field, k_impl) || {
+				proto_name: `atu8_${snake(si_field)}`,
+				proto_type: k_impl.importType(`./${sr_path}`, `Any${si_ref}`),
+			},
 		};
 	},
 
@@ -196,3 +236,15 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		};
 	},
 });
+
+export const H_FIELD_TYPE_TO_HUMAN_READABLE: Dict = {
+	[H_FIELD_TYPES.TYPE_BOOL]: 'boolean',
+	[H_FIELD_TYPES.TYPE_BYTES]: 'bytes',
+	[H_FIELD_TYPES.TYPE_INT32]: 'int32',
+	[H_FIELD_TYPES.TYPE_INT64]: 'int32',
+	[H_FIELD_TYPES.TYPE_UINT32]: 'uint32',
+	[H_FIELD_TYPES.TYPE_UINT64]: 'uint64',
+	[H_FIELD_TYPES.TYPE_STRING]: 'string',
+};
+
+export {H_FIELD_TYPES};

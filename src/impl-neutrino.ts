@@ -2,24 +2,28 @@ import type {O} from 'ts-toolbelt';
 
 import type {TsThing} from './common';
 import type {MethodOptionsWithCosmosExtension, MethodOptionsWithHttp} from './env';
-import type {MethodDescriptorProto, DescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
-import type {SourceFile as MorphSourceFile} from 'ts-morph';
 
-import type {Statement, TypeNode, Expression} from 'typescript';
+import type {MethodDescriptorProto, DescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
+import type {Statement, TypeNode, Expression, ParameterDeclaration, CallExpression, ArrayBindingElement, ConciseBody} from 'typescript';
 
 import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from '@blake.regalia/belt';
+import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
 import {ts} from 'ts-morph';
 
-import {field_router} from './common';
+import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router} from './common';
 import {findCommentByPath} from './plugin';
 import {RpcImplementor, type AugmentedDescriptor} from './rpc-impl';
-import {access, arrow, call, declareConst, ident, numericLit, objectLit, param, print, string, tuple, y_factory} from './ts-factory';
+import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, block, call, castAs, declareConst, doReturn, ident, importModule, intersection, numericLit, objectLit, param, print, string, tuple, typeRef, union, y_factory} from './ts-factory';
 
 type ReturnThing = {
 	type: TypeNode;
 	parser: Expression | null;
 	things: TsThing[];
 };
+
+const {
+	FieldDescriptorProto,
+} = pb;
 
 const {
 	SyntaxKind,
@@ -29,6 +33,7 @@ export class NeutrinoImpl extends RpcImplementor {
 	protected _si_const = '';
 	protected _s_path_prefix = '';
 	protected _h_consts: Dict<Statement> = {};
+	protected _a_lines: string[] = [];
 
 	constructor() {
 		super();
@@ -38,11 +43,13 @@ export class NeutrinoImpl extends RpcImplementor {
 
 	protected override _reset(): void {
 		this._h_consts = {};
+		this._a_lines = [];
 	}
 
 	lines(): string[] {
 		return [
 			...this.imports(),
+			...this._a_lines,
 			...oderac(this._h_consts, (si_const, yn_const) => print(yn_const)),
 		];
 	}
@@ -327,39 +334,185 @@ export class NeutrinoImpl extends RpcImplementor {
 		);
 	}
 
+	encodeParams(g_msg: DescriptorProto.AsObject): [ParameterDeclaration[], Expression] {
+		// instantiate writer
+		let yn_chain = call('Protobuf', __UNDEFINED, [], '...');
 
-	encoderDecoder(
+		// create params from fields
+		const a_params_required: ParameterDeclaration[]= [];
+		const a_params_optional: ParameterDeclaration[] = [];
+		g_msg.fieldList.forEach((g_field, i_field) => {
+			// convert field to thing
+			const g_thing = this.route(g_field);
+
+			// prep args
+			const a_args: Expression[] = [g_thing.to_proto];
+
+			// add optional field id
+			const i_number = g_field.number;
+			if('number' === typeof i_number && i_number !== i_field+1) {
+				a_args.push(numericLit(i_number));
+			}
+
+			// add to chain
+			const s_comment_type = g_field.typeName?.split('.').at(-1)
+				|| H_FIELD_TYPE_TO_HUMAN_READABLE[g_field.type!] || 'unknown';
+
+			yn_chain = call(
+				access(yn_chain, g_thing.write),
+				__UNDEFINED,
+				a_args,
+				`${s_comment_type}${FieldDescriptorProto.Label.LABEL_REPEATED === g_field.label? '[]': ''} ${g_field.name} = ${g_field.number}`
+			);
+
+			// create parameter
+			const yn_param = param(ident(g_thing.proto_name), g_thing.proto_type, g_thing.optional);
+
+			// add to optional/required depending on which one
+			if(g_thing.optional) {
+				a_params_optional.push(yn_param);
+			}
+			else {
+				a_params_required.push(yn_param);
+			}
+		});
+
+		return [[
+			...a_params_required,
+			...a_params_optional,
+		], access(yn_chain, 'o')];
+	}
+
+	anyEncoder(
 		g_msg: DescriptorProto.AsObject
 	) {
-		// instantiate writer
-		let yn_chain = call('Protobuf', __UNDEFINED, []);
-
 		// implements interface
 		const g_opts = g_msg.options as MethodOptionsWithCosmosExtension;
 		if(g_opts.implementsInterfaceList) {
-			// create params from fields
-			const a_params = g_msg.fieldList.map((g_field, i_field) => {
-				const g_thing = this.route(g_field);
+			// prep unique type
+			const si_singleton = `Any${g_msg.name}`;
 
-				const a_args: Expression[] = [g_thing.to_proto];
+			// declare unique type
+			const yn_type = y_factory.createTypeAliasDeclaration([
+				y_factory.createToken(SyntaxKind.ExportKeyword),
+			], ident(si_singleton), __UNDEFINED, this.importType('../_core', 'ImplementsInterfaces', [
+				union([
+					string(g_msg.name!),
+					...g_opts.implementsInterfaceList.map(si_interface => string(si_interface)),
+				].map(yn => y_factory.createLiteralTypeNode(yn))),
+			]));
 
-				const i_number = g_field.number;
-				if('number' === typeof i_number && i_number !== i_field+1) {
-					a_args.push(numericLit(i_number));
-				}
+			// add to preamble
+			this._a_lines.push(print(yn_type));
 
-				// add to chain
-				yn_chain = call(access(yn_chain, g_thing.write), __UNDEFINED, a_args);
-
-				// create parameter
-				return param(g_thing.id, g_thing.type, g_thing.optional);
-			});
+			// encode params and build chain
+			const [a_params, yn_chain] = this.encodeParams(g_msg);
 
 			// construct call chain
-			const yn_writer = arrow(a_params, access(yn_chain, 'o'));
+			const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)));
 
 			// create statement
-			return declareConst(`write${g_msg.name!}`, yn_writer, true);
+			return declareConst(`any${g_msg.name!}`, yn_writer, true);
 		}
+	}
+
+	msgEncoder(
+		g_method: MethodDescriptorProto.AsObject,
+		g_input: AugmentedDescriptor,
+		g_output: AugmentedDescriptor
+	) {
+		const g_opts = g_method.options;
+
+			// encode params and build chain
+		const [a_params, yn_chain] = this.encodeParams(g_input);
+
+		// prep unique type
+		const si_singleton = `Msg${g_method.name}`;
+
+		// declare unique type
+		const yn_type = y_factory.createTypeAliasDeclaration([
+			y_factory.createToken(SyntaxKind.ExportKeyword),
+		], ident(si_singleton), __UNDEFINED, typeRef(si_singleton));
+
+		// add type decl to preamble
+		this._a_lines.push(print(yn_type));
+
+		// construct call chain
+		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)));
+
+		// create statement
+		const yn_const = declareConst(`msg${g_method.name!}`, yn_writer, true);
+
+
+		return yn_const;
+	}
+
+	// 
+	msgDecoder(g_msg: AugmentedDescriptor) {
+		let b_monotonic = true;
+
+		let b_flat = true;
+
+		const a_types: [string, boolean, TypeNode][] = [];
+
+		// create bindings
+		const a_bindings = g_msg.fieldList.map((g_field, i_field) => {
+			if(g_field.number !== i_field + 1) {
+				b_monotonic = false;
+			}
+
+			const g_thing = this.route(g_field);
+
+			if(g_thing.nests) b_flat = false;
+
+			a_types.push([g_thing.name, g_thing.optional, g_thing.type]);
+
+			// repeated type; bind items
+			if(FieldDescriptorProto.Label.LABEL_REPEATED === g_field.label) {
+				return binding(g_thing.id);
+			}
+			// single item; unwrap ot
+			else {
+				return arrayBinding([binding(g_thing.id)]);
+			}
+		}) as ArrayBindingElement[];
+
+
+		if(!b_monotonic) {
+			console.warn(`Skipping non-monotonic response type ${g_msg.name}`);
+			return;
+		}
+
+		const yn_decode = call('decode_protobuf', __UNDEFINED, [ident('atu8_payload')]);
+
+
+		let yn_body: ConciseBody;
+
+		// single field; use simplified response
+		if(1 === a_bindings.length) {
+			// flat type
+			if(b_flat) {
+				yn_body = ident('decode_protobuf_0');
+			}
+			// not flat
+			else {
+				yn_body = arrayAccess(yn_decode, numericLit(0));
+			}
+		}
+		else {
+			const yn_destructure = declareConst(
+				arrayBinding(a_bindings),
+				yn_decode
+			);
+
+			yn_body = block([
+				yn_destructure,
+				doReturn(arrayLit([])),
+			]);
+		}
+
+		return declareConst(`decode${g_msg.name}`, arrow([
+			param(ident('atu8_payload'), typeRef('Uint8Array')),
+		], yn_body, tuple(a_types)), true);
 	}
 }

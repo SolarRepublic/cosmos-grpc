@@ -16,7 +16,7 @@ import {__UNDEFINED, oderac, F_IDENTITY} from '@blake.regalia/belt';
 import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
 import {ts} from 'ts-morph';
 
-import {type FieldRouter, type TsThing} from './common';
+import {type FieldRouter, type TsThing, type TsThingBare} from './common';
 import {access, arrayType, arrow, call, ident, importModule, param, print, typeRef} from './ts-factory';
 
 
@@ -67,9 +67,9 @@ export abstract class RpcImplementor {
 		return (b_enum? this.enum(si_type): this.msg(si_type)).source.name!.split('.').slice(0, -1).join('.');
 	}
 
-	importType(sr_path: string, si_ident: string): TypeNode {
+	importType(sr_path: string, si_ident: string, a_type_args?: TypeNode[]): TypeNode {
 		this._h_type_imports[si_ident] = sr_path;
-		return typeRef(si_ident);
+		return typeRef(si_ident, a_type_args);
 	}
 
 	imports(): string[] {
@@ -86,6 +86,7 @@ export abstract class RpcImplementor {
 		// lookup or set message
 		const g_msg = this._h_msgs[si_type] ??= g_desc as AugmentedDescriptor;
 		if(!g_msg) {
+			debugger;
 			throw new Error(`No message found "${si_type}"`);
 		}
 
@@ -135,6 +136,9 @@ export abstract class RpcImplementor {
 
 			// adjust type
 			g_bare.type = arrayType(g_bare.type);
+			if(!g_bare.proto_type) {
+				g_bare.proto_type = g_bare.type;
+			}
 
 			// assert write type
 			if(!g_bare.write) {
@@ -153,35 +157,54 @@ export abstract class RpcImplementor {
 				);
 			}
 
-			if(g_bare.to_proto) {
-				g_bare.to_proto = call(
-					access(g_bare.name, 'map'),
-					__UNDEFINED,
-					[arrow([param(s_name_singular)], g_bare.to_proto)]
-				);
-			}
-
 			if(g_bare.from_wire) {
 				g_bare.from_wire = yn_data => call(access(yn_data, 'map'), __UNDEFINED, [
 					arrow([param(s_name_singular)], g_bare.from_wire!(ident(s_name_singular))),
 				]);
 			}
+
+			// wrap proto adapter
+			if(g_bare.to_proto) {
+				// fill-in proto name
+				g_bare.proto_name ||= g_bare.name;
+
+				// special wrap for Coin[]
+				if('.cosmos.base.v1beta1.Coin' === g_field.typeName) {
+					g_bare.to_proto = call('coins', __UNDEFINED, [ident(g_bare.proto_name)]);
+				}
+				// map items
+				else {
+					g_bare.to_proto = call(
+						access(g_bare.proto_name, 'map'),
+						__UNDEFINED,
+						[arrow([param(s_name_singular)], g_bare.to_proto)]
+					);
+				}
+			}
 		}
 
 		// default identifier
-		const yn_id = y_factory.createIdentifier(g_bare.name);
+		const yn_id = ident(g_bare.name);
+
+		// fill-in proto name
+		const si_proto = g_bare.proto_name || g_bare.name;
 
 		// create and return thing
 		return {
-			...g_bare,
-			write: g_bare.write || '',
+			...g_bare as TsThingBare & Required<Pick<TsThingBare, 'proto_name' | 'write'>>,
 			field: g_field,
 			id: yn_id,
-			optional: g_field.proto3Optional || false,
+			optional: !(g_field.options as {nullable?: boolean})?.nullable
+				&& (pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label || g_field.proto3Optional || false),
+
 			to_wire: g_bare.to_wire || yn_id,
 			from_wire: g_bare.from_wire || F_IDENTITY,
 
-			to_proto: g_bare.to_proto || yn_id,
+			proto_name: si_proto,
+			write: g_bare.write || '',
+			to_proto: g_bare.to_proto || ident(si_proto),
+			proto_type: g_bare.proto_type || g_bare.type,
+			nests: g_bare.nests || false,
 		};
 	}
 }

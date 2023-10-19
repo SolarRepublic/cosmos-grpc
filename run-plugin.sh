@@ -38,6 +38,7 @@ add_annotation google.api.http
 add_annotation google.api.annotations
 add_annotation gogoproto.gogo
 add_annotation cosmos_proto.cosmos
+add_annotation amino.amino
 
 # rename all generated .js annotations => .cjs
 find "$sr_annotations" -type f -name "*.js" | while read -r file; do
