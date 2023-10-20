@@ -1,5 +1,6 @@
 import type {O} from 'ts-toolbelt';
 
+import type {FieldDescriptorProtoWithComments} from './env';
 import type {RpcImplementor} from './rpc-impl';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
@@ -29,11 +30,11 @@ export type TsThingBare = {
 	write?: string;
 	to_proto?: Expression;
 
-	nests?: boolean;  // the field uses some other message for its type (for decoding)
+	nests?: null | ((yn_data: Expression) => Expression);  // the field uses some other message for its type (for decoding)
 };
 
-export type TsThing = O.Compulsory<TsThingBare> & {
-	field: FieldDescriptorProto.AsObject;
+export type TsThing = Required<TsThingBare> & {
+	field: FieldDescriptorProtoWithComments;
 	id: Identifier;
 	optional: boolean;
 };
@@ -61,8 +62,11 @@ const temporal = (g_field: FieldDescriptorProto.AsObject, k_impl: RpcImplementor
 	return {
 		name: s_ident,
 		type: type('number'),
-		to_proto: call('timestamp', __UNDEFINED, [ident(s_ident)]),
+		to_proto: call('timestamp', [ident(s_ident)]),
 		write: 'b',
+		proto_name: `atu8_${snake(g_field.name!)}`,
+		proto_type: typeRef('Uint8Array'),
+		nests: yn_data => call(ident('decode_protobuf_r0'), [yn_data], [type('number')]),
 	};
 };
 
@@ -74,8 +78,11 @@ const H_OVERRIDE_MIXINS: Dict<(g_field: FieldDescriptorProto.AsObject, k_impl: R
 		return {
 			name: s_ident,
 			type: k_impl.importType('../_core', 'SlimCoin'),
-			to_proto: call('coin', __UNDEFINED, [ident(s_ident)]),
+			to_proto: call('coin', [ident(s_ident)]),
 			write: 'b',
+			proto_name: `atu8_${snake(g_field.name!)}`,
+			proto_type: typeRef('Uint8Array'),
+			nests: yn_data => call(ident('decode_coin'), [yn_data], [typeRef('SlimCoin')]),
 		};
 	},
 
@@ -140,14 +147,19 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	// uint64
 	[H_FIELD_TYPES.TYPE_UINT64]: si_field => ({
 		name: `sg_${si_field}`,
-		type: k_impl.importType('../_core', 'WeakUint128'),
+		type: k_impl.importType('../_core', 'WeakUint64Str'),
+		return_type: k_impl.importType('../_core', 'Uint64Str'),
 		write: 'v',
+		proto_name: `atu8_${si_field}`,
+		proto_type: typeRef('Uint8Array'),
+
 	}),
 
 	// int64
 	[H_FIELD_TYPES.TYPE_INT64]: si_field => ({
 		name: `sg_${si_field}`,
-		type: k_impl.importType('../_core', 'WeakUint128'),
+		type: k_impl.importType('../_core', 'WeakInt64Str'),
+		return_type: k_impl.importType('../_core', 'Int64Str'),
 		write: 'v',
 	}),
 
@@ -158,11 +170,13 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 
 		// create default type
 		let yn_type: TypeNode = type('string');
+		let yn_return!: TypeNode;
 
 		// route snake type
 		if(si_field.endsWith('_address') || A_SEMANTIC_ACCOUNT.includes(si_field)) {
 			si_name = `sa_${si_field.replace(/_address$/, '')}`;
-			yn_type = k_impl.importType('../_core', 'WeakSecretAddr');
+			yn_type = k_impl.importType('../_core', 'WeakAccountAddr');
+			yn_return = k_impl.importType('../core', 'AccountAddr');
 		}
 		else if(si_field.endsWith('_id')) {
 			si_name = `si_${si_field.replace(/_id$/, '')}`;
@@ -176,6 +190,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		return {
 			name: si_name,
 			type: yn_type,
+			return_type: yn_return,
 			write: 's',
 		};
 	},
@@ -192,7 +207,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		return {
 			name: `sc_${snake(si_field)}`,
 			type: k_impl.importType(`../types/${sr_path}`, si_ref),
-			nests: true,
+			nests: yn_data => call(ident('decode_protobuf'), [yn_data]),
 		};
 	},
 
@@ -209,7 +224,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			name: `g_${snake(si_field)}`,
 			type: k_impl.importType(`../types/${sr_path}`, si_ref),
 			write: 'b',
-			nests: true,
+			nests: yn_data => call(ident('decode_protobuf'), [yn_data]),
 			...H_OVERRIDE_MIXINS[g_field.typeName!]?.(g_field, k_impl) || {
 				proto_name: `atu8_${snake(si_field)}`,
 				proto_type: k_impl.importType(`./${sr_path}`, `Any${si_ref}`),
@@ -230,9 +245,9 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			type: yn_type,
 			write: 'b',
 
-			to_wire: ternary(ident(si_self), call('buffer_to_base64', [], [ident(si_self)]), ident('__UNDEFINED')) as Expression,
+			to_wire: ternary(ident(si_self), call('buffer_to_base64', [ident(si_self)]), ident('__UNDEFINED')) as Expression,
 
-			from_wire: yn_data => call('base64_to_buffer', [], [castAs(yn_data, type('string'))]) as Expression,
+			from_wire: yn_data => call('base64_to_buffer', [castAs(yn_data, type('string'))]) as Expression,
 		};
 	},
 });

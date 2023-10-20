@@ -3,7 +3,7 @@ import type {Dict, Promisable} from '@blake.regalia/belt';
 import type {CodeGeneratorRequest as CodeGenReq, CodeGeneratorResponse as CodeGenRes} from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 import type {FileDescriptorProto, SourceCodeInfo} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {fold, concat2} from '@blake.regalia/belt';
+import {fold, concat2, escape_regex} from '@blake.regalia/belt';
 
 import pluginPb from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 
@@ -82,7 +82,8 @@ export const plugin = async(
  */
 export const findCommentByPath = (
 	a_path: number[],
-	g_proto: FileDescriptorProto.AsObject
+	g_proto: FileDescriptorProto.AsObject,
+	s_name?: string
 ) => ((g_proto.sourceCodeInfo?.locationList || []).filter((g_loc) => {
 	if(g_loc.pathList.length !== a_path.length) return false;
 	let b_ans = true;
@@ -95,5 +96,7 @@ export const findCommentByPath = (
 })
 	.map(l => l.leadingComments)
 	.pop() || '')
+	.replace(/\s*\n\s*/g, ' ')
+	.replace(s_name? new RegExp('^\\s*'+escape_regex(s_name || '')+'(?:\\s+is\\s+)?'): /^/, '')
 	.trim();
 

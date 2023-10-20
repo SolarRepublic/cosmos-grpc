@@ -2,7 +2,7 @@
 
 import type {O} from 'ts-toolbelt';
 
-import type {MethodOptionsWithCosmosExtension, MethodOptionsWithHttp} from './env';
+import type {FieldDescriptorProtoWithComments, MethodOptionsWithCosmosExtension, MethodOptionsWithHttp} from './env';
 
 import type {AugmentedDescriptor, RpcImplementor} from './rpc-impl';
 import type {Dict} from '@blake.regalia/belt';
@@ -11,7 +11,7 @@ import type {DescriptorProto, FileDescriptorProto} from 'google-protobuf/google/
 
 import type {Statement} from 'typescript';
 
-import {__UNDEFINED, ode, oderac} from '@blake.regalia/belt';
+import {__UNDEFINED, escape_regex, ode, oderac} from '@blake.regalia/belt';
 
 import {NeutrinoImpl} from './impl-neutrino';
 import {findCommentByPath, plugin} from './plugin';
@@ -32,11 +32,16 @@ const capture_messages = (
 	// append to path
 	const a_local = [...a_path, 4, i_msg];
 
+	// each field
+	g_msg.fieldList.forEach((g_field, i_field) => {
+		(g_field as FieldDescriptorProtoWithComments).comments = findCommentByPath([...a_local, 2, i_field], g_proto, g_field.name);
+	});
+
 	// save to global lookup
-	k_impl.msg(p_msg, Object.assign(g_msg, {
+	k_impl.msg(p_msg, Object.assign(g_msg as AugmentedDescriptor, {
 		source: g_proto,
 		index: i_msg,
-		comments: findCommentByPath(a_local, g_proto),
+		comments: findCommentByPath(a_local, g_proto, g_msg.name),
 	}));
 
 	// capture nested types
@@ -68,7 +73,7 @@ void plugin((a_protos, h_inputs) => {
 			k_impl.enum(`.${si_package}.${si_enum}`, Object.assign(g_enum, {
 				source: g_proto,
 				index: i_enum,
-				comments: findCommentByPath([5, i_enum], g_proto),
+				comments: findCommentByPath([5, i_enum], g_proto, g_enum.name),
 			}));
 		});
 	}
@@ -110,6 +115,40 @@ void plugin((a_protos, h_inputs) => {
 			const si_service = g_service.name?.toLowerCase();
 			if(!si_service) return;
 
+			// find longest path prefix
+			let s_path_prefix = '';
+			{
+				// each method (pre-gen)
+				for(const g_method of g_service.methodList) {
+					const g_opts = g_method.options as O.Compulsory<MethodOptionsWithHttp>;
+					const g_http = g_opts?.http;
+
+					// only interested in GET or POST
+					const sr_path = g_http?.get || g_http?.post;
+
+					// no path; skip
+					if(!sr_path) continue;
+
+					// initialize
+					if(!s_path_prefix) {
+						s_path_prefix = sr_path;
+						const i_param = sr_path.indexOf('{');
+						if(i_param >= 0) s_path_prefix = sr_path.slice(0, sr_path.indexOf('{'));
+					}
+					// find common substring
+					else {
+						// each character
+						for(let i_char=0; i_char<Math.min(s_path_prefix.length, sr_path.length); i_char++) {
+							// end of common substring
+							if(sr_path[i_char] !== s_path_prefix[i_char]) {
+								s_path_prefix = sr_path.slice(0, i_char);
+								break;
+							}
+						}
+					}
+				}
+			}
+
 			// each method
 			g_service.methodList.forEach((g_method, i_method) => {
 				// skip functions missing input or output type
@@ -131,17 +170,18 @@ void plugin((a_protos, h_inputs) => {
 				const g_opts = g_method.options as O.Compulsory<MethodOptionsWithHttp>;
 				const g_http = g_opts?.http;
 
+				// get comment(s)
+				const s_comments = findCommentByPath([6, i_service, 2, i_method], g_proto) || '';
+
 				// only interested in GET or POST
 				if(g_http?.get || g_http?.post) {
-					// get comment(s)
-					const s_comments = findCommentByPath([6, i_service, 2, i_method], g_proto) || '';
-
 					// generate
 					const yn_method = k_impl.generate(
 						si_service,
 						si_vendor,
 						si_module,
 						s_version,
+						s_path_prefix,
 						g_method,
 						g_opts,
 						g_input,
@@ -153,7 +193,7 @@ void plugin((a_protos, h_inputs) => {
 				}
 				// otherwise, create encoder/decoder
 				else {
-					k_impl.msgEncoder(g_method, g_input, g_output);
+					k_impl.msgEncoder(g_method, g_input, g_output, s_comments);
 
 					// add decoder to queue
 					if(g_output.fieldList.length) {
@@ -174,7 +214,7 @@ void plugin((a_protos, h_inputs) => {
 
 			// implements interface; generate 'any' encoder
 			if(g_opts?.implementsInterfaceList) {
-				a_encoders.push(k_impl.anyEncoder(g_msg)!);
+				a_encoders.push(k_impl.anyEncoder(g_msg as AugmentedDescriptor)!);
 			}
 		});
 
@@ -245,9 +285,11 @@ void plugin((a_protos, h_inputs) => {
 		}
 	}
 
-	console.warn(a_lines_decoder.join('\n\n'));
+	h_outputs['decoders.ts'] = a_lines_decoder.join('\n\n');
 
-	debugger;
+	// console.warn(a_lines_decoder.join('\n\n'));
+
+	// debugger;
 
 	return oderac(h_outputs, (si_file, sx_contents) => ({
 		name: si_file,

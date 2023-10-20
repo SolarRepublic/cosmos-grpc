@@ -28,6 +28,17 @@ const {
 	ScriptKind,
 } = ts;
 
+const H_TYPE_KEYWORDS = {
+	boolean: SyntaxKind.BooleanKeyword,
+	number: SyntaxKind.NumberKeyword,
+	bigint: SyntaxKind.BigIntKeyword,
+	string: SyntaxKind.StringKeyword,
+	unknown: SyntaxKind.UnknownKeyword,
+	never: SyntaxKind.NeverKeyword,
+	undefined: SyntaxKind.UndefinedKeyword,
+};
+
+
 // shortcuts
 export const ident = (z_indent: string | Identifier) => 'string' === typeof z_indent? y_factory.createIdentifier(z_indent): z_indent;
 export const type = (si_type: keyof typeof H_TYPE_KEYWORDS) => y_factory.createKeywordTypeNode(H_TYPE_KEYWORDS[si_type] as KeywordTypeSyntaxKind);
@@ -47,7 +58,7 @@ export const trailingLineComment = <
 	return yn_node;
 };
 
-export const call = (z_method: string | Expression, a_types: TypeNode[] | undefined, a_args: Expression[], s_comment?: string) => trailingLineComment(
+export const call = (z_method: string | Expression, a_args?: Expression[], a_types?: TypeNode[] | undefined, s_comment?: string) => trailingLineComment(
 	y_factory.createCallExpression(
 		'string' === typeof z_method? ident(z_method): z_method,
 		a_types,
@@ -99,10 +110,10 @@ export const union = (a_types: TypeNode[]) => y_factory.createUnionTypeNode(a_ty
 
 export const intersection = (a_types: TypeNode[]) => y_factory.createIntersectionTypeNode(a_types);
 
-export const param = (z_ident: string | Identifier, yn_type?: TypeNode, b_optional=false, yn_init?: Expression) => y_factory.createParameterDeclaration(
+export const param = (z_binding: string | BindingName, yn_type?: TypeNode, b_optional=false, yn_init?: Expression) => y_factory.createParameterDeclaration(
 	__UNDEFINED,
 	__UNDEFINED,
-	ident(z_ident),
+	'string' === typeof z_binding? ident(z_binding): z_binding,
 	b_optional? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
 	yn_type,
 	yn_init
@@ -161,13 +172,9 @@ export const importModule = (sx_specifier: string, a_imports: string[], b_type_o
 
 export const arrayType = (yn_type: TypeNode) => y_factory.createArrayTypeNode(yn_type);
 
-const H_TYPE_KEYWORDS = {
-	boolean: SyntaxKind.BooleanKeyword,
-	number: SyntaxKind.NumberKeyword,
-	bigint: SyntaxKind.BigIntKeyword,
-	string: SyntaxKind.StringKeyword,
-	unknown: SyntaxKind.UnknownKeyword,
-};
+export const parens = (yn_expr: Expression) => y_factory.createParenthesizedExpression(yn_expr);
+
+export const funcType = (a_params: ParameterDeclaration[], yn_return: TypeNode) => y_factory.createFunctionTypeNode(__UNDEFINED, a_params, yn_return);
 
 export const print = (yn_stmt: Statement): string => {
 	const y_printer = ts.createPrinter({

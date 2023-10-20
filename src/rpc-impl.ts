@@ -1,6 +1,7 @@
 import type {O} from 'ts-toolbelt';
 
-import type {MethodOptionsWithHttp} from './env';
+import type {FieldRouter, TsThing, TsThingBare} from './common';
+import type {FieldDescriptorProtoWithComments, MethodOptionsWithHttp} from './env';
 import type {Dict} from '@blake.regalia/belt';
 import type {
 	DescriptorProto,
@@ -16,17 +17,17 @@ import {__UNDEFINED, oderac, F_IDENTITY} from '@blake.regalia/belt';
 import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
 import {ts} from 'ts-morph';
 
-import {type FieldRouter, type TsThing, type TsThingBare} from './common';
 import {access, arrayType, arrow, call, ident, importModule, param, print, typeRef} from './ts-factory';
 
 
 // alias ts.factory
 const y_factory = ts.factory;
 
-export type AugmentedDescriptor = DescriptorProto.AsObject & {
+export type AugmentedDescriptor = Omit<DescriptorProto.AsObject, 'fieldList'> & {
 	source: FileDescriptorProto.AsObject;
 	index: number;
 	comments: string;
+	fieldList: FieldDescriptorProtoWithComments[];
 };
 
 export type AugmentedEnumDescriptor = EnumDescriptorProto.AsObject & {
@@ -52,6 +53,7 @@ export abstract class RpcImplementor {
 		si_vendor: string,
 		si_module: string,
 		s_version: string,
+		sr_path_prefix: string,
 		g_method: MethodDescriptorProto.AsObject,
 		g_opts: O.Compulsory<MethodOptionsWithHttp>,
 		g_input: DescriptorProto.AsObject,
@@ -105,7 +107,7 @@ export abstract class RpcImplementor {
 		return g_enum;
 	}
 
-	route(g_field: FieldDescriptorProto.AsObject): TsThing {
+	route(g_field: FieldDescriptorProtoWithComments): TsThing {
 		// lookup transformer
 		const f_transformer = this._h_router[g_field.type!];
 		if(!f_transformer) {
@@ -152,13 +154,12 @@ export abstract class RpcImplementor {
 			if(g_bare.to_wire) {
 				g_bare.to_wire = call(
 					access(g_bare.name, 'map'),
-					__UNDEFINED,
 					[arrow([param(s_name_singular)], g_bare.to_wire)]
 				);
 			}
 
 			if(g_bare.from_wire) {
-				g_bare.from_wire = yn_data => call(access(yn_data, 'map'), __UNDEFINED, [
+				g_bare.from_wire = yn_data => call(access(yn_data, 'map'), [
 					arrow([param(s_name_singular)], g_bare.from_wire!(ident(s_name_singular))),
 				]);
 			}
@@ -170,13 +171,12 @@ export abstract class RpcImplementor {
 
 				// special wrap for Coin[]
 				if('.cosmos.base.v1beta1.Coin' === g_field.typeName) {
-					g_bare.to_proto = call('coins', __UNDEFINED, [ident(g_bare.proto_name)]);
+					g_bare.to_proto = call('coins', [ident(g_bare.proto_name)]);
 				}
 				// map items
 				else {
 					g_bare.to_proto = call(
 						access(g_bare.proto_name, 'map'),
-						__UNDEFINED,
 						[arrow([param(s_name_singular)], g_bare.to_proto)]
 					);
 				}
@@ -204,7 +204,7 @@ export abstract class RpcImplementor {
 			write: g_bare.write || '',
 			to_proto: g_bare.to_proto || ident(si_proto),
 			proto_type: g_bare.proto_type || g_bare.type,
-			nests: g_bare.nests || false,
+			nests: g_bare.nests || null,
 		};
 	}
 }
