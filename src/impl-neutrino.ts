@@ -1,9 +1,7 @@
-import type {O} from 'ts-toolbelt';
-
 import type {TsThing} from './common';
-import type {MethodOptionsWithCosmosExtension, MethodOptionsWithHttp} from './env';
+import type {AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
 
-import type {MethodDescriptorProto, DescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
+import type {FileCategory} from './rpc-impl';
 import type {Statement, TypeNode, Expression, ParameterDeclaration, ArrayBindingElement, ConciseBody} from 'typescript';
 
 import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from '@blake.regalia/belt';
@@ -11,7 +9,7 @@ import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
 import {ts} from 'ts-morph';
 
 import {H_FIELD_TYPE_TO_HUMAN_READABLE, XC_HINT_NUMBER, XC_HINT_STRING, XC_HINT_BIGINT, field_router, XC_HINT_SINGULAR, XC_HINT_BYTES} from './common';
-import {RpcImplementor, type AugmentedDescriptor, type FileCategory} from './rpc-impl';
+import {RpcImplementor} from './rpc-impl';
 import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, funcType, ident, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
 
 type ReturnThing = {
@@ -90,7 +88,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		return typeRef(si_type);
 	}
 
-	generate_return(g_output: AugmentedDescriptor, g_input: AugmentedDescriptor): ReturnThing {
+	generate_return(g_output: AugmentedMessage, g_input: AugmentedMessage): ReturnThing {
 		// remove redundant fields
 		const a_fields = g_output.fieldList.filter((g_field) => {
 			// test each field in input
@@ -144,7 +142,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 
 	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-	pattern_string_to_ast_node(sx_pattern: string, g_input: AugmentedDescriptor) {
+	pattern_string_to_ast_node(sx_pattern: string, g_input: AugmentedMessage) {
 		const {
 			_si_const,
 			_s_path_prefix,
@@ -243,20 +241,19 @@ export class NeutrinoImpl extends RpcImplementor {
 
 	override lcd(
 		si_service: string,
-		si_vendor: string,
-		si_module: string,
-		s_version: string,
 		sr_path_prefix: string,
-		g_method: MethodDescriptorProto.AsObject,
-		g_opts: O.Compulsory<MethodOptionsWithHttp>,
-		g_input: AugmentedDescriptor,
-		g_output: AugmentedDescriptor,
+		g_method: AugmentedMethod,
+		g_input: AugmentedMessage,
+		g_output: AugmentedMessage,
 		s_comments: string
 	): string {
-		const si_module_ident = si_module.replace(/\//g, '_');
+		// ref path parts
+		const g_parts = g_method.service.source.parts;
+
+		const si_module_ident = g_parts.module.replace(/\//g, '_');
 
 		// 
-		const si_const = this._si_const = `SR_LCD_${si_vendor.toUpperCase()}_${si_module_ident.toUpperCase()}`;
+		const si_const = this._si_const = `SR_LCD_${g_parts.vendor.toUpperCase()}_${si_module_ident.toUpperCase()}`;
 
 		// const s_path_prefix = this._s_path_prefix = `${'secret' === si_vendor? '': `/${si_vendor}`}/${si_module}/${s_version}/`;
 		this._s_path_prefix = sr_path_prefix;
@@ -272,7 +269,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				get: sx_path_http_get,
 				post: sx_path_http_post,
 			},
-		} = g_opts;
+		} = g_method.options! as Required<ExtendedMethodOptions>;
 
 		// transform output type
 		const g_return = this.generate_return(g_output, g_input);
@@ -328,7 +325,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// const si_action_prefix = si_service
 		const si_action_prefix = sx_path_http_get? 'query': 'submit';
-		const yn_statement = declareConst(`${si_action_prefix}${proper(si_vendor)}${proper(si_module_ident)}${si_method}`, yn_call, true);
+		const yn_statement = declareConst(`${si_action_prefix}${proper(g_parts.vendor)}${proper(si_module_ident)}${si_method}`, yn_call, true);
 
 		const a_comment_lines = s_comments.trim().replace(new RegExp(`^${escape_regex(g_method.name!)}\\s+`, 'i'), '').split(/\n/g);
 		const [s_line_0] = a_comment_lines;
@@ -369,7 +366,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		));
 	}
 
-	encodeParams(g_msg: AugmentedDescriptor): [ParameterDeclaration[], Expression] {
+	encodeParams(g_msg: AugmentedMessage): [ParameterDeclaration[], Expression] {
 		// instantiate writer
 		let yn_chain = call('Protobuf', [], __UNDEFINED, '...');
 
@@ -424,11 +421,11 @@ export class NeutrinoImpl extends RpcImplementor {
 	}
 
 	anyEncoder(
-		g_msg: AugmentedDescriptor
+		g_msg: AugmentedMessage
 	): string {
 		// implements interface
-		const g_opts = g_msg.options as MethodOptionsWithCosmosExtension;
-		if(!g_opts.implementsInterfaceList) throw new Error('No interface option');
+		const a_interfaces = g_msg.options?.implementsInterfaceList;
+		if(!a_interfaces) throw new Error('No interface option');
 
 		// prep unique type
 		const si_singleton = `Actual${g_msg.name}`;
@@ -442,7 +439,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		], ident(si_singleton), __UNDEFINED, typeRef('ImplementsInterfaces', [
 			union([
 				string(p_type),
-				...g_opts.implementsInterfaceList.map(si_interface => string(si_interface)),
+				...a_interfaces.map(si_interface => string(si_interface)),
 			].map(yn => y_factory.createLiteralTypeNode(yn))),
 		]));
 
@@ -479,12 +476,12 @@ export class NeutrinoImpl extends RpcImplementor {
 	}
 
 	msgEncoder(
-		g_method: MethodDescriptorProto.AsObject,
-		g_input: AugmentedDescriptor,
-		g_output: AugmentedDescriptor,
+		g_method: AugmentedMethod,
+		g_input: AugmentedMessage,
+		g_output: AugmentedMessage,
 		s_comments: string
 	): string {
-		const g_opts = g_method.options;
+		const g_parts = g_method.service.source.parts;
 
 			// encode params and build chain
 		const [a_params, yn_chain] = this.encodeParams(g_input);
@@ -508,13 +505,13 @@ export class NeutrinoImpl extends RpcImplementor {
 		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)));
 
 		// create statement
-		const yn_const = declareConst(`msg${g_method.name!}`, yn_writer, true);
+		const yn_const = declareConst(`msg${proper(g_parts.vendor)}${g_method.name!}`, yn_writer, true);
 
 		return print(yn_const);
 	}
 
 	// 
-	msgDecoder(g_msg: AugmentedDescriptor): string | undefined {
+	msgDecoder(g_msg: AugmentedMessage): string | undefined {
 		let b_monotonic = true;
 
 		let b_flat = true;

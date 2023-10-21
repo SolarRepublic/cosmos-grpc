@@ -1,4 +1,5 @@
 // import {default as pluginPb} from 
+import type {AugmentedFile} from './env';
 import type {Dict, Promisable} from '@blake.regalia/belt';
 import type {CodeGeneratorRequest as CodeGenReq, CodeGeneratorResponse as CodeGenRes} from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 import type {FileDescriptorProto, SourceCodeInfo} from 'google-protobuf/google/protobuf/descriptor_pb';
@@ -82,7 +83,7 @@ export const plugin = async(
  */
 export const findCommentByPath = (
 	a_path: number[],
-	g_proto: FileDescriptorProto.AsObject,
+	g_proto: FileDescriptorProto.AsObject | AugmentedFile,
 	s_name?: string
 ) => ((g_proto.sourceCodeInfo?.locationList || []).filter((g_loc) => {
 	if(g_loc.pathList.length !== a_path.length) return false;

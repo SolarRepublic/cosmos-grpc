@@ -1,13 +1,18 @@
 #!/usr/bin/env node --inspect-brk
 
-import type {O} from 'ts-toolbelt';
+import type {AugmentedEnum, AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod, AugmentedService, EnumAugmentations, FieldAugmentations, MessageAugmentations, MethodAugmentations, ServiceAugmentations} from './env';
 
-import type {AugmentedField, AugmentedFile, MethodOptionsWithCosmosExtension, MethodOptionsWithHttp} from './env';
-
-import type {AugmentedDescriptor, RpcImplementor} from './rpc-impl';
+import type {RpcImplementor} from './rpc-impl';
 import type {Dict} from '@blake.regalia/belt';
 
-import type {DescriptorProto, FileDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
+import type {
+	FileDescriptorProto,
+	ServiceDescriptorProto,
+	MethodDescriptorProto,
+	DescriptorProto,
+	EnumDescriptorProto,
+	FieldDescriptorProto,
+} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {Statement} from 'typescript';
 
 import {__UNDEFINED, escape_regex, ode, oderac} from '@blake.regalia/belt';
@@ -20,7 +25,9 @@ import {findCommentByPath, plugin} from './plugin';
 import {importModule, print} from './ts-factory';
 
 const {
-	FieldDescriptorProto,
+	FieldDescriptorProto: {
+		Label: FieldLabel,
+	},
 } = pb;
 
 // inject into preamble of any file, allow linter to delete unused imports
@@ -78,6 +85,31 @@ const A_GLOBAL_PREAMBLE = [
 	].map(print),
 ];
 
+const augment_service = (
+	g_service: ServiceDescriptorProto.AsObject,
+	g_augments: Omit<ServiceAugmentations, keyof ServiceDescriptorProto.AsObject>
+): AugmentedService => Object.assign(g_service, g_augments) as unknown as AugmentedService;
+
+const augment_method = (
+	g_method: MethodDescriptorProto.AsObject,
+	g_augments: Omit<MethodAugmentations, keyof MethodDescriptorProto.AsObject>
+): AugmentedMethod => Object.assign(g_method, g_augments) as unknown as AugmentedMethod;
+
+const augment_enum = (
+	g_enum: EnumDescriptorProto.AsObject,
+	g_augments: Omit<EnumAugmentations, keyof EnumDescriptorProto.AsObject>
+): AugmentedEnum => Object.assign(g_enum, g_augments);
+
+const augment_message = (
+	g_msg: DescriptorProto.AsObject,
+	g_augments: Omit<MessageAugmentations, keyof DescriptorProto.AsObject>
+): AugmentedMessage => Object.assign(g_msg, g_augments) as unknown as AugmentedMessage;
+
+const augment_field = (
+	g_field: FieldDescriptorProto.AsObject,
+	g_augments: Omit<FieldAugmentations, keyof FieldDescriptorProto.AsObject>
+): AugmentedField => Object.assign(g_field, g_augments) as AugmentedField;
+
 const capture_messages = (
 	k_impl: RpcImplementor,
 	g_proto: FileDescriptorProto.AsObject,
@@ -95,15 +127,15 @@ const capture_messages = (
 
 	// each field
 	g_msg.fieldList.forEach((g_field, i_field) => {
-		Object.assign(g_field as AugmentedField, {
-			repeated: FieldDescriptorProto.Label.LABEL_REPEATED === g_field.label,
+		augment_field(g_field, {
+			repeated: FieldLabel.LABEL_REPEATED === g_field.label,
 			comments: findCommentByPath([...a_local, 2, i_field], g_proto, g_field.name),
 		});
 	});
 
 	// save to global lookup
-	k_impl.msg(p_msg, Object.assign(g_msg as AugmentedDescriptor, {
-		source: g_proto,
+	k_impl.msg(p_msg, augment_message(g_msg, {
+		source: g_proto as AugmentedFile,
 		index: i_msg,
 		comments: findCommentByPath(a_local, g_proto, g_msg.name),
 	}));
@@ -170,11 +202,30 @@ void plugin((a_protos, h_inputs) => {
 			if(!si_enum) return;
 
 			// save to global lookup
-			k_impl.enum(`.${si_package}.${si_enum}`, Object.assign(g_enum, {
+			k_impl.enum(`.${si_package}.${si_enum}`, augment_enum(g_enum, {
 				source: g_proto as AugmentedFile,
 				index: i_enum,
 				comments: findCommentByPath([5, i_enum], g_proto, g_enum.name),
 			}));
+		});
+
+		// each service
+		g_proto.serviceList.forEach((g_service, i_service) => {
+			// augment service
+			augment_service(g_service, {
+				source: g_proto as AugmentedFile,
+				index: i_service,
+				comments: findCommentByPath([6, i_service], g_proto),
+			});
+
+			// each method
+			g_service.methodList.forEach((g_method, i_method) => {
+				// augment method
+				augment_method(g_method, {
+					service: g_service as AugmentedService,
+					comments: findCommentByPath([6, i_service, 7, i_method], g_proto),
+				});
+			});
 		});
 	}
 
@@ -206,7 +257,7 @@ void plugin((a_protos, h_inputs) => {
 			{
 				// each method (pre-gen)
 				for(const g_method of g_service.methodList) {
-					const g_opts = g_method.options as O.Compulsory<MethodOptionsWithHttp>;
+					const g_opts = g_method.options;
 					const g_http = g_opts?.http;
 
 					// only interested in GET or POST
@@ -253,7 +304,7 @@ void plugin((a_protos, h_inputs) => {
 				if(!g_output) throw new Error(`Failed to find rpc output ${sr_output}`);
 
 				// skip functions missing http options
-				const g_opts = g_method.options as O.Compulsory<MethodOptionsWithHttp>;
+				const g_opts = g_method.options;
 				const g_http = g_opts?.http;
 
 				// get comment(s)
@@ -263,12 +314,8 @@ void plugin((a_protos, h_inputs) => {
 				if(g_http?.get || g_http?.post) {
 					const sx_lcd = k_impl.lcd(
 						si_service,
-						si_vendor,
-						si_module,
-						si_version,
 						s_path_prefix,
 						g_method,
-						g_opts,
 						g_input,
 						g_output,
 						s_comments
@@ -297,11 +344,10 @@ void plugin((a_protos, h_inputs) => {
 			const si_msg = g_msg.name?.toLowerCase();
 			if(!si_msg) return;
 
-			const g_opts = g_msg.options as MethodOptionsWithCosmosExtension;
-
 			// implements interface; generate 'any' encoder
+			const g_opts = g_msg.options;
 			if(g_opts?.implementsInterfaceList) {
-				a_encoders.push(k_impl.anyEncoder(g_msg as AugmentedDescriptor)!);
+				a_encoders.push(k_impl.anyEncoder(g_msg)!);
 			}
 		});
 

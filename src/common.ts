@@ -1,6 +1,6 @@
-import type {AugmentedField} from './env';
+import type {AugmentedField, AugmentedFile} from './env';
 import type {RpcImplementor} from './rpc-impl';
-import type {FieldDescriptorProto, FileDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
+import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
 
 import {__UNDEFINED, snake, type Dict} from '@blake.regalia/belt';
@@ -73,7 +73,7 @@ const route_not_impl = (si_field: string) => {
 
 export type FieldRouter = Record<
 	FieldDescriptorProto.Type,
-	(si_field: string, g_field: FieldDescriptorProto.AsObject) => TsThingBare
+	(si_field: string, g_field: AugmentedField) => TsThingBare
 >;
 
 const A_SEMANTIC_ACCOUNT_ADDR = [
@@ -87,7 +87,7 @@ const A_SEMANTIC_ACCOUNT_ADDR = [
 const SR_IMPORT_TYPES_PROTO = '#/gen/_types/';
 const SR_IMPORT_TYPES_LIB = '#/types';
 
-const temporal = (g_field: FieldDescriptorProto.AsObject, k_impl: RpcImplementor): Partial<TsThingBare> => {
+const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): Partial<TsThingBare> => {
 	const s_ident = `xt_${snake(g_field.name!)}`;
 	return {
 		calls: {
@@ -112,7 +112,7 @@ const temporal = (g_field: FieldDescriptorProto.AsObject, k_impl: RpcImplementor
 };
 
 // special overrides
-const H_OVERRIDE_MIXINS: Dict<(g_field: FieldDescriptorProto.AsObject, k_impl: RpcImplementor) => Partial<TsThingBare> | undefined> = {
+const H_OVERRIDE_MIXINS: Dict<(g_field: AugmentedField, k_impl: RpcImplementor) => Partial<TsThingBare> | undefined> = {
 	// Coin
 	'.cosmos.base.v1beta1.Coin'(g_field, k_impl) {
 		const si_name = snake(g_field.name!);
@@ -150,11 +150,11 @@ const H_OVERRIDE_MIXINS: Dict<(g_field: FieldDescriptorProto.AsObject, k_impl: R
 	'.google.protobuf.Any'(g_field, k_impl) {
 		let yn_type: TypeNode = typeRef('Uint8Array');
 
-		const g_opts = g_field.options as {acceptsInterface?: string} | undefined;
-		if(g_opts?.acceptsInterface) {
+		const si_accepts = g_field.options?.acceptsInterface;
+		if(si_accepts) {
 			yn_type = typeRef('ImplementsInterfaces', [
 				union([
-					typeLit(string(g_opts.acceptsInterface)),
+					typeLit(string(si_accepts)),
 				]),
 			]);
 			// yn_type = k_impl.importType(`${SR_IMPORT_TYPES_PROTO}${k_impl.pathToFieldType(g_field)}`, `Any${g_opts.acceptsInterface}`);
@@ -403,7 +403,7 @@ export const XC_HINT_SINGULAR_BIGINT = XC_HINT_SINGULAR | XC_HINT_BIGINT;
 export const XC_HINT_SINGULAR_NUMBER = XC_HINT_SINGULAR | XC_HINT_NUMBER;
 export const XC_HINT_SINGULAR_STRING = XC_HINT_SINGULAR | XC_HINT_STRING;
 
-export const map_proto_path = (g_proto: FileDescriptorProto.AsObject): string => g_proto.name!.split('.').slice(0, -1).join('.');
+export const map_proto_path = (g_proto: AugmentedFile): string => g_proto.name!.split('.').slice(0, -1).join('.');
 
 
 type VersionSelector = [n_major: number, s_tag: string, n_minor: number];

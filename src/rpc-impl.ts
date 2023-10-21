@@ -1,47 +1,21 @@
-import type {O} from 'ts-toolbelt';
-
-import type {AugmentedField, AugmentedFile, MethodOptionsWithHttp} from './env';
+import type {FieldRouter, TsThing} from './common';
+import type {AugmentedEnum, AugmentedField, AugmentedMessage, AugmentedMethod} from './env';
 import type {Dict} from '@blake.regalia/belt';
-import type {
-	DescriptorProto,
-	EnumDescriptorProto,
-	FieldDescriptorProto,
-	FileDescriptorProto,
-	MethodDescriptorProto,
-} from 'google-protobuf/google/protobuf/descriptor_pb';
 
 import type {TypeNode} from 'typescript';
 
 import {__UNDEFINED, oderac, F_IDENTITY} from '@blake.regalia/belt';
-import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
-import {ts} from 'ts-morph';
 
-import {map_proto_path, type FieldRouter, type TsThing, type TsThingBare, version_supercedes} from './common';
+import {map_proto_path, version_supercedes} from './common';
 
 import {access, arrayType, arrow, call, ident, importModule, param, print, typeRef} from './ts-factory';
 
 
-// alias ts.factory
-const y_factory = ts.factory;
-
-export type AugmentedDescriptor = Omit<DescriptorProto.AsObject, 'fieldList'> & {
-	source: AugmentedFile;
-	index: number;
-	comments: string;
-	fieldList: AugmentedField[];
-};
-
-export type AugmentedEnumDescriptor = EnumDescriptorProto.AsObject & {
-	source: AugmentedFile;
-	index: number;
-	comments: string;
-};
-
 export type FileCategory = 'lcd' | 'encoder' | 'decoder';
 
 export abstract class RpcImplementor {
-	protected _h_msgs: Dict<AugmentedDescriptor> = {};
-	protected _h_enums: Dict<AugmentedEnumDescriptor> = {};
+	protected _h_msgs: Dict<AugmentedMessage> = {};
+	protected _h_enums: Dict<AugmentedEnum> = {};
 
 	protected _h_router!: FieldRouter;
 
@@ -51,14 +25,10 @@ export abstract class RpcImplementor {
 
 	abstract lcd(
 		si_service: string,
-		si_vendor: string,
-		si_module: string,
-		s_version: string,
 		sr_path_prefix: string,
-		g_method: MethodDescriptorProto.AsObject,
-		g_opts: O.Compulsory<MethodOptionsWithHttp>,
-		g_input: DescriptorProto.AsObject,
-		g_output: DescriptorProto.AsObject,
+		g_method: AugmentedMethod,
+		g_input: AugmentedMessage,
+		g_output: AugmentedMessage,
 		s_comments: string
 	): string;
 
@@ -69,7 +39,7 @@ export abstract class RpcImplementor {
 	abstract accepts(si_interface: string, s_alias: string): TypeNode;
 
 	pathToType(si_type: string): string {
-		let g_src!: AugmentedDescriptor | AugmentedEnumDescriptor;
+		let g_src!: AugmentedMessage | AugmentedEnum;
 
 		if(si_type in this._h_msgs) {
 			g_src = this.msg(si_type);
@@ -84,7 +54,7 @@ export abstract class RpcImplementor {
 		return map_proto_path(g_src.source);
 	}
 
-	pathToFieldType(g_field: FieldDescriptorProto.AsObject): string {
+	pathToFieldType(g_field: AugmentedField): string {
 		return this.pathToType(g_field.typeName!);
 	}
 
@@ -103,7 +73,7 @@ export abstract class RpcImplementor {
 		return;
 	}
 
-	msg(si_type: string, g_desc?: AugmentedDescriptor): AugmentedDescriptor {
+	msg(si_type: string, g_desc?: AugmentedMessage): AugmentedMessage {
 		const {_h_msgs} = this;
 
 		// check for existing message
@@ -140,9 +110,9 @@ export abstract class RpcImplementor {
 		return g_msg;
 	}
 
-	enum(si_type: string, g_desc?: AugmentedEnumDescriptor): AugmentedEnumDescriptor {
+	enum(si_type: string, g_desc?: AugmentedEnum): AugmentedEnum {
 		// lookup or set message
-		const g_enum = this._h_enums[si_type] ??= g_desc as AugmentedEnumDescriptor;
+		const g_enum = this._h_enums[si_type] ??= g_desc as AugmentedEnum;
 		if(!g_enum) {
 			throw new Error(`No enum found "${si_type}"`);
 		}
@@ -251,8 +221,7 @@ export abstract class RpcImplementor {
 			let b_optional = true;  // pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label;
 
 			// explicitly not nullable
-			const g_opt = g_field.options as {nullable?: boolean};
-			if(g_opt && 'nullable' in g_opt && !g_opt.nullable) {
+			if(false === g_field.options?.nullable) {
 				// explictly optional
 				if(g_field.proto3Optional) {
 					debugger;
