@@ -1,4 +1,4 @@
-import type {Dict} from '@blake.regalia/belt';
+import type {Arrayable, Dict} from '@blake.regalia/belt';
 
 import type {
 	TypeNode,
@@ -15,7 +15,7 @@ import type {
 	TypeParameterDeclaration,
 } from 'typescript';
 
-import {__UNDEFINED, oderac} from '@blake.regalia/belt';
+import {__UNDEFINED, fodemtv, oderac} from '@blake.regalia/belt';
 import {ts, NodeFlags} from 'ts-morph';
 
 // alias ts.factory
@@ -82,6 +82,8 @@ export const string = (s_value: string) => y_factory.createStringLiteral(s_value
 
 export const doReturn = (yn_expr: Expression) => y_factory.createReturnStatement(yn_expr);
 
+export const typeLit = (yn_lit: Parameters<ts.NodeFactory['createLiteralTypeNode']>[0]) => y_factory.createLiteralTypeNode(yn_lit);
+
 export const declareConst = (z_binding: string | BindingName, yn_initializer: Expression, b_export?: boolean) => y_factory.createVariableStatement(
 	b_export? [y_factory.createToken(SyntaxKind.ExportKeyword)]: __UNDEFINED,
 	y_factory.createVariableDeclarationList([
@@ -135,6 +137,27 @@ export const numericLit = (xn_value: number) => y_factory.createNumericLiteral(x
 
 export const arrayLit = (a_elements: Expression[]) => y_factory.createArrayLiteralExpression(a_elements, false);
 
+export const literal = (z_value: Arrayable<boolean | number | bigint | string | undefined>): Expression => {
+	switch(typeof z_value) {
+		case 'boolean': return y_factory.createToken(z_value? SyntaxKind.TrueKeyword: SyntaxKind.FalseKeyword) as Expression;
+		case 'number': return numericLit(z_value);
+		case 'bigint': return y_factory.createBigIntLiteral(z_value+'');
+		case 'string': return string(z_value);
+		case 'undefined': return y_factory.createVoidExpression(numericLit(0));
+		default: {
+			if(null === z_value) {
+				return y_factory.createToken(SyntaxKind.NullKeyword);
+			}
+			else if(Array.isArray(z_value)) {
+				return arrayLit(z_value.map(literal));
+			}
+			else {
+				return objectLit(fodemtv(z_value, literal));
+			}
+		}
+	}
+};
+
 export const access = (
 	z_prime: string | Expression,
 	...a_rest: Array<string | MemberName>
@@ -183,5 +206,11 @@ export const print = (yn_stmt: Statement): string => {
 
 	const y_source_anon = ts.createSourceFile('_.ts', '', ScriptTarget.Latest, false, ScriptKind.TS);
 
-	return y_printer.printNode(ts.EmitHint.Unspecified, yn_stmt, y_source_anon);
+	const sx_print = y_printer.printNode(ts.EmitHint.Unspecified, yn_stmt, y_source_anon)
+		.replace(/\n(  {2,})/g, (s_line, s_spaces) => '\n'+'\t'.repeat((s_spaces.length / 4) | 0))
+		.replace(/(const \w+ = \(.*)/g, s_line => s_line
+			.replace(/(\()?(\w+\??: [^,)]+)(?:(, )|\))/g, (s_match, s_lparen, s_main, s_comma) => ''
+				+`${s_lparen? s_lparen+'\n\t': ''}${s_main}${s_comma? ',\n\t': '\n)'}`));
+
+	return sx_print;
 };

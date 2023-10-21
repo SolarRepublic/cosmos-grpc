@@ -87,3 +87,6 @@ protoc \
 	--descriptor_set_out=dist/descriptors.pb \
 	--proto_path=proto \
 	$(find "${sr_protos[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0)
+
+# run through linter with fix-all
+yarn eslint --no-ignore --parser-options project:tsconfig.dist.json --fix dist

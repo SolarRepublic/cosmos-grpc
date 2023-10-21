@@ -1,6 +1,7 @@
 import type {
 	MethodOptions,
 	FieldDescriptorProto,
+	FileDescriptorProto,
 } from 'google-protobuf/google/protobuf/descriptor_pb';
 
 interface MethodOptionsWithHttpExtension {
@@ -16,8 +17,18 @@ interface MethodOptionsWithCosmosExtension {
 	implementsInterfaceList?: string[];
 }
 
-interface FieldDescriptorProtoWithCommentsExtension {
+interface FieldDescriptorProtoAugmentations {
+	repeated: boolean;
 	comments: string;
+}
+
+interface FileDescriptorProtoAugmentations {
+	parts: {
+		vendor: string;
+		module: string;
+		version: string;
+		purpose: string;
+	};
 }
 
 
@@ -25,7 +36,9 @@ interface MethodOptionsWithHttp extends MethodOptions.AsObject, MethodOptionsWit
 
 interface MessageOptionsWithCosmos extends MessageOptions.AsObject, MethodOptionsWithCosmosExtension {}
 
-interface FieldDescriptorProtoWithComments extends FieldDescriptorProto.AsObject, FieldDescriptorProtoWithCommentsExtension {}
+export interface AugmentedField extends FieldDescriptorProto.AsObject, FieldDescriptorProtoAugmentations {}
+
+export interface AugmentedFile extends FileDescriptorProto.AsObject, FileDescriptorProtoAugmentations {}
 
 // interface Method
 
@@ -35,7 +48,7 @@ declare module 'google-protobuf/google/protobuf/descriptor_pb' {
 	}
 
 	namespace FieldDescriptorProto {
-		interface AsObject extends FieldDescriptorProtoWithCommentsExtension {}
+		interface AsObject extends FieldDescriptorProtoAugmentations {}
 	}
 
 	// namespace MethodDescriptorProto {
