@@ -76,7 +76,7 @@ export type FieldRouter = Record<
 	(si_field: string, g_field: FieldDescriptorProto.AsObject) => TsThingBare
 >;
 
-const A_SEMANTIC_ACCOUNT = [
+const A_SEMANTIC_ACCOUNT_ADDR = [
 	'creator',
 	'voter',
 	'depositor',
@@ -84,7 +84,7 @@ const A_SEMANTIC_ACCOUNT = [
 	'grantee',
 ];
 
-const SR_IMPORT_TYPES_PROTO = '#/proto/types/';
+const SR_IMPORT_TYPES_PROTO = '#/gen/_types/';
 const SR_IMPORT_TYPES_LIB = '#/types';
 
 const temporal = (g_field: FieldDescriptorProto.AsObject, k_impl: RpcImplementor): Partial<TsThingBare> => {
@@ -261,8 +261,14 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		let yn_type: TypeNode = type('string');
 		let yn_return!: TypeNode;
 
-		// route snake type
-		if(si_field.endsWith('_address') || A_SEMANTIC_ACCOUNT.includes(si_field)) {
+		// validator address
+		if(/(?:^validator_.*?|validator)_addr(ess)?$/.test(si_field)) {
+			si_name = `sa_${si_field.replace(/_addr(ess)?$/, '')}`;
+			yn_type = typeRef('WeakValidatorAddr');
+			yn_return = typeRef('ValidatorAddr');
+		}
+		// account address
+		else if(/_addr(ess)?$/.test(si_field) || A_SEMANTIC_ACCOUNT_ADDR.includes(si_field)) {
 			si_name = `sa_${si_field.replace(/_address$/, '')}`;
 			yn_type = typeRef('WeakAccountAddr');
 			yn_return = typeRef('AccountAddr');

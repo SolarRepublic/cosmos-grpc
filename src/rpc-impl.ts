@@ -247,12 +247,29 @@ export abstract class RpcImplementor {
 			g_proto.type ||= g_calls.type;
 			g_proto.writer ||= '';
 
+			// optionality (everything in proto3 is optional by default)
+			let b_optional = true;  // pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label;
+
+			// explicitly not nullable
+			const g_opt = g_field.options as {nullable?: boolean};
+			if(g_opt && 'nullable' in g_opt && !g_opt.nullable) {
+				// explictly optional
+				if(g_field.proto3Optional) {
+					debugger;
+				}
+				// not repeated
+				else if(!g_field.repeated) {
+					b_optional = true;
+				}
+			}
+
 			// create and return thing
 			return {
 				field: g_field,
 
-				optional: (!g_field.repeated && !(g_field.options as {nullable?: boolean})?.nullable)
-					&& (pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label || g_field.proto3Optional || false),
+				optional: b_optional,
+				// optional: (!g_field.repeated && !(g_field.options as {nullable?: boolean})?.nullable)
+				// 	&& (pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label || g_field.proto3Optional || false),
 
 				calls: {
 					...g_calls,

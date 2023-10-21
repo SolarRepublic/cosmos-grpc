@@ -210,7 +210,8 @@ export const print = (yn_stmt: Statement): string => {
 		.replace(/\n(  {2,})/g, (s_line, s_spaces) => '\n'+'\t'.repeat((s_spaces.length / 4) | 0))
 		.replace(/(const \w+ = \(.*)/g, s_line => s_line
 			.replace(/(\()?(\w+\??: [^,)]+)(?:(, )|\))/g, (s_match, s_lparen, s_main, s_comma) => ''
-				+`${s_lparen? s_lparen+'\n\t': ''}${s_main}${s_comma? ',\n\t': '\n)'}`));
+				+`${s_lparen? s_lparen+'\n\t': ''}${s_main}${s_comma? ',\n\t': '\n)'}`))
+		.replace(/\[\s+\]/g, '[]');
 
 	return sx_print;
 };

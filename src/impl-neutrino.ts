@@ -326,7 +326,9 @@ export class NeutrinoImpl extends RpcImplementor {
 			g_return.type,
 		]);
 
-		const yn_statement = declareConst(`${si_service}${proper(si_vendor)}${proper(si_module_ident)}${si_method}`, yn_call, true);
+		// const si_action_prefix = si_service
+		const si_action_prefix = sx_path_http_get? 'query': 'submit';
+		const yn_statement = declareConst(`${si_action_prefix}${proper(si_vendor)}${proper(si_module_ident)}${si_method}`, yn_call, true);
 
 		const a_comment_lines = s_comments.trim().replace(new RegExp(`^${escape_regex(g_method.name!)}\\s+`, 'i'), '').split(/\n/g);
 		const [s_line_0] = a_comment_lines;

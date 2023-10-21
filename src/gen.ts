@@ -60,13 +60,18 @@ const A_GLOBAL_PREAMBLE = [
 			'lcd_query',
 		]),
 		importModule('#/types', [
+			'WeakInt64Str',
 			'WeakUint64Str',
+			'WeakInt128Str',
+			'WeakUint128Str',
+			'Int64Str',
 			'Uint64Str',
-			'Int64Str',
+			'Int128Str',
 			'Uint128Str',
-			'Int64Str',
-			'WeakAccAddr',
-			'AccAddr',
+			'WeakAccountAddr',
+			'WeakValidatorAddr',
+			'AccountAddr',
+			'ValidatorAddr',
 			'HexLower',
 			'ImplementsInterface',
 		], true),
@@ -341,12 +346,12 @@ void plugin((a_protos, h_inputs) => {
 
 			a_body.push(
 				...k_impl.body('decoder'),
-				...a_encoders
+				...a_decoders
 			);
 		}
 
 		if(a_body.length) {
-			(h_outputs[si_file] ||= {})[si_version] = [...g_parts.head, ...g_parts.body].join('\n\n');
+			(h_outputs[si_file] ||= {})[si_version] = [g_parts.head.join('\n'), ...g_parts.body].join('\n\n');
 		}
 	}
 

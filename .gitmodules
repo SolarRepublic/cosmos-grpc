@@ -20,3 +20,12 @@
 [submodule "submodules/gogoproto"]
 	path = submodules/gogoproto
 	url = https://github.com/cosmos/gogoproto
+[submodule "submodules/osmosis"]
+	path = submodules/osmosis
+	url = https://github.com/osmosis-labs/osmosis
+[submodule "submodules/akash"]
+	path = submodules/akash
+	url = https://github.com/akash-network/akash-api
+[submodule "submodules/gaia"]
+	path = submodules/gaia
+	url = https://github.com/cosmos/gaia
