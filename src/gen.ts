@@ -82,7 +82,7 @@ const A_GLOBAL_PREAMBLE = [
 			'HexLower',
 			'ImplementsInterface',
 		], true),
-	].map(print),
+	].map(yn => print(yn)),
 ];
 
 const augment_service = (

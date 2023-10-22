@@ -199,7 +199,16 @@ export const parens = (yn_expr: Expression) => y_factory.createParenthesizedExpr
 
 export const funcType = (a_params: ParameterDeclaration[], yn_return: TypeNode) => y_factory.createFunctionTypeNode(__UNDEFINED, a_params, yn_return);
 
-export const print = (yn_stmt: Statement): string => {
+export const print = (yn_stmt: Statement, a_comment_lines?: string[]): string => {
+	if(a_comment_lines) {
+		yn_stmt = ts.addSyntheticLeadingComment(
+			yn_stmt,
+			SyntaxKind.MultiLineCommentTrivia,
+			`*${a_comment_lines.map(s => '\n * '+s).join('')}\n `,
+			true
+		);
+	}
+
 	const y_printer = ts.createPrinter({
 		newLine: NewLineKind.LineFeed,
 	});

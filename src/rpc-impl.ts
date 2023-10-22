@@ -64,7 +64,7 @@ export abstract class RpcImplementor {
 	}
 
 	imports(): string[] {
-		return oderac(this._h_type_imports, (si_ident, sr_path) => importModule(sr_path, [si_ident], true)).map(print);
+		return oderac(this._h_type_imports, (si_ident, sr_path) => importModule(sr_path, [si_ident], true)).map(yn => print(yn));
 	}
 
 	reset(): void {

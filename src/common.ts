@@ -78,6 +78,7 @@ export type FieldRouter = Record<
 >;
 
 const A_SEMANTIC_ACCOUNT_ADDR = [
+	'sender',
 	'creator',
 	'voter',
 	'depositor',
@@ -228,9 +229,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		},
 
 		proto: {
-			name: `atu8_${si_field}`,
-			type: typeRef('Uint8Array'),
-			writer: 'v',
+			writer: 'g',
 		},
 
 		return_type: typeRef('Uint64Str'),
@@ -244,7 +243,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		},
 
 		proto: {
-			writer: 'v',
+			writer: 'g',
 		},
 
 		return_type: typeRef('Int64Str'),
@@ -260,7 +259,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		let yn_return!: TypeNode;
 
 		// validator address
-		if(/(?:^validator_.*?|validator)_addr(ess)?$/.test(si_field)) {
+		if(/(^val(idator)?_.*?|val(idator)?)_addr(ess)?$/.test(si_field)) {
 			si_name = `sa_${si_field.replace(/_addr(ess)?$/, '')}`;
 			yn_type = typeRef('WeakValidatorAddr');
 			yn_return = typeRef('ValidatorAddr');

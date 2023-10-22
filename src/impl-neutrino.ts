@@ -359,12 +359,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			}
 		}
 
-		return print(ts.addSyntheticLeadingComment(
-			yn_statement,
-			SyntaxKind.MultiLineCommentTrivia,
-			`*${a_comment_lines.map(s => '\n * '+s).join('')}\n `,
-			true
-		));
+		return print(yn_statement, a_comment_lines);
 	}
 
 	encodeParams(g_msg: AugmentedMessage): [ParameterDeclaration[], Expression] {
@@ -462,18 +457,11 @@ export class NeutrinoImpl extends RpcImplementor {
 		// create statement
 		const yn_const = declareConst(`any${g_msg.name!}`, yn_writer, true);
 
-		const a_comment_lines = [
-			`Encodes a ${g_msg.name} protobuf message wrapped in the \`Any\` container`,
-			...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - ${g_thing.field.comments}`),
+		return print(yn_const, [
+			`Encodes a ${g_msg.name} protobuf message wrapped in the \`Any\` container: ${g_msg.comments}`,
+			...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
 			`@returns a strongly subtyped Uint8Array representing an \`Any\` protobuf message`,
-		];
-
-		return print(ts.addSyntheticLeadingComment(
-			yn_const,
-			SyntaxKind.MultiLineCommentTrivia,
-			`*${a_comment_lines.map(s => '\n * '+s).join('')}\n `,
-			true
-		));
+		]);
 	}
 
 	msgEncoder(
@@ -483,9 +471,6 @@ export class NeutrinoImpl extends RpcImplementor {
 		s_comments: string
 	): string {
 		const g_parts = g_method.service.source.parts;
-
-			// encode params and build chain
-		const [a_params, yn_chain] = this.encodeParams(g_input);
 
 		// prep unique type
 		const si_singleton = `ProtoMsg${g_method.name}`;
@@ -497,10 +482,11 @@ export class NeutrinoImpl extends RpcImplementor {
 			typeLit(string(si_singleton)),
 		]));
 
-		// const yn_type = this.accepts();
-
 		// add type decl to preamble
 		this._g_heads.encoder.push(print(yn_type));
+
+		// encode params and build chain
+		const [a_params, yn_chain] = this.encodeParams(g_input);
 
 		// construct call chain
 		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)));
@@ -508,7 +494,11 @@ export class NeutrinoImpl extends RpcImplementor {
 		// create statement
 		const yn_const = declareConst(`msg${proper(g_parts.vendor)}${g_method.name!}`, yn_writer, true);
 
-		return print(yn_const);
+		return print(yn_const, [
+			`Encodes a ${g_method.name} protobuf message: ${g_method.comments}`,
+			...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
+			`@returns a strongly subtyped Uint8Array protobuf message`,
+		]);
 	}
 
 	// 
@@ -669,7 +659,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		const yn_statement = declareConst(`decode${g_msg.name}`, yn_init, true);
 
-		const a_comment_lines = [
+		return print(yn_statement, [
 			`Decodes a protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} response message`,
 			'@param atu8_payload - raw bytes to decode',
 			...1 === a_types.length
@@ -678,13 +668,6 @@ export class NeutrinoImpl extends RpcImplementor {
 					'@returns a tuple where:',
 					...a_types.map((g_type, i_type) => `  - ${i_type}: ${g_type.field.name} - ${g_type.field.comments}`),
 				],
-		];
-
-		return print(ts.addSyntheticLeadingComment(
-			yn_statement,
-			SyntaxKind.MultiLineCommentTrivia,
-			`*${a_comment_lines.map(s => '\n * '+s).join('')}\n `,
-			true
-		));
+		]);
 	}
 }
