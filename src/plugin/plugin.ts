@@ -9,27 +9,22 @@ import {fold, concat2, escape_regex} from '@blake.regalia/belt';
 import pluginPb from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 
 // import anotations
-import '../lib/annotations/gogoproto/gogo_pb.cjs';
-import '../lib/annotations/google/api/annotations_pb.cjs';
-import '../lib/annotations/cosmos_proto/cosmos_pb.cjs';
-import '../lib/annotations/amino/amino_pb.cjs';
+import '../annotations/gogoproto/gogo_pb.cjs';
+import '../annotations/google/api/annotations_pb.cjs';
+import '../annotations/cosmos_proto/cosmos_pb.cjs';
+import '../annotations/amino/amino_pb.cjs';
 
 const {
 	CodeGeneratorRequest,
 	CodeGeneratorResponse,
 } = pluginPb;
 
-/**
- * Construct a simple protoc plugin from a promise
- * @param  {Function} f_plugin A function that returns a promise or value
- * @return {promise}     Resolves on success
- */
 export const plugin = async(
 	f_plugin: (
 		a_protos: FileDescriptorProto.AsObject[],
 		a_includes: Dict<FileDescriptorProto.AsObject>
 	) => Promisable<CodeGenRes.File.AsObject[]>
-) => {
+): Promise<void> => {
 	let atu8_accumulate = new Uint8Array();
 	for await(const atu8_chunk of process.stdin) {
 		atu8_accumulate = concat2(atu8_accumulate, atu8_chunk as Uint8Array);
@@ -70,22 +65,12 @@ export const plugin = async(
 	}
 };
 
-/**
- * Find leadingComments in locationList, by pathList
- * @param  {number[]} a_path       path of comment
- * @param  {object} a_loc_list comment optioct from protobuf
- * @return {string}              the comment that you requested
- * examples paths:
- * [4, m] - message comments
- * [4, m, 2, f] - field comments in message
- * [6, s] - service comments
- * [6, s, 2, r] - rpc comments in service
- */
-export const findCommentByPath = (
+
+export const comments_at = (
 	a_path: number[],
 	g_proto: FileDescriptorProto.AsObject | AugmentedFile,
 	s_name?: string
-) => ((g_proto.sourceCodeInfo?.locationList || []).filter((g_loc) => {
+): string => ((g_proto.sourceCodeInfo?.locationList || []).filter((g_loc) => {
 	if(g_loc.pathList.length !== a_path.length) return false;
 	let b_ans = true;
 
@@ -98,6 +83,6 @@ export const findCommentByPath = (
 	.map(l => l.leadingComments)
 	.pop() || '')
 	.replace(/\s*\n\s*/g, ' ')
-	.replace(s_name? new RegExp('^\\s*'+escape_regex(s_name || '')+'(?:\\s+is\\s+)?'): /^/, '')
+	.replace(s_name? new RegExp('^\\s*'+escape_regex(s_name || '')+'(?:\\s+is\\s+)?'): /^/i, '')
 	.trim();
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-mkdir -p proto
+mkdir -p build/proto
 
 ###############################
 # chains to build from
@@ -13,8 +13,7 @@ mkdir -p proto
 # protos from submodules
 ###############################
 function copy() {
-	dst=${2:-proto}
-	rsync -a submodules/$1/ $dst
+	rsync -a submodules/$1/ build/proto/$2
 }
 
 copy protobuf
@@ -24,10 +23,10 @@ copy cosmos-sdk/proto
 copy wasmd/proto
 
 # TODO: perform additive merging of protobufs from different projects
-copy gaia/proto/gaia proto/gaia
-copy akash/proto/node/akash proto/akash
-copy osmosis/proto/osmosis proto/osmosis
-copy secret/third_party/proto/cosmos proto/cosmos
+copy gaia/proto/gaia gaia
+copy akash/proto/node/akash akash
+copy osmosis/proto/osmosis osmosis
+copy secret/third_party/proto/cosmos cosmos
 copy secret/proto
 
 copy gogoproto

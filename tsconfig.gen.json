@@ -1,0 +1,15 @@
+// for compiling the protoc-gen-cosmos plugin
+{
+	"extends": "./tsconfig.json",
+
+	"compilerOptions": {
+		"baseUrl": "src",
+		"outDir": "build/gen",
+		"declaration": false,
+		"skipLibCheck": true,
+	},
+
+	"include": [
+		"src/plugin/**/*.ts",
+	],
+}

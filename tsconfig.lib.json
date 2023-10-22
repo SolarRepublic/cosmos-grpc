@@ -3,12 +3,16 @@
 	"extends": "./tsconfig.json",
 
 	"compilerOptions": {
-		"baseUrl": "build",
-		"outDir": "build/lib",
-		"declarationDir": "build/lib",
+		"baseUrl": "build/lib",
+		"outDir": "build/dist",
+		"declarationDir": "build/dist",
+
+		"paths": {
+			"#/*": ["./*"]
+		}
 	},
 
 	"include": [
-		"build/dist/**/*.ts",
+		"build/lib/**/*.ts",
 	],
 }

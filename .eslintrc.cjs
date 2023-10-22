@@ -6,4 +6,9 @@ module.exports = {
 		tsconfigRootDir: __dirname,
 		project: 'tsconfig.json',
 	},
+	plugins: ['unused-imports'],
+	rules: {
+		'unused-imports/no-unused-imports': 'warn',
+		'@typescript-eslint/naming-convention': 'off',
+	},
 };

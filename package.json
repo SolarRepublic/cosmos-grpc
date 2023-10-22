@@ -3,48 +3,41 @@
   "description": "Generates tree-shakable TypeScript APIs from the .proto files of any blockchain built using Cosmos-SDK.",
   "version": "0.6.3",
   "type": "module",
-  "main": "dist/main.js",
+  "main": "build/main.js",
   "files": [
-    "dist/"
+    "build/dist/"
   ],
   "bin": {
-    "protoc-gen-secret": "./build/gen.js"
+    "protoc-gen-secret": "./build/protoc/run.js"
   },
   "author": "Blake Regalia <blake.regalia@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "clean": "rm -rf dist lib proto",
-    "build": "./build.sh",
-    "rebuild": "yarn clean && yarn build",
-    "build-plugin": "tsc && chmod u+x ./build/gen.js && yarn tsc-esm-fix --target=build",
-    "run-plugin": "./run-plugin.sh",
-    "debug-plugin": "yarn build-plugin && yarn run-plugin"
+    "clean": "rm -rf build",
+    "proto:build": "./build.sh",
+    "gen:compile": "tsc -p tsconfig.gen.json",
+    "gen:fix": "yarn tsc-esm-fix --target=build/gen",
+    "gen:chmod": "chmod u+x ./build/gen/plugin/{run,debug}.js",
+    "plugin:build": "yarn gen:compile && yarn gen:fix && yarn gen:chmod",
+    "plugin:run": "./run-plugin.sh",
+    "build": "yarn clean && yarn proto:build && yarn plugin:build && yarn plugin:run",
+    "debug": "yarn build debug"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.9.5",
-    "add": "^2.0.6",
     "google-protobuf": "^3.21.2",
-    "protobufjs": "^7.2.5",
-    "protoc-gen-ts": "^0.8.7",
-    "secretjs": "^1.11.1"
+    "protobufjs": "^7.2.5"
   },
   "devDependencies": {
-    "@bazel/bazelisk": "^1.18.0",
-    "@bazel/typescript": "^5.7.3",
-    "@blake.regalia/belt": "^0.16.1",
+    "@blake.regalia/belt": "^0.17.0",
     "@blake.regalia/eslint-config-elite": "^0.3.3",
     "@blake.regalia/tsconfig": "^0.1.2",
-    "@solar-republic/grpc-web": "^0.15.0-fix.3",
-    "@types/google-protobuf": "^3.15.7",
-    "@types/node": "^20.8.6",
-    "@types/protoc-plugin": "^0.0.2",
-    "@typescript-eslint/parser": "^6.7.5",
-    "eslint": "^8.51.0",
-    "grpc-web": "^1.4.2",
-    "protoc-plugin": "^0.0.6",
+    "@types/google-protobuf": "^3.15.9",
+    "@types/node": "^20.8.7",
+    "@typescript-eslint/parser": "^6.8.0",
+    "eslint": "^8.52.0",
+    "eslint-plugin-unused-imports": "^3.0.0",
     "ts-morph": "^20.0.0",
     "ts-node": "^10.9.1",
-    "ts-proto": "^1.162.1",
     "ts-toolbelt": "^9.6.0",
     "tsc-esm-fix": "^2.20.17",
     "typescript": "^5.2.2"

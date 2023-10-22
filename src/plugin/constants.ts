@@ -3,7 +3,7 @@
  */
 export const N_MAX_PROTO_FIELD_NUMBER_GAP = 12;
 
-export const SR_IMPORT_TYPES_PROTO = '#/gen/_types/';
+export const SR_IMPORT_TYPES_PROTO = '#/_types/';
 export const SR_IMPORT_TYPES_LIB = '#/types';
 
 export const XC_HINT_UNKNOWN = 0;

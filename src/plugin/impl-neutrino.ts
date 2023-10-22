@@ -2,7 +2,7 @@ import type {TsThing} from './common';
 import type {AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
 
 import type {FileCategory} from './rpc-impl';
-import type {Statement, TypeNode, Expression, ParameterDeclaration, ArrayBindingElement, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
+import type {Statement, TypeNode, Expression, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
 
 import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from '@blake.regalia/belt';
 import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
@@ -11,7 +11,7 @@ import {ts} from 'ts-morph';
 import {H_FIELD_TYPE_TO_HUMAN_READABLE, field_router} from './common';
 import {XC_HINT_NUMBER, XC_HINT_STRING, XC_HINT_BIGINT, XC_HINT_SINGULAR, XC_HINT_BYTES, N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, funcType, ident, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
+import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
 
 type ReturnThing = {
 	type: TypeNode;
@@ -245,8 +245,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		sr_path_prefix: string,
 		g_method: AugmentedMethod,
 		g_input: AugmentedMessage,
-		g_output: AugmentedMessage,
-		s_comments: string
+		g_output: AugmentedMessage
 	): string {
 		// ref path parts
 		const g_parts = g_method.service.source.parts;
@@ -296,7 +295,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			return `@param ${g_arg.calls.name} - ${s_comment}`;
 		});
 
-		const yn_call = call(`lcd_${si_service}`, [
+		const yn_call = call('restful_grpc', [
 			// request formatter
 			arrow(a_args.map(g_arg => param(g_arg.calls.id)), g_pattern.expr),
 
@@ -328,9 +327,12 @@ export class NeutrinoImpl extends RpcImplementor {
 		const si_action_prefix = sx_path_http_get? 'query': 'submit';
 		const yn_statement = declareConst(`${si_action_prefix}${proper(g_parts.vendor)}${proper(si_module_ident)}${si_method}`, yn_call, true);
 
-		const a_comment_lines = s_comments.trim().replace(new RegExp(`^${escape_regex(g_method.name!)}\\s+`, 'i'), '').split(/\n/g);
-		const [s_line_0] = a_comment_lines;
-		if(s_line_0) a_comment_lines[0] = s_line_0[0].toUpperCase()+s_line_0.slice(1);
+		// upper-case first letter of comment if present
+		let s_line_0 = g_method.comments;
+		if(s_line_0) s_line_0 = s_line_0[0].toUpperCase()+s_line_0.slice(1);
+
+		// init comment lines
+		const a_comment_lines = [s_line_0];
 		a_comment_lines.push(`@param z_req - URL origin of LCD endpoint or {@link RequestInit}`);
 		a_comment_lines.push(...a_docs_parmas);
 
@@ -366,31 +368,43 @@ export class NeutrinoImpl extends RpcImplementor {
 		// instantiate writer
 		let yn_chain = call('Protobuf', [], __UNDEFINED, '...');
 
-		// create params from fields
+		// prep params lists
 		const a_params_required: ParameterDeclaration[]= [];
 		const a_params_optional: ParameterDeclaration[] = [];
-		g_msg.fieldList.forEach((g_field, i_field) => {
+
+		// keep track of the expected field number to determine when there are gaps
+		let n_field_expected = 1;
+
+		// each field
+		g_msg.fieldList.forEach((g_field) => {
 			// convert field to thing
 			const g_thing = this.route(g_field);
 
 			// prep args
 			const a_args: Expression[] = [g_thing.calls.to_proto];
 
-			// add optional field id
-			const i_number = g_field.number;
-			if('number' === typeof i_number && i_number !== i_field+1) {
+			// field number does not immediately follow previous
+			const i_number = g_field.number!;
+			if(i_number !== n_field_expected++) {
+				// append the correct number to the calll args
 				a_args.push(numericLit(i_number));
+
+				// no number
+				if('number' !== typeof i_number) {
+					throw new Error(`Field is missing explicit number: ${g_field.name}`);
+				}
 			}
 
-			// add to chain
+			// human-readable field type for comment
 			const s_comment_type = g_field.typeName?.split('.').at(-1)
 				|| H_FIELD_TYPE_TO_HUMAN_READABLE[g_field.type!] || 'unknown';
 
+			// append to protobuf-building call chain
 			yn_chain = call(
 				access(yn_chain, g_thing.proto.writer),
 				a_args,
 				__UNDEFINED,
-				`${s_comment_type}${FieldDescriptorProto.Label.LABEL_REPEATED === g_field.label? '[]': ''} ${g_field.name} = ${g_field.number}`
+				`${s_comment_type}${g_field.repeated? '[]': ''} ${g_field.name} = ${g_field.number}`
 			);
 
 			// create parameter
@@ -401,7 +415,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			// extend
 			(yn_param as any).thing = g_thing;
 
-			// add to optional/required depending on which one
+			// add to optional/required params list, depending on which one it is
 			if(g_thing.optional) {
 				a_params_optional.push(yn_param);
 			}
@@ -432,11 +446,15 @@ export class NeutrinoImpl extends RpcImplementor {
 		// declare unique type
 		const yn_type = y_factory.createTypeAliasDeclaration([
 			y_factory.createToken(SyntaxKind.ExportKeyword),
-		], ident(si_singleton), __UNDEFINED, typeRef('ImplementsInterfaces', [
-			union([
-				string(p_type),
-				...a_interfaces.map(si_interface => string(si_interface)),
-			].map(yn => y_factory.createLiteralTypeNode(yn))),
+		], ident(si_singleton), __UNDEFINED, intersection([
+			// ProtoMsg<si_message>
+			typeRef('ProtoMsg', [
+				typeLit(string(p_type)),
+			]),
+			// ImplementsInterfaces<as_interfaces>
+			typeRef('ImplementsInterfaces', [
+				union(a_interfaces.map(si_interface => typeLit(string(si_interface)))),
+			]),
 		]));
 
 		// add to preamble
@@ -458,7 +476,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const yn_const = declareConst(`any${g_msg.name!}`, yn_writer, true);
 
 		return print(yn_const, [
-			`Encodes a ${g_msg.name} protobuf message wrapped in the \`Any\` container: ${g_msg.comments}`,
+			`Encodes a \`${g_msg.name}\` protobuf message wrapped in the \`Any\` container: ${g_msg.comments}`,
 			...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
 			`@returns a strongly subtyped Uint8Array representing an \`Any\` protobuf message`,
 		]);
@@ -467,8 +485,7 @@ export class NeutrinoImpl extends RpcImplementor {
 	msgEncoder(
 		g_method: AugmentedMethod,
 		g_input: AugmentedMessage,
-		g_output: AugmentedMessage,
-		s_comments: string
+		g_output: AugmentedMessage
 	): string {
 		const g_parts = g_method.service.source.parts;
 
@@ -478,8 +495,8 @@ export class NeutrinoImpl extends RpcImplementor {
 		// declare unique type
 		const yn_type = y_factory.createTypeAliasDeclaration([
 			y_factory.createToken(SyntaxKind.ExportKeyword),
-		], ident(si_singleton), __UNDEFINED, typeRef('ImplementsInterface', [
-			typeLit(string(si_singleton)),
+		], ident(si_singleton), __UNDEFINED, typeRef('ProtoMsg', [
+			typeLit(string(`/${g_method.service.source.pb_package}.${g_method.name!}`)),
 		]));
 
 		// add type decl to preamble
@@ -495,7 +512,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const yn_const = declareConst(`msg${proper(g_parts.vendor)}${g_method.name!}`, yn_writer, true);
 
 		return print(yn_const, [
-			`Encodes a ${g_method.name} protobuf message: ${g_method.comments}`,
+			`Encodes a \`${g_method.name}\` protobuf message: ${g_method.comments}`,
 			...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
 			`@returns a strongly subtyped Uint8Array protobuf message`,
 		]);
@@ -652,7 +669,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				),
 				funcType([
 					...a_params,
-					param('reserved', type('never'), true),
+					param('RESERVED', type('never'), true),
 				], yn_return)
 			)
 			: yn_destructure;
@@ -662,6 +679,9 @@ export class NeutrinoImpl extends RpcImplementor {
 		return print(yn_statement, [
 			`Decodes a protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} response message`,
 			'@param atu8_payload - raw bytes to decode',
+			...g_param_destructure
+				? ['@param RESERVED - a second argument is explicitly forbidden. make sure not to pass this function by reference to some callback argument']
+				: [],
 			...1 === a_types.length
 				? [`@returns ${a_types[0].field.name} - ${a_types[0].field.comments}`]
 				: [

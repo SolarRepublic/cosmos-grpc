@@ -29,7 +29,6 @@ export abstract class RpcImplementor {
 		g_method: AugmentedMethod,
 		g_input: AugmentedMessage,
 		g_output: AugmentedMessage,
-		s_comments: string
 	): string;
 
 	abstract head(si_category: FileCategory): string[];
@@ -135,25 +134,37 @@ export abstract class RpcImplementor {
 		// apply transform
 		const g_bare = f_transformer(g_field.name, g_field);
 
+		// ref parts
+		const g_calls = g_bare.calls as TsThing['calls'];
+		const g_proto = g_bare.proto as TsThing['proto'];
+
+		// auto-fill proto
+		{
+			let si_proto = g_calls.name;
+
+			if('b' === g_proto.writer) {
+				si_proto = `atu8_${g_calls.name.replace(/^[^_]+_/, '')}`;
+			}
+
+			g_proto.name = si_proto;
+			g_proto.type ||= g_calls.type;
+		}
+
 		// repeated field
 		if(g_field.repeated) {
-			// ref parts
-			const {
-				calls: g_calls,
-				proto: g_proto,
-			} = g_bare;
+			if('preferences' === g_field.name) debugger;
 
 			// ref singular name format
 			const s_name_singular = g_calls.name;
 
 			// assert write type exists
-			if(!g_proto?.writer) {
+			if(!g_proto.writer) {
 				debugger;
 				throw new Error(`Repeated field type is not mapped to a proto writer function: ${s_name_singular}`);
 			}
 
 			// pluralize names
-			g_calls.name = s_name_singular.replace(/^[^_]+/, 'a')
+			g_proto.name = g_calls.name = s_name_singular.replace(/^[^_]+/, 'a')
 				.replace(/(\w\w)$/, (s_match, s_term) => s_term + (
 					's' === s_term[1]
 						? 'e' === s_term[0]
@@ -163,14 +174,15 @@ export abstract class RpcImplementor {
 								: ''
 						: 's'));
 
-			// adjust type
+			// adjust call type
 			g_calls.type = arrayType(g_calls.type);
 
-			// turn into repeated writer
-			g_proto.writer = g_proto.writer.toUpperCase();
+			// adjust proto type
+			g_proto.type = arrayType(g_proto.type);
 
-			// no type; inherit from calls
-			if(!g_proto.type) g_proto.type = g_calls.type;
+			// turn into repeated writer
+			// @ts-expect-error ignore
+			g_proto.writer = g_proto.writer.toUpperCase();
 
 			// wrap to_json
 			if(g_calls.to_json) {
@@ -183,7 +195,7 @@ export abstract class RpcImplementor {
 			// wrap from_json
 			if(g_calls.from_json) {
 				g_calls.from_json = yn_data => call(access(yn_data, 'map'), [
-					arrow([param(s_name_singular)], g_calls.from_json!(ident(s_name_singular))),
+					arrow([param(s_name_singular)], g_calls.from_json(ident(s_name_singular))),
 				]);
 			}
 
@@ -203,61 +215,53 @@ export abstract class RpcImplementor {
 			}
 		}
 
-		{
-			// auto-fill calls
-			const g_calls = g_bare.calls as TsThing['calls'];
-			g_calls.to_json ||= ident(g_calls.name);
-			g_calls.from_json ||= F_IDENTITY;
-			g_calls.to_proto ||= ident(g_calls.name);
-			g_calls.return_type ||= g_calls.type;
+		// auto-fill calls
+		g_calls.to_json ||= ident(g_calls.name);
+		g_calls.from_json ||= F_IDENTITY;
+		g_calls.to_proto ||= ident(g_calls.name);
+		g_calls.return_type ||= g_calls.type;
 
-			// auto-fill proto
-			const g_proto = (g_bare.proto ||= {}) as TsThing['proto'];
-			const si_proto = g_proto.name ||= g_calls.name;
-			g_proto.type ||= g_calls.type;
-			g_proto.writer ||= '';
 
-			// optionality (everything in proto3 is optional by default)
-			let b_optional = true;  // pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label;
+		// optionality (everything in proto3 is optional by default)
+		let b_optional = true;  // pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label;
 
-			// explicitly not nullable
-			if(false === g_field.options?.nullable) {
-				// explictly optional
-				if(g_field.proto3Optional) {
-					debugger;
-				}
-				// not repeated
-				else if(!g_field.repeated) {
-					b_optional = true;
-				}
+		// explicitly not nullable
+		if(false === g_field.options?.nullable) {
+			// explictly optional
+			if(g_field.proto3Optional) {
+				debugger;
 			}
-
-			// create and return thing
-			return {
-				field: g_field,
-
-				optional: b_optional,
-				// optional: (!g_field.repeated && !(g_field.options as {nullable?: boolean})?.nullable)
-				// 	&& (pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label || g_field.proto3Optional || false),
-
-				calls: {
-					...g_calls,
-
-					get id() {
-						return ident(g_calls.name);
-					},
-				},
-
-				proto: {
-					...g_proto,
-
-					get id() {
-						return ident(si_proto);
-					},
-				},
-
-				nests: g_bare.nests || null,
-			};
+			// not repeated
+			else if(!g_field.repeated) {
+				b_optional = true;
+			}
 		}
+
+		// create and return thing
+		return {
+			field: g_field,
+
+			optional: b_optional,
+			// optional: (!g_field.repeated && !(g_field.options as {nullable?: boolean})?.nullable)
+			// 	&& (pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label || g_field.proto3Optional || false),
+
+			calls: {
+				...g_calls,
+
+				get id() {
+					return ident(g_calls.name);
+				},
+			},
+
+			proto: {
+				...g_proto,
+
+				get id() {
+					return ident(g_proto.name);
+				},
+			},
+
+			nests: g_bare.nests || null,
+		};
 	}
 }

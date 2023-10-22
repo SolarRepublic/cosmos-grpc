@@ -1,12 +1,11 @@
+// root tsconfig extended by others; this should never be used by `tsc`
 {
 	"extends": "@blake.regalia/tsconfig/tsconfig.node.json",
 
 	"compilerOptions": {
 		"baseUrl": ".",
-		"outDir": "build",
 
 		"declaration": true,
-		"declarationDir": "build",
 		"noImplicitReturns": false,
 
 		"allowJs": false,
@@ -22,29 +21,3 @@
 		"experimentalSpecifierResolution": "node"
 	},
 }
-
-// {
-// 	"compilerOptions": {
-// 		"outDir": "dist",
-// 		"declaration": true,
-// 		"declarationMap": true,
-
-// 		// downleveling ES features can have very nasty side effects
-// 		"target": "es2022",
-// 		"module": "es2022",
-// 		"moduleResolution": "node",
-// 		"sourceMap": true,
-// 		"esModuleInterop": true,
-
-// 		// ensure consistent build outputs for code hashes
-// 		"newLine": "lf",
-
-// 		"disableSizeLimit": true,
-
-// 		"forceConsistentCasingInFileNames": true,
-// 		"strict": true,
-// 		"useUnknownInCatchVariables": false,
-// 		"skipLibCheck": true
-// 	},
-// 	"exclude": ["node_modules", "dist", "proto", "scrap", "submodules"],
-//  }

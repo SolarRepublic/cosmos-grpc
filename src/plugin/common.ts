@@ -1,7 +1,10 @@
 import type {AugmentedField, AugmentedFile} from './env';
 import type {RpcImplementor} from './rpc-impl';
+import type {ProtoWriterMethod} from '../api/protobuf-writer';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
+
+// type ProtoWriterMethod = string;
 
 import {__UNDEFINED, snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
@@ -35,10 +38,13 @@ export type TsThingBare = {
 		from_json?: (yn_expr: Expression) => Expression;
 	};
 
-	proto?: {
-		name?: string;
+	proto: {
+		// which method to use on the `Protobuf` writer
+		writer: ProtoWriterMethod;
+
 		type?: TypeNode;
-		writer?: string;
+
+		// indicates that encoders prefer to use the `calls` type in parameters
 		prefers_call?: number;
 	};
 
@@ -58,13 +64,11 @@ export type TsThing = {
 	};
 
 	proto: Required<TsThingBare['proto']> & {
+		name: string;
 		id: Identifier;
 	};
 
 	nests: Required<TsThingBare['nests']>;
-	//  & {
-	// 	id: Identifier;
-	// };
 };
 
 const route_not_impl = (si_field: string) => {
@@ -80,13 +84,20 @@ export type FieldRouter = Record<
 const A_SEMANTIC_ACCOUNT_ADDR = [
 	'sender',
 	'creator',
-	'voter',
+	'delegator',
 	'depositor',
-	'granter',
 	'grantee',
+	'granter',
+	'voter',
+
+	'recipient',
+	'owner',
+	'new_owner',
 ];
 
-const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): Partial<TsThingBare> => {
+type ThingDefMixin = Pick<TsThingBare, 'proto'> & Partial<Omit<TsThingBare, 'proto'>>;
+
+const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixin => {
 	const s_ident = `xt_${snake(g_field.name!)}`;
 	return {
 		calls: {
@@ -96,9 +107,8 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): Partial<TsTh
 		},
 
 		proto: {
-			name: `atu8_${snake(g_field.name!)}`,
-			type: typeRef('Uint8Array'),
 			writer: 'b',
+			type: typeRef('Uint8Array'),
 			prefers_call: 1,
 		},
 
@@ -111,7 +121,9 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): Partial<TsTh
 };
 
 // special overrides
-const H_OVERRIDE_MIXINS: Dict<(g_field: AugmentedField, k_impl: RpcImplementor) => Partial<TsThingBare> | undefined> = {
+const H_OVERRIDE_MIXINS: Dict<
+	(g_field: AugmentedField, k_impl: RpcImplementor) => ThingDefMixin | undefined
+> = {
 	// Coin
 	'.cosmos.base.v1beta1.Coin'(g_field, k_impl) {
 		const si_name = snake(g_field.name!);
@@ -125,9 +137,8 @@ const H_OVERRIDE_MIXINS: Dict<(g_field: AugmentedField, k_impl: RpcImplementor) 
 			},
 
 			proto: {
-				name: `atu8_${si_name}`,
-				type: typeRef('Uint8Array'),
 				writer: 'b',
+				type: typeRef('Uint8Array'),
 				prefers_call: 1,
 			},
 
@@ -156,7 +167,6 @@ const H_OVERRIDE_MIXINS: Dict<(g_field: AugmentedField, k_impl: RpcImplementor) 
 					typeLit(string(si_accepts)),
 				]),
 			]);
-			// yn_type = k_impl.importType(`${SR_IMPORT_TYPES_PROTO}${k_impl.pathToFieldType(g_field)}`, `Any${g_opts.acceptsInterface}`);
 		}
 
 		return {
@@ -194,6 +204,10 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		calls: {
 			name: `b_${si_field}`,
 			type: type('boolean'),
+		},
+
+		proto: {
+			writer: 'v',
 		},
 	}),
 
@@ -265,7 +279,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			yn_return = typeRef('ValidatorAddr');
 		}
 		// account address
-		else if(/_addr(ess)?$/.test(si_field) || A_SEMANTIC_ACCOUNT_ADDR.includes(si_field)) {
+		else if(/(_addr(ess)?|(^|_)receiver)$/.test(si_field) || A_SEMANTIC_ACCOUNT_ADDR.includes(si_field)) {
 			si_name = `sa_${si_field.replace(/_address$/, '')}`;
 			yn_type = typeRef('WeakAccountAddr');
 			yn_return = typeRef('AccountAddr');
@@ -307,6 +321,10 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 				name: `sc_${snake(si_field)}`,
 				type: k_impl.importType(`${SR_IMPORT_TYPES_PROTO}${sr_path}`, si_ref),
 			},
+			proto: {
+				writer: 'v',
+				type: typeRef(`SPECIAL_ENUM_PROTO`),
+			},
 			// nests: {
 			// 	yn_data => call(ident('decode_protobuf'), [yn_data]),
 			// }
@@ -328,7 +346,6 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		return {
 			calls: {
 				name: `g_${si_name}`,
-				to_proto: ident(`atu8_${si_name}`),
 				type: k_impl.importType(`${SR_IMPORT_TYPES_PROTO}${sr_path}`, si_ref),
 			},
 
@@ -340,14 +357,11 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 
 			...H_OVERRIDE_MIXINS[g_field.typeName!]?.(g_field, k_impl) || {
 				proto: {
-					name: `atu8_${si_name}`,
-					type: typeRef('ImplementsInterface', [
+					writer: 'b',
+					type: typeRef('ProtoMsg', [
 						typeLit(string(g_field.typeName!.replace(/^\./, '/'))),
 					]),
-					// type: k_impl.importType(`${SR_IMPORT_TYPES_PROTO}${sr_path}`, `Any${si_ref}`),
-					// type: typeRef('Uint8Array'),
-					writer: 'b',
-					prefer_call: 1,
+					prefers_call: 1,
 				},
 			},
 		};
