@@ -112,7 +112,7 @@ const augment_field = (
 
 const capture_messages = (
 	k_impl: RpcImplementor,
-	g_proto: FileDescriptorProto.AsObject,
+	g_proto: AugmentedFile,
 	sr_package: string,
 	a_path: number[]=[]
 ) => (g_msg: DescriptorProto.AsObject, i_msg: number) => {
@@ -135,7 +135,7 @@ const capture_messages = (
 
 	// save to global lookup
 	k_impl.msg(p_msg, augment_message(g_msg, {
-		source: g_proto as AugmentedFile,
+		source: g_proto,
 		index: i_msg,
 		comments: findCommentByPath(a_local, g_proto, g_msg.name),
 	}));
@@ -153,7 +153,10 @@ void plugin((a_protos, h_inputs) => {
 	const h_outputs: Dict<OutputFile> = {};
 
 	// each included file
-	for(const [, g_proto] of ode(h_inputs)) {
+	for(const [, g_proto_raw] of ode(h_inputs)) {
+		// force cast type of proto file
+		const g_proto = g_proto_raw as unknown as AugmentedFile;
+
 		// skip anonymous
 		const si_package = g_proto.pb_package;
 		if(!si_package) continue;
@@ -193,7 +196,7 @@ void plugin((a_protos, h_inputs) => {
 		});
 
 		// each message type
-		g_proto.messageTypeList.forEach(capture_messages(k_impl, g_proto, '.'+si_package));
+		g_proto_raw.messageTypeList.forEach(capture_messages(k_impl, g_proto, '.'+si_package));
 
 		// each enum
 		g_proto.enumTypeList.forEach((g_enum, i_enum) => {
@@ -203,7 +206,7 @@ void plugin((a_protos, h_inputs) => {
 
 			// save to global lookup
 			k_impl.enum(`.${si_package}.${si_enum}`, augment_enum(g_enum, {
-				source: g_proto as AugmentedFile,
+				source: g_proto,
 				index: i_enum,
 				comments: findCommentByPath([5, i_enum], g_proto, g_enum.name),
 			}));
@@ -213,7 +216,7 @@ void plugin((a_protos, h_inputs) => {
 		g_proto.serviceList.forEach((g_service, i_service) => {
 			// augment service
 			augment_service(g_service, {
-				source: g_proto as AugmentedFile,
+				source: g_proto,
 				index: i_service,
 				comments: findCommentByPath([6, i_service], g_proto),
 			});
@@ -222,7 +225,7 @@ void plugin((a_protos, h_inputs) => {
 			g_service.methodList.forEach((g_method, i_method) => {
 				// augment method
 				augment_method(g_method, {
-					service: g_service as AugmentedService,
+					service: g_service,
 					comments: findCommentByPath([6, i_service, 7, i_method], g_proto),
 				});
 			});
@@ -230,7 +233,7 @@ void plugin((a_protos, h_inputs) => {
 	}
 
 	// each proto file
-	for(const g_proto of a_protos as AugmentedFile[]) {
+	for(const g_proto of a_protos as unknown as AugmentedFile[]) {
 		// reset instance's internal file stuff
 		k_impl.reset();
 

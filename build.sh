@@ -1,6 +1,13 @@
 #!/bin/bash
 mkdir -p proto
 
+###############################
+# chains to build from
+###############################
+# gaia: https://github.com/cosmos/gaia
+# akash: https://github.com/akash-network/akash-api
+# osmosis: https://github.com/osmosis-labs/osmosis
+# secret: https://github.com/scrtlabs/SecretNetwork
 
 ###############################
 # protos from submodules
@@ -15,42 +22,48 @@ copy googleapis
 copy cosmos-proto/proto
 copy cosmos-sdk/proto
 copy wasmd/proto
+
+# TODO: perform additive merging of protobufs from different projects
+copy gaia/proto/gaia proto/gaia
+copy akash/proto/node/akash proto/akash
+copy osmosis/proto/osmosis proto/osmosis
 copy secret/third_party/proto/cosmos proto/cosmos
 copy secret/proto
+
 copy gogoproto
 
 
-###############################
-# annotations
-###############################
-sr_annotations="lib/_annotations"
-rm -rf "$sr_annotations"
-mkdir -p "$sr_annotations"
+# ###############################
+# # annotations
+# ###############################
+# sr_annotations="lib/_annotations"
+# rm -rf "$sr_annotations"
+# mkdir -p "$sr_annotations"
 
-add_annotation() {
-	sr_path="${1//.//}"
-	echo "copying annotations at $sr_path..."
+# add_annotation() {
+# 	sr_path="${1//.//}"
+# 	echo "copying annotations at $sr_path..."
 
-	protoc "--js_out=import_style=commonjs,binary:$sr_annotations" \
-		-I proto/ \
-		"proto/$sr_path.proto"
-}
+# 	protoc "--js_out=import_style=commonjs,binary:$sr_annotations" \
+# 		-I proto/ \
+# 		"proto/$sr_path.proto"
+# }
 
-add_annotation google.api.http
-add_annotation gogoproto.gogo
+# add_annotation google.api.http
+# add_annotation gogoproto.gogo
 
 
 
-###############################
-# plugin
-###############################
-protoc \
-	--plugin='protoc-gen-neutrino=./dist/gen.js' \
-	--neutrino_out=generated \
-	--include_imports \
-	--descriptor_set_out=dist/descriptors.pb \
-	--proto_path=proto \
-	$(find proto/{cosmos,secret} -path -prune -o -name '*.proto' -print0 | xargs -0)
+# ###############################
+# # plugin
+# ###############################
+# protoc \
+# 	--plugin='protoc-gen-neutrino=./dist/gen.js' \
+# 	--neutrino_out=generated \
+# 	--include_imports \
+# 	--descriptor_set_out=dist/descriptors.pb \
+# 	--proto_path=proto \
+# 	$(find proto/{cosmos,secret} -path -prune -o -name '*.proto' -print0 | xargs -0)
 
 
 

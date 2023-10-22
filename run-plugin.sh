@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # dirs to target proto files
-sr_protos=(proto/{secret,cosmos})
+sr_protos=(proto/{secret,akash,gaia,osmosis,cosmos})
 
 # dir to annotations to generate
 sr_annotations="lib/annotations"
 
 # typings output
-sr_types="dist/types"
+sr_types="dist/_types"
 
 
 # clean dir
@@ -17,6 +17,7 @@ mkdir -p "$sr_annotations"
 # define function for annotation
 add_annotation() {
 	sr_path="${1//.//}"
+	sr_js="$sr_annotations/${sr_path}_pb.js"
 
 	# generate annotations using js plugin
 	protoc \
@@ -25,10 +26,9 @@ add_annotation() {
 		"proto/$sr_path.proto"
 
 	# verbose
-	echo "generated annotation: $sr_js"
+	echo "[INFO] generated annotation: $sr_js"
 
 	# replace relative .js imports
-	sr_js="$sr_annotations/${sr_path}_pb.js"
 	sed -i.delete -e 's/\(require(['"'"'"]\.[^)]*\)\.js/\1.cjs/' "$sr_js"
 	rm "$sr_js.delete"
 }
@@ -71,22 +71,31 @@ useJsonWireFormat=true
 outputServices=false
 """
 
+# ignore certain warnings from protoc
+SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
+
 # generate typings
 protoc \
 	--plugin='protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto' \
 	--ts_proto_out="$sr_types" \
 	--ts_proto_opt="$(echo -n "${s_opts/$'\n'/}" | tr '\n' ',' | sed 's/,$//')" \
 	--proto_path=proto \
-	$(find "${sr_protos[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0)
+	$(find "${sr_protos[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
+	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
+
+echo "[INFO] generated typings"
 
 # generate neutrino lib
 protoc \
 	--plugin='protoc-gen-neutrino=./build/gen.js' \
 	--neutrino_out=dist \
-	--include_imports \
-	--descriptor_set_out=dist/descriptors.pb \
 	--proto_path=proto \
-	$(find "${sr_protos[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0)
+	$(find "${sr_protos[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
+	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
+
+
+	# --include_imports \
+	# --descriptor_set_out=dist/descriptors.pb \
 
 # run through linter with fix-all
 yarn eslint --no-ignore --parser-options project:tsconfig.dist.json --fix dist

@@ -2,13 +2,14 @@ import type {TsThing} from './common';
 import type {AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
 
 import type {FileCategory} from './rpc-impl';
-import type {Statement, TypeNode, Expression, ParameterDeclaration, ArrayBindingElement, ConciseBody} from 'typescript';
+import type {Statement, TypeNode, Expression, ParameterDeclaration, ArrayBindingElement, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
 
 import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from '@blake.regalia/belt';
 import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
 import {ts} from 'ts-morph';
 
-import {H_FIELD_TYPE_TO_HUMAN_READABLE, XC_HINT_NUMBER, XC_HINT_STRING, XC_HINT_BIGINT, field_router, XC_HINT_SINGULAR, XC_HINT_BYTES} from './common';
+import {H_FIELD_TYPE_TO_HUMAN_READABLE, field_router} from './common';
+import {XC_HINT_NUMBER, XC_HINT_STRING, XC_HINT_BIGINT, XC_HINT_SINGULAR, XC_HINT_BYTES, N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
 import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, funcType, ident, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
 
@@ -520,10 +521,28 @@ export class NeutrinoImpl extends RpcImplementor {
 		const a_returns: Expression[] = [];
 		const a_hints: Expression[] = [];
 
-		// create bindings
-		const a_bindings = g_msg.fieldList.map((g_field, i_field) => {
-			if(g_field.number !== i_field + 1) {
-				b_monotonic = false;
+		// prep bindings
+		const a_bindings: Array<OmittedExpression | BindingElement> = [];
+
+		// each field
+		g_msg.fieldList.forEach((g_field, i_field) => {
+			const i_number = g_field.number!;
+
+			// found a gap, fields are not monotonic
+			if(i_number !== i_field + 1) {
+				// gap is skippable
+				const n_gap = i_number - (i_field + 1);
+				if(n_gap < N_MAX_PROTO_FIELD_NUMBER_GAP) {
+					// clear the gap
+					for(let i_omit=0; i_omit<n_gap; i_omit++) {
+						a_bindings.push(y_factory.createOmittedExpression());
+						a_hints.push(literal(0));
+					}
+				}
+				// gap is not skippable; flag as not monotonic
+				else {
+					return b_monotonic = false;
+				}
 			}
 
 			// convert to thing
@@ -562,7 +581,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			// set return type
 			a_types.push(g_thing);
 
-			return binding(yn_ident);
+			a_bindings.push(binding(yn_ident));
 
 			// // repeated type; bind items
 			// if(g_field.repeated) {
@@ -572,11 +591,12 @@ export class NeutrinoImpl extends RpcImplementor {
 			// else {
 			// 	return arrayBinding([binding(yn_ident)]);
 			// }
-		}) as ArrayBindingElement[];
+		});
 
 
+		// message fields are not monotonic
 		if(!b_monotonic) {
-			console.warn(`Skipping non-monotonic response type ${g_msg.name}`);
+			console.warn(`WARNING: Message ${g_msg.name} in ${g_msg.source.name} has too wide of a gap between non-monotonic fields`);
 			return;
 		}
 

@@ -6,6 +6,7 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 import {__UNDEFINED, snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
+import {SR_IMPORT_TYPES_PROTO, SR_IMPORT_TYPES_LIB, XC_HINT_SINGULAR_NUMBER, XC_HINT_SINGULAR_STRING} from './constants';
 import {call, castAs, ident, literal, string, ternary, type, typeLit, typeRef, union, y_factory} from './ts-factory';
 
 // destructure members from protobuf
@@ -83,9 +84,6 @@ const A_SEMANTIC_ACCOUNT_ADDR = [
 	'granter',
 	'grantee',
 ];
-
-const SR_IMPORT_TYPES_PROTO = '#/gen/_types/';
-const SR_IMPORT_TYPES_LIB = '#/types';
 
 const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): Partial<TsThingBare> => {
 	const s_ident = `xt_${snake(g_field.name!)}`;
@@ -390,18 +388,6 @@ export const H_FIELD_TYPE_TO_HUMAN_READABLE: Dict = {
 };
 
 export {H_FIELD_TYPES};
-
-export const XC_HINT_UNKNOWN = 0;
-export const XC_HINT_SINGULAR = 1;
-export const XC_HINT_BIGINT = 2;
-export const XC_HINT_STRING = 4;
-export const XC_HINT_BOOLEAN = 0;  // 8;  // should not be used, booleans will become 0 | 1
-export const XC_HINT_NUMBER = 0;  // 16;  // should not be used, is default
-export const XC_HINT_BYTES = 0;  // 32;  // should not be used, is default
-
-export const XC_HINT_SINGULAR_BIGINT = XC_HINT_SINGULAR | XC_HINT_BIGINT;
-export const XC_HINT_SINGULAR_NUMBER = XC_HINT_SINGULAR | XC_HINT_NUMBER;
-export const XC_HINT_SINGULAR_STRING = XC_HINT_SINGULAR | XC_HINT_STRING;
 
 export const map_proto_path = (g_proto: AugmentedFile): string => g_proto.name!.split('.').slice(0, -1).join('.');
 
