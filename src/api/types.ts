@@ -1,3 +1,14 @@
+import type {
+	Int64,
+	Int128,
+	Uint64,
+	Uint128,
+} from '@solar-republic/contractor';
+
+export type Int64Str = Int64;
+export type Int128Str = Int128;
+export type Uint64Str = Uint64;
+export type Uint128Str = Uint128;
 
 /**
  * Any sized int as a string

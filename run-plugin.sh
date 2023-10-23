@@ -103,6 +103,10 @@ protoc \
 	$(find "${srd_chains[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
 	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
 
+# replace all interface defs with type literals
+find "$srd_types" -name "*.ts" -exec \
+	sed -i.del -E 's/export interface (\w+) /export type \1 = /g' {} +
+
 echo "[INFO] Done"
 
 

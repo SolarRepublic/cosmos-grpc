@@ -348,15 +348,15 @@ export const main = () => {
 				);
 			}
 
-			// decoders
-			if(a_decoders?.length) {
-				g_parts.head.push(...k_impl.head('decoder'));
+			// // decoders
+			// if(a_decoders?.length) {
+			// 	g_parts.head.push(...k_impl.head('decoder'));
 
-				a_body.push(
-					...k_impl.body('decoder'),
-					...a_decoders
-				);
-			}
+			// 	a_body.push(
+			// 		...k_impl.body('decoder'),
+			// 		...a_decoders
+			// 	);
+			// }
 
 			// there are contents to write to the file
 			if(a_body.length) {

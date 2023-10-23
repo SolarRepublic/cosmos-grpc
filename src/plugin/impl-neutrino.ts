@@ -29,6 +29,7 @@ const {
 } = ts;
 
 type Draft = {
+	imports: Dict;
 	heads: Record<FileCategory, string[]>;
 	consts: Record<FileCategory, Dict<Statement>>;
 };
@@ -71,9 +72,12 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// open draft
 		const g_draft = this._h_drafts[p_output] ||= {
+			imports: this._h_type_imports,
 			heads: reset_heads(),
 			consts: reset_consts(),
 		};
+
+		this._h_type_imports = g_draft.imports;
 
 		// destructure parts
 		const {
@@ -506,7 +510,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		]);
 
 		// construct writer
-		const yn_writer = arrow(a_params, castAs(yn_any, typeRef(si_singleton)));
+		const yn_writer = arrow(a_params, castAs(yn_any, typeRef(si_singleton)), typeRef(si_singleton));
 
 		// create statement
 		const yn_const = declareConst(`any${g_msg.name!}`, yn_writer, true);
@@ -541,7 +545,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const [a_params, yn_chain] = this.encodeParams(g_input);
 
 		// construct call chain
-		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)));
+		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)), typeRef(si_singleton));
 
 		// create statement
 		const yn_const = declareConst(`msg${proper(g_parts.vendor)}${g_method.name!}`, yn_writer, true);
@@ -573,7 +577,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const [a_params, yn_chain] = this.encodeParams(g_msg);
 
 		// construct call chain
-		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)));
+		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)), typeRef(si_singleton));
 
 		// create statement
 		const yn_const = declareConst(`msg${proper(g_parts.vendor)}${g_msg.name!}`, yn_writer, true);
@@ -597,6 +601,9 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// prep bindings
 		const a_bindings: Array<OmittedExpression | BindingElement> = [];
+
+		// whether or not to include hints
+		const b_worthy = false;
 
 		// each field
 		g_msg.fieldList.forEach((g_field, i_field) => {
@@ -674,8 +681,11 @@ export class NeutrinoImpl extends RpcImplementor {
 			return;
 		}
 
-		const yn_decode = call('decode_protobuf', [ident('atu8_payload'), arrayLit(a_hints)]);
-
+		const yn_decode = call('decode_protobuf', [
+			ident('atu8_payload'),
+			// ...b_worthy? [arrayLit(a_hints)]: [],
+			arrayLit(a_hints),
+		]);
 
 		let yn_init: Expression;
 		let yn_body!: ConciseBody;
@@ -741,7 +751,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			)
 			: yn_destructure;
 
-		const yn_statement = declareConst(`decode${g_msg.name}`, yn_init, true);
+		const yn_statement = declareConst(`decode${proper(g_msg.source.parts.vendor)}${g_msg.name}`, yn_init, true);
 
 		return print(yn_statement, [
 			`Decodes a protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} response message`,

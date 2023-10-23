@@ -1,10 +1,11 @@
-import type {Dict, JsonObject} from '@blake.regalia/belt';
+import type {Dict, JsonObject, JsonValue} from '@blake.regalia/belt';
 
-import {safe_json} from '@blake.regalia/belt';
+import {safe_json, ode, buffer_to_base64} from '@blake.regalia/belt';
+
 
 export type RpcRequest<
 	a_args extends any[]=[],
-> = (...a_args: a_args) => [string] | [string, Dict<string | undefined>];
+> = (...a_args: a_args) => [string] | [string, JsonObject<Uint8Array | undefined>];
 
 export const F_RPC_REQ_NO_ARGS: RpcRequest = () => [''];
 
@@ -19,6 +20,36 @@ export type NetworkErrorDetails = [
 // 		d: a_details,
 // 	});
 // };
+
+const json_to_flatdot = (w_value: JsonValue<Uint8Array>, h_root: Dict, sr_path: string): void => {
+	if(Array.isArray(w_value)) {
+		// eslint-disable-next-line array-callback-return
+		w_value.map((w_item, i_item) => {
+			json_to_flatdot(w_item, h_root, `${sr_path}[${i_item}]`);
+		});
+	}
+	else if(ArrayBuffer.isView(w_value)) {
+		h_root[sr_path] = buffer_to_base64(w_value);
+	}
+	else if('object' === typeof w_value) {
+		json_object_to_flatdot(w_value as JsonObject, h_root, sr_path);
+	}
+	else {
+		h_root[sr_path] = encodeURIComponent(w_value+'');
+	}
+};
+
+const json_object_to_flatdot = (h_object: JsonObject<Uint8Array | undefined>, h_root: Dict={}, sr_path=''): Dict => {
+	for(const [si_key, w_value] of ode(h_object)) {
+		// anything falsy is default, skip it
+		if(!w_value) continue;
+
+		// encode
+		json_to_flatdot(w_value as JsonObject<Uint8Array>, h_root, (sr_path? sr_path+'.': '')+si_key);
+	}
+
+	return h_root;
+};
 
 /**
  * Submits a query to the RESTful gRPC-gateway endpoint
@@ -55,8 +86,8 @@ export const restful_grpc = <
 	}
 	// query action, args are defined
 	else if(h_args) {
-		// remove `undefined` values from args by round-trip (de)serializing as JSON, then append to query params
-		sr_append += '?'+new URLSearchParams(JSON.parse(JSON.stringify(h_args)) as Dict);
+		// encode json to flatdot, then to search params
+		sr_append += '?'+new URLSearchParams(json_object_to_flatdot(h_args));
 	}
 
 	// normalize origin and request init

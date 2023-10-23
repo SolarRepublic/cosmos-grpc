@@ -15,9 +15,6 @@ import {access, arrayType, arrow, call, ident, importModule, param, print, typeR
 export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
 
 export abstract class RpcImplementor {
-	// protected _h_msgs: Dict<AugmentedMessage> = {};
-	// protected _h_enums: Dict<AugmentedEnum> = {};
-
 	protected _h_router!: FieldRouter;
 
 	protected _h_type_imports: Dict = {};
@@ -152,6 +149,8 @@ export abstract class RpcImplementor {
 			g_proto.type ||= g_calls.type;
 		}
 
+		const si_snake = g_calls.name;
+
 		// repeated field
 		if(g_field.repeated) {
 			// ref singular name format
@@ -216,16 +215,15 @@ export abstract class RpcImplementor {
 		}
 
 		// auto-fill calls
-		if('b' === g_proto.writer) {
+		if(si_snake.startsWith('atu8_')) {
 			g_calls.to_json ||= call('safe_buffer_to_base64', [ident(g_calls.name)]);
 			g_calls.from_json ||= yn_data => call('safe_base64_to_buffer', [yn_data]);
 		}
-		else {
-			g_calls.to_json ||= ident(g_calls.name);
-			g_calls.from_json ||= F_IDENTITY;
-		}
 
-		g_calls.to_proto ||= ident(g_calls.name);
+		g_calls.to_json ||= ident(g_calls.name);
+		g_calls.from_json ||= F_IDENTITY;
+
+		g_calls.to_proto ||= ident(g_proto.prefers_call? g_calls.name: g_proto.name);
 		g_calls.return_type ||= g_calls.type;
 
 
