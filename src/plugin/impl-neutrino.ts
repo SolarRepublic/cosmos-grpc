@@ -1,6 +1,7 @@
 import type {TsThing} from './common';
-import type {AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
+import type {AugmentedFile, AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
 
+import type {TypesDict} from './plugin';
 import type {FileCategory} from './rpc-impl';
 import type {Statement, TypeNode, Expression, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
 
@@ -8,7 +9,7 @@ import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from 
 import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
 import {ts} from 'ts-morph';
 
-import {H_FIELD_TYPE_TO_HUMAN_READABLE, field_router} from './common';
+import {H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {XC_HINT_NUMBER, XC_HINT_STRING, XC_HINT_BIGINT, XC_HINT_SINGULAR, XC_HINT_BYTES, N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
 import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
@@ -27,36 +28,62 @@ const {
 	SyntaxKind,
 } = ts;
 
-const reset_consts = () => ({
-	lcd: {},
-	encoder: {},
-	decoder: {},
-});
+type Draft = {
+	heads: Record<FileCategory, string[]>;
+	consts: Record<FileCategory, Dict<Statement>>;
+};
 
-const reset_heads = () => ({
+const reset_heads = (): Draft['heads'] => ({
 	lcd: [],
+	any: [],
 	encoder: [],
 	decoder: [],
+});
+
+const reset_consts = (): Draft['consts'] => ({
+	lcd: {},
+	any: {},
+	encoder: {},
+	decoder: {},
 });
 
 export class NeutrinoImpl extends RpcImplementor {
 	protected _si_const = '';
 	protected _s_path_prefix = '';
 
-	protected _g_consts: Record<FileCategory, Dict<Statement>> = reset_consts();
+	protected _g_heads: Draft['heads'] = reset_heads();
+	protected _g_consts: Draft['consts'] = reset_consts();
+	protected _h_drafts: Dict<Draft> = {};
 
-	protected _g_heads: Record<FileCategory, string[]> = reset_heads();
+	protected _p_output = '';
 
-	constructor() {
-		super();
+	constructor(h_types: TypesDict) {
+		super(h_types);
 
 		this._h_router = field_router(this);
 	}
 
-	protected override _reset(): void {
-		this._g_consts = reset_consts();
+	override open(g_proto: AugmentedFile): void {
+		super.open(g_proto);
 
-		this._g_heads = reset_heads();
+		// would-be output file nam
+		const p_output = this._p_output = map_proto_path(g_proto)+'.ts';
+
+		// open draft
+		const g_draft = this._h_drafts[p_output] ||= {
+			heads: reset_heads(),
+			consts: reset_consts(),
+		};
+
+		// destructure parts
+		const {
+			consts: g_consts,
+			heads: g_heads,
+		} = g_draft;
+
+		// set fields
+		this._g_consts = g_consts;
+		this._g_heads = g_heads;
 	}
 
 	override head(si_category: FileCategory): string[] {
@@ -87,6 +114,10 @@ export class NeutrinoImpl extends RpcImplementor {
 		this._g_heads.encoder.push(print(yn_type));
 
 		return typeRef(si_type);
+	}
+
+	get path(): string {
+		return this._p_output;
 	}
 
 	generate_return(g_output: AugmentedMessage, g_input: AugmentedMessage): ReturnThing {
@@ -240,8 +271,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 
 
-	override lcd(
-		si_service: string,
+	override gateway(
 		sr_path_prefix: string,
 		g_method: AugmentedMethod,
 		g_input: AugmentedMessage,
@@ -326,6 +356,12 @@ export class NeutrinoImpl extends RpcImplementor {
 		// const si_action_prefix = si_service
 		const si_action_prefix = sx_path_http_get? 'query': 'submit';
 		const yn_statement = declareConst(`${si_action_prefix}${proper(g_parts.vendor)}${proper(si_module_ident)}${si_method}`, yn_call, true);
+
+		// service, reflectionService
+		// if(sx_path_http_get && 'query' !== si_service.toLowerCase()) debugger;
+
+		// service, 
+		// if(sx_path_http_post) debugger;
 
 		// upper-case first letter of comment if present
 		let s_line_0 = g_method.comments;
@@ -447,8 +483,8 @@ export class NeutrinoImpl extends RpcImplementor {
 		const yn_type = y_factory.createTypeAliasDeclaration([
 			y_factory.createToken(SyntaxKind.ExportKeyword),
 		], ident(si_singleton), __UNDEFINED, intersection([
-			// ProtoMsg<si_message>
-			typeRef('ProtoMsg', [
+			// Encoded<si_message>
+			typeRef('Encoded', [
 				typeLit(string(p_type)),
 			]),
 			// ImplementsInterfaces<as_interfaces>
@@ -458,7 +494,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		]));
 
 		// add to preamble
-		this._g_heads.encoder.push(print(yn_type));
+		this._g_heads.any.push(print(yn_type));
 
 		// encode params and build chain
 		const [a_params, yn_chain] = this.encodeParams(g_msg);
@@ -482,20 +518,19 @@ export class NeutrinoImpl extends RpcImplementor {
 		]);
 	}
 
-	msgEncoder(
+	methodEncoder(
 		g_method: AugmentedMethod,
-		g_input: AugmentedMessage,
-		g_output: AugmentedMessage
+		g_input: AugmentedMessage
 	): string {
 		const g_parts = g_method.service.source.parts;
 
 		// prep unique type
-		const si_singleton = `ProtoMsg${g_method.name}`;
+		const si_singleton = `Encoded${proper(g_parts.vendor)}${g_method.name}`;
 
 		// declare unique type
 		const yn_type = y_factory.createTypeAliasDeclaration([
 			y_factory.createToken(SyntaxKind.ExportKeyword),
-		], ident(si_singleton), __UNDEFINED, typeRef('ProtoMsg', [
+		], ident(si_singleton), __UNDEFINED, typeRef('Encoded', [
 			typeLit(string(`/${g_method.service.source.pb_package}.${g_method.name!}`)),
 		]));
 
@@ -513,6 +548,38 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		return print(yn_const, [
 			`Encodes a \`${g_method.name}\` protobuf message: ${g_method.comments}`,
+			...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
+			`@returns a strongly subtyped Uint8Array protobuf message`,
+		]);
+	}
+
+	msgEncoder(g_msg: AugmentedMessage): string {
+		const g_parts = g_msg.source.parts;
+
+		// prep unique type
+		const si_singleton = `Encoded${proper(g_parts.vendor)}${g_msg.name}`;
+
+		// declare unique type
+		const yn_type = y_factory.createTypeAliasDeclaration([
+			y_factory.createToken(SyntaxKind.ExportKeyword),
+		], ident(si_singleton), __UNDEFINED, typeRef('Encoded', [
+			typeLit(string(`/${g_msg.source.pb_package}.${g_msg.name!}`)),
+		]));
+
+		// add type decl to preamble
+		this._g_heads.encoder.push(print(yn_type));
+
+		// encode params and build chain
+		const [a_params, yn_chain] = this.encodeParams(g_msg);
+
+		// construct call chain
+		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)));
+
+		// create statement
+		const yn_const = declareConst(`msg${proper(g_parts.vendor)}${g_msg.name!}`, yn_writer, true);
+
+		return print(yn_const, [
+			`Encodes a \`${g_msg.name}\` protobuf message: ${g_msg.comments}`,
 			...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
 			`@returns a strongly subtyped Uint8Array protobuf message`,
 		]);

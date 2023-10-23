@@ -8,6 +8,7 @@ import type {
 	DescriptorProto,
 	EnumDescriptorProto,
 	FieldOptions,
+	EnumValueDescriptorProto,
 } from 'google-protobuf/google/protobuf/descriptor_pb';
 
 // ################################
@@ -20,7 +21,6 @@ interface AugmentComments {
 
 interface AugmentSource extends AugmentComments {
 	source: AugmentedFile;
-	index: number;
 }
 
 
@@ -52,19 +52,30 @@ export interface MethodAugmentations extends AugmentComments {
 }
 
 export interface MessageAugmentations extends AugmentSource {
+	form: 'message';
+	path: string;
 	options?: ExtendedMessageOptions;
 	fieldList: AugmentedField[];
-	nestedTypeList: AugmentedField[];
+	nestedTypeList: AugmentedMessage[];
+	enumTypeList: AugmentedEnum[];
+	// nestedTypeHash: Dict<AugmentedField>;
+	// nestedEnumHash: Dict<AugmentedEnum>;
 }
-
-export interface EnumAugmentations extends AugmentSource {}
-
 
 export interface FieldAugmentations extends AugmentComments {
 	repeated: boolean;
 	options?: ExtendedFieldOptions;
 }
 
+export interface EnumAugmentations extends AugmentSource {
+	form: 'enum';
+	path: string;
+	valueList: AugmentedEnumValue[];
+}
+
+export interface EnumValueAugmentations extends AugmentComments {
+	enum: EnumAugmentations;
+}
 
 
 // ################################
@@ -123,7 +134,47 @@ export interface AugmentedEnum extends
 	Omit<EnumDescriptorProto.AsObject, keyof EnumAugmentations>,
 	EnumAugmentations {}
 
+export interface AugmentedEnumValue extends
+	Omit<EnumValueDescriptorProto.AsObject, keyof EnumValueAugmentations>,
+	EnumValueAugmentations {}
 
+
+export type ProtoElement =
+	| FileDescriptorProto.AsObject
+	| ServiceDescriptorProto.AsObject
+	| MethodDescriptorProto.AsObject
+	| DescriptorProto.AsObject
+	| FieldDescriptorProto.AsObject
+	| EnumDescriptorProto.AsObject
+	| EnumValueDescriptorProto.AsObject;
+
+export type AugmentedElement =
+	| AugmentedFile
+	| AugmentedService
+	| AugmentedMethod
+	| AugmentedMessage
+	| AugmentedField
+	| AugmentedEnum
+	| AugmentedEnumValue;
+
+export type AugmentedFormOf<
+	g_form extends ProtoElement,
+	g_strict extends Required<g_form>=Required<g_form>,
+> = g_strict extends Required<FileDescriptorProto.AsObject>
+	? AugmentedFile
+	: g_strict extends Required<ServiceDescriptorProto.AsObject>
+		? AugmentedService
+		: g_strict extends Required<MethodDescriptorProto.AsObject>
+			? AugmentedMethod
+			: g_strict extends Required<DescriptorProto.AsObject>
+				? AugmentedMessage
+				: g_strict extends Required<FieldDescriptorProto.AsObject>
+					? AugmentedField
+					: g_strict extends Required<EnumDescriptorProto.AsObject>
+						? AugmentedEnum
+						: g_strict extends Required<EnumValueDescriptorProto.AsObject>
+							? AugmentedEnumValue
+							: AugmentedElement;
 
 declare module 'google-protobuf/google/protobuf/descriptor_pb' {
 	// namespace MethodOptions {

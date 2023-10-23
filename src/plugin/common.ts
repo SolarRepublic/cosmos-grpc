@@ -6,11 +6,11 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 
 // type ProtoWriterMethod = string;
 
-import {__UNDEFINED, snake, type Dict} from '@blake.regalia/belt';
+import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
 import {SR_IMPORT_TYPES_PROTO, SR_IMPORT_TYPES_LIB, XC_HINT_SINGULAR_NUMBER, XC_HINT_SINGULAR_STRING} from './constants';
-import {call, castAs, ident, literal, string, ternary, type, typeLit, typeRef, union, y_factory} from './ts-factory';
+import {call, ident, literal, string, type, typeLit, typeRef, union} from './ts-factory';
 
 // destructure members from protobuf
 const {
@@ -310,7 +310,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	// enum
 	[H_FIELD_TYPES.TYPE_ENUM](si_field, g_field) {
 		// locate source
-		const sr_path = k_impl.pathToFieldType(g_field);
+		const sr_path = k_impl.pathOfFieldType(g_field);
 
 		// extract type reference ident
 		const si_ref = g_field.typeName!.split('.').at(-1)!;
@@ -337,7 +337,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		const si_name = snake(si_field);
 
 		// locate source
-		const sr_path = k_impl.pathToFieldType(g_field);
+		const sr_path = k_impl.pathOfFieldType(g_field);
 
 		// extract type reference ident
 		const si_ref = g_field.typeName!.split('.').at(-1)!;
@@ -358,10 +358,11 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			...H_OVERRIDE_MIXINS[g_field.typeName!]?.(g_field, k_impl) || {
 				proto: {
 					writer: 'b',
-					type: typeRef('ProtoMsg', [
+					type: typeRef('Encoded', [
 						typeLit(string(g_field.typeName!.replace(/^\./, '/'))),
 					]),
-					prefers_call: 1,
+					// type: k_impl.importType(k_impl.pathOfFieldType(g_field), `EncodedThing`),
+					// prefers_call: 1,
 				},
 			},
 		};
@@ -379,8 +380,6 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			calls: {
 				name: si_self,
 				type: yn_type,
-				to_json: ternary(ident(si_self), call('buffer_to_base64', [ident(si_self)]), ident('__UNDEFINED')) as Expression,
-				from_json: yn_data => call('base64_to_buffer', [castAs(yn_data, type('string'))]) as Expression,
 			},
 
 			proto: {

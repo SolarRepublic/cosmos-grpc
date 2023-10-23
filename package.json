@@ -38,6 +38,7 @@
     "eslint-plugin-unused-imports": "^3.0.0",
     "ts-morph": "^20.0.0",
     "ts-node": "^10.9.1",
+    "ts-proto": "^1.162.1",
     "ts-toolbelt": "^9.6.0",
     "tsc-esm-fix": "^2.20.17",
     "typescript": "^5.2.2"

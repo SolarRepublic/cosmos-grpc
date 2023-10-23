@@ -1,31 +1,12 @@
 
-import type {AugmentedEnum, AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod, AugmentedService, EnumAugmentations, FieldAugmentations, MessageAugmentations, MethodAugmentations, ServiceAugmentations} from './env';
+import type {AugmentedEnum, AugmentedMessage} from './env';
 
-import type {RpcImplementor} from './rpc-impl';
-import type {Dict} from '@blake.regalia/belt';
+import {ode, type Dict, odv} from '@blake.regalia/belt';
 
-import type {
-	ServiceDescriptorProto,
-	MethodDescriptorProto,
-	DescriptorProto,
-	EnumDescriptorProto,
-	FieldDescriptorProto,
-} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {ode, oderac} from '@blake.regalia/belt';
-
-import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
-
-import {map_proto_path, version_supercedes} from './common';
 import {NeutrinoImpl} from './impl-neutrino';
-import {comments_at, plugin} from './plugin';
+import {plugin} from './plugin';
 import {importModule, print} from './ts-factory';
-
-const {
-	FieldDescriptorProto: {
-		Label: FieldLabel,
-	},
-} = pb;
 
 // inject into preamble of any file, allow linter to delete unused imports
 const A_GLOBAL_PREAMBLE = [
@@ -40,9 +21,11 @@ const A_GLOBAL_PREAMBLE = [
 			'F_IDENTITY',
 			'__UNDEFINED',
 			'base64_to_buffer',
-			'buffer_to_base64',
 			'text_to_buffer',
-			'buffer_to_text',
+		]),
+		importModule('#/util', [
+			'safe_buffer_to_base64',
+			'safe_buffer_to_text',
 		]),
 		importModule('#/protobuf-writer', [
 			'Protobuf',
@@ -78,182 +61,100 @@ const A_GLOBAL_PREAMBLE = [
 			'ValidatorAddr',
 			'HexLower',
 			'ImplementsInterface',
-			'ProtoMsg',
+			'Encoded',
 		], true),
 	].map(yn => print(yn)),
 ];
 
-const augment_service = (
-	g_service: ServiceDescriptorProto.AsObject,
-	g_augments: Omit<ServiceAugmentations, keyof ServiceDescriptorProto.AsObject>
-): AugmentedService => Object.assign(g_service, g_augments) as unknown as AugmentedService;
-
-const augment_method = (
-	g_method: MethodDescriptorProto.AsObject,
-	g_augments: Omit<MethodAugmentations, keyof MethodDescriptorProto.AsObject>
-): AugmentedMethod => Object.assign(g_method, g_augments) as unknown as AugmentedMethod;
-
-const augment_enum = (
-	g_enum: EnumDescriptorProto.AsObject,
-	g_augments: Omit<EnumAugmentations, keyof EnumDescriptorProto.AsObject>
-): AugmentedEnum => Object.assign(g_enum, g_augments);
-
-const augment_message = (
-	g_msg: DescriptorProto.AsObject,
-	g_augments: Omit<MessageAugmentations, keyof DescriptorProto.AsObject>
-): AugmentedMessage => Object.assign(g_msg, g_augments) as unknown as AugmentedMessage;
-
-const augment_field = (
-	g_field: FieldDescriptorProto.AsObject,
-	g_augments: Omit<FieldAugmentations, keyof FieldDescriptorProto.AsObject>
-): AugmentedField => Object.assign(g_field, g_augments) as AugmentedField;
-
-const capture_messages = (
-	k_impl: RpcImplementor,
-	g_proto: AugmentedFile,
-	sr_package: string,
-	a_path: number[]=[]
-) => (g_msg: DescriptorProto.AsObject, i_msg: number) => {
-	// skip anonymous
-	const si_msg = g_msg.name;
-	if(!si_msg) return;
-
-	const p_msg = `${sr_package}.${si_msg}`;
-
-	// append to path
-	const a_local = [...a_path, 4, i_msg];
-
-	// each field
-	g_msg.fieldList.forEach((g_field, i_field) => {
-		augment_field(g_field, {
-			repeated: FieldLabel.LABEL_REPEATED === g_field.label,
-			comments: comments_at([...a_local, 2, i_field], g_proto, g_field.name),
-		});
-	});
-
-	// save to global lookup
-	k_impl.msg(p_msg, augment_message(g_msg, {
-		source: g_proto,
-		index: i_msg,
-		comments: comments_at(a_local, g_proto, g_msg.name),
-	}));
-
-	// capture nested types
-	g_msg.nestedTypeList.forEach(capture_messages(k_impl, g_proto, p_msg, a_local));
-};
-
-type OutputFile = Dict<string>;
 
 export const main = () => {
-	void plugin((a_protos, h_inputs) => {
+	void plugin((a_protos, h_inputs, h_types) => {
 		// new impl
-		const k_impl = new NeutrinoImpl();
+		const k_impl = new NeutrinoImpl(h_types);
 
-		const h_outputs: Dict<OutputFile> = {};
+		// const h_drafts: Dict<
 
-		// each included file
-		for(const [, g_proto_raw] of ode(h_inputs)) {
-			// force cast type of proto file
-			const g_proto = g_proto_raw as unknown as AugmentedFile;
+		const h_outputs: Dict<string> = {};
 
-			// skip anonymous
-			const si_package = g_proto.pb_package;
-			if(!si_package) continue;
+		// [typePath: string]: serialized encoders
+		const h_encoders: Dict<{
+			message: AugmentedMessage;
+			encoder: string;
+		}> = {};
 
-			// split path => [vendor, module, version, purpose]
-			const a_path = g_proto.name!.split('/');
+		// 
+		const h_closure: Dict<AugmentedMessage> = {};
+		const h_enums: Dict<AugmentedEnum> = {};
 
-			// prep path parts
-			const si_vendor = a_path[0]!;
-			let si_module = a_path[1];
-			let s_version = '';
-			let s_purpose = '';
+		/**
+		 * add closures from given message type
+		 */
+		function mark_fields(g_msg: AugmentedMessage) {
+			// ensure every field's type has an encoder
+			for(const g_field of g_msg.fieldList) {
+				// ref type path
+				const si_type = g_field.typeName;
 
-			// determine separation between parts
-			for(let i_part=2; i_part<a_path.length-1; i_part++) {
-				const s_part = a_path[i_part];
+				// type exists, is not encoded, and is not yet defined in closure/enum
+				if(si_type && !h_encoders[si_type] && !h_closure[si_type] && !h_enums[si_type]) {
+					// resolve type
+					const g_resolved = h_types[si_type];
 
-				// found version
-				if(/^v\d/.test(s_part)) {
-					s_version = s_part;
-					s_purpose = a_path.slice(i_part+1).join('/').split('.')[0];
-					break;
+					// message
+					if('message' === g_resolved.form) {
+						h_closure[si_type] = g_resolved;
+
+						// recurse on message
+						mark_fields(g_resolved);
+					}
+					// enum
+					else {
+						h_enums[si_type] = g_resolved;
+					}
 				}
-
-				// part of module
-				si_module += '/'+s_part;
 			}
-
-			// save path parts to file
-			Object.assign(g_proto, {
-				parts: {
-					vendor: si_vendor,
-					module: si_module,
-					version: s_version,
-					purpose: s_purpose,
-				},
-			});
-
-			// each message type
-			g_proto_raw.messageTypeList.forEach(capture_messages(k_impl, g_proto, '.'+si_package));
-
-			// each enum
-			g_proto.enumTypeList.forEach((g_enum, i_enum) => {
-				// skip anonymous
-				const si_enum = g_enum.name;
-				if(!si_enum) return;
-
-				// save to global lookup
-				k_impl.enum(`.${si_package}.${si_enum}`, augment_enum(g_enum, {
-					source: g_proto,
-					index: i_enum,
-					comments: comments_at([5, i_enum], g_proto, g_enum.name),
-				}));
-			});
-
-			// each service
-			g_proto.serviceList.forEach((g_service, i_service) => {
-				// augment service
-				augment_service(g_service, {
-					source: g_proto,
-					index: i_service,
-					comments: comments_at([6, i_service], g_proto, g_service.name),
-				});
-
-				// each method
-				g_service.methodList.forEach((g_method, i_method) => {
-					// augment method
-					augment_method(g_method, {
-						service: g_service,
-						comments: comments_at([6, i_service, 2, i_method], g_proto, g_method.name),
-					});
-				});
-			});
 		}
 
+
+		const h_tmps: Dict<{
+			a_gateways: string[];
+			a_anys: string[];
+			a_decoders: string[];
+		}> = {};
+
 		// each proto file
-		for(const g_proto of a_protos as unknown as AugmentedFile[]) {
+		for(const g_proto of a_protos) {
 			// reset instance's internal file stuff
-			k_impl.reset();
+			k_impl.open(g_proto);
 
 			// new string lists
-			const a_lcds: string[] = [];
-			const a_encoders: string[] = [];
+			const a_gateways: string[] = [];
+			const a_anys: string[] = [];
 			const a_decoders: string[] = [];
 
-			// destructure path parts
-			const {
-				vendor: si_vendor,
-				module: si_module,
-				version: si_version,
-			} = g_proto.parts;
+			h_tmps[k_impl.path] = {
+				a_gateways,
+				a_anys,
+				a_decoders,
+			};
 
-			// services
-			g_proto.serviceList.forEach((g_service, i_service) => {
-				// skip anonymous services
-				const si_service = g_service.name?.toLowerCase();
-				if(!si_service) return;
+			// each top-level messages
+			for(const g_msg of g_proto.messageTypeList) {
+				// ref message options
+				const g_opts = g_msg.options;
 
+				// implements interface
+				if(g_opts?.implementsInterfaceList) {
+					// produce 'any' encoder
+					a_anys.push(k_impl.anyEncoder(g_msg));
+
+					// ensure its fields can be encoded
+					mark_fields(g_msg);
+				}
+			}
+
+			// each service
+			for(const g_service of g_proto.serviceList) {
 				// find longest path prefix
 				let s_path_prefix = '';
 				{
@@ -289,68 +190,114 @@ export const main = () => {
 				}
 
 				// each method
-				g_service.methodList.forEach((g_method, i_method) => {
+				for(const g_method of g_service.methodList) {
 					// skip functions missing input or output type
-					if(!g_method.inputType || !g_method.outputType) return;
+					if(!g_method.inputType || !g_method.outputType) continue;
 					const {
 						inputType: sr_input,
 						outputType: sr_output,
 					} = g_method;
 
 					// locate rpc input
-					const g_input = k_impl.msg(sr_input);
-					if(!g_input) throw new Error(`Failed to find rpc input ${sr_input} in ${g_proto.name!}`);
+					const g_input = h_types[sr_input];
+					if('message' !== g_input?.form) throw new Error(`Failed to find rpc input ${sr_input} in ${g_proto.name!}`);
 
 					// locate rpc output
-					const g_output = k_impl.msg(sr_output);
-					if(!g_output) throw new Error(`Failed to find rpc output ${sr_output}`);
+					const g_output = h_types[sr_output];
+					if('message' !== g_output?.form) throw new Error(`Failed to find rpc output ${sr_output}`);
 
-					// skip functions missing http options
-					const g_opts = g_method.options;
-					const g_http = g_opts?.http;
-
-					// LCD implementation
+					// gRPC-gateway method
+					const g_http = g_method.options?.http;
 					if(g_http?.get || g_http?.post) {
-						const sx_lcd = k_impl.lcd(
-							si_service,
+						const sx_gateway = k_impl.gateway(
 							s_path_prefix,
 							g_method,
 							g_input,
 							g_output
 						);
 
-						a_lcds.push(sx_lcd);
+						a_gateways.push(sx_gateway);
 					}
-					// otherwise, create encoder/decoder
+					// otherwise, ensure user can encode method inputs and decode method outputs
 					else {
-						// add encoder
-						a_encoders.push(k_impl.msgEncoder(g_method, g_input, g_output));
+						// add input encoder
+						h_encoders[g_input.path] = {
+							message: g_input,
+							encoder: k_impl.msgEncoder(g_input),
+						};
 
-						// message has output; add decoder to queue
+						// ensure its fields can be encoded
+						mark_fields(g_input);
+
+						// message has output content
 						if(g_output.fieldList.length) {
+							// add output decoder
 							const sx_decoder = k_impl.msgDecoder(g_output);
 
+							// closure is not needed since decoder handles everything
 							if(sx_decoder) a_decoders.push(sx_decoder);
 						}
 					}
-				});
-			});
-
-			// interface messages
-			g_proto.messageTypeList.forEach((g_msg, i_msg) => {
-				// skip anonymous messages
-				const si_msg = g_msg.name?.toLowerCase();
-				if(!si_msg) return;
-
-				// implements interface; generate 'any' encoder
-				const g_opts = g_msg.options;
-				if(g_opts?.implementsInterfaceList) {
-					a_encoders.push(k_impl.anyEncoder(g_msg)!);
 				}
-			});
+			}
+		}
 
-			// would-be file name
-			const si_file = map_proto_path(g_proto)+'.ts';
+		debugger;
+
+		// each message in need of an encoder
+		for(const [, g_msg] of ode(h_closure)) {
+			// open message's source
+			k_impl.open(g_msg.source);
+
+			// add encoder
+			h_encoders[g_msg.path] = {
+				message: g_msg,
+				encoder: k_impl.msgEncoder(g_msg),
+			};
+
+			// 	// normal message
+			// 	else {
+			// 		// produce encoder but 
+			// 		a_encoders.push(k_impl.msgEncoder(g_msg));
+			// 	}
+
+			// 	// recurse on nested types
+			// 	gen_encoders(g_msg.nestedTypeList);
+			// function gen_encoders(a_msgs: AugmentedMessage[]) {
+			// 	for(const g_msg of a_msgs) {
+			// 		// ref message options
+			// 		const g_opts = g_msg.options;
+
+			// 		// implements interface; produce 'any' encoder
+			// 		if(g_opts?.implementsInterfaceList) {
+			// 			a_encoders.push(k_impl.anyEncoder(g_msg)!);
+			// 		}
+			// 		// normal message
+			// 		else {
+			// 			// produce encoder but 
+			// 			a_encoders.push(k_impl.msgEncoder(g_msg));
+			// 		}
+
+			// 		// recurse on nested types
+			// 		gen_encoders(g_msg.nestedTypeList);
+
+			// 		// // recurse on nested enums
+			// 		// gen_enums(g_msg.enumTypeList);
+			// 	}
+			// }
+		}
+
+
+		// every file
+		for(const [, g_proto] of ode(h_inputs)) {
+			// open
+			k_impl.open(g_proto);
+
+			const {
+				a_gateways,
+				a_anys,
+				a_decoders,
+			} = h_tmps[k_impl.path] || {};
 
 			// body
 			const a_body: string[] = [];
@@ -365,16 +312,33 @@ export const main = () => {
 			};
 
 			// lcd methods
-			if(a_lcds.length) {
+			if(a_gateways?.length) {
 				g_parts.head.push(...k_impl.head('lcd'));
 
 				a_body.push(
 					...k_impl.body('lcd'),
-					...a_lcds
+					...a_gateways
+				);
+			}
+
+			// anys
+			if(a_anys?.length) {
+				g_parts.head.push(...k_impl.head('any'));
+
+				a_body.push(
+					...k_impl.body('any'),
+					...a_anys
 				);
 			}
 
 			// encoders
+			const a_encoders: string[] = [];
+			for(const g_encoder of odv(h_encoders)) {
+				if(g_proto === g_encoder.message.source) {
+					a_encoders.push(g_encoder.encoder);
+				}
+			}
+
 			if(a_encoders.length) {
 				g_parts.head.push(...k_impl.head('encoder'));
 
@@ -385,7 +349,7 @@ export const main = () => {
 			}
 
 			// decoders
-			if(a_decoders.length) {
+			if(a_decoders?.length) {
 				g_parts.head.push(...k_impl.head('decoder'));
 
 				a_body.push(
@@ -394,52 +358,60 @@ export const main = () => {
 				);
 			}
 
+			// there are contents to write to the file
 			if(a_body.length) {
-				(h_outputs[si_file] ||= {})[si_version] = [g_parts.head.join('\n'), ...g_parts.body].join('\n\n');
+				h_outputs[k_impl.path] = [g_parts.head.join('\n'), ...g_parts.body].join('\n\n');
 			}
 		}
 
-		// // build decoder file
-		// const a_lines_decoder: string[] = [];
-		// for(const g_output of a_decoders) {
-		// 	const yn_decoder = k_impl.msgDecoder(g_output);
+		debugger;
 
-		// 	if(yn_decoder) {
-		// 		a_lines_decoder.push(print(yn_decoder));
+		// // process closures
+		// let h_search = h_closure;
+		// for(;;) {
+		// 	const h_discovered: Dict<AugmentedMessage> = {};
+
+		// 	for(const [, g_msg] of ode(h_search)) {
+		// 		// each field in message
+		// 		for(const g_field of g_msg.fieldList) {
+		// 			const si_type = g_field.typeName!;
+
+		// 			// not yet in closure/dicosvered
+		// 			if(si_type && !h_closure[si_type] && !h_discovered[si_type]) {
+		// 				// resolve
+		// 				const g_resolved = k_impl.resolveType(si_type);
+
+		// 				// message
+		// 				if('fieldList' in g_resolved) {
+		// 					h_discovered[si_type] = g_resolved;
+		// 				}
+		// 				// enum
+		// 				else {
+		// 					h_enums[si_type] = g_resolved;
+		// 				}
+		// 			}
+		// 		}
+		// 	}
+
+		// 	// new messages were discovered
+		// 	if(Object.keys(h_discovered).length) {
+		// 		// merge with closure
+		// 		Object.assign(h_closure, h_discovered);
+
+		// 		// repeat search on newly discovered ones
+		// 		h_search = h_discovered;
+		// 	}
+		// 	else {
+		// 		break;
 		// 	}
 		// }
 
-		// h_outputs['decoders.ts'][''] = a_lines_decoder.join('\n\n');
+		// // each closure type
+		// for(const [, g_msg] of ode(h_closure)) {
+		// 	k_impl.msgEncoder(g_msg);
+		// }
 
-		// console.warn(a_lines_decoder.join('\n\n'));
 
-		debugger;
-
-
-		return oderac(h_outputs, (si_file, h_versions) => ({
-			name: si_file,
-			content: (() => {
-				// all versions generated
-				const a_versions = Object.keys(h_versions);
-
-				// default current best pick to first one
-				let s_picked = a_versions[0] || '';
-
-				// multiple versions
-				if(a_versions.length > 1) {
-					// each version
-					for(const si_version of a_versions) {
-						if(version_supercedes(si_version, s_picked)) {
-							s_picked = si_version;
-						}
-					}
-
-					console.warn(`Multiple versions of '${si_file}' were generated from: [${a_versions.join(', ')}];\n    └─ picked latest: ${s_picked}`);
-				}
-
-				// return best pick
-				return h_versions[s_picked] || '';
-			})(),
-		}));
+		return h_outputs;
 	});
 };

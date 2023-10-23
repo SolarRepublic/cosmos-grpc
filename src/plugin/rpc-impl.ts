@@ -1,30 +1,30 @@
 import type {FieldRouter, TsThing} from './common';
-import type {AugmentedEnum, AugmentedField, AugmentedMessage, AugmentedMethod} from './env';
+import type {AugmentedEnum, AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod} from './env';
+import type {TypesDict} from './plugin';
 import type {Dict} from '@blake.regalia/belt';
 
 import type {TypeNode} from 'typescript';
 
-import {__UNDEFINED, oderac, F_IDENTITY} from '@blake.regalia/belt';
+import {oderac, F_IDENTITY} from '@blake.regalia/belt';
 
-import {map_proto_path, version_supercedes} from './common';
+import {map_proto_path} from './common';
 
 import {access, arrayType, arrow, call, ident, importModule, param, print, typeRef} from './ts-factory';
 
 
-export type FileCategory = 'lcd' | 'encoder' | 'decoder';
+export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
 
 export abstract class RpcImplementor {
-	protected _h_msgs: Dict<AugmentedMessage> = {};
-	protected _h_enums: Dict<AugmentedEnum> = {};
+	// protected _h_msgs: Dict<AugmentedMessage> = {};
+	// protected _h_enums: Dict<AugmentedEnum> = {};
 
 	protected _h_router!: FieldRouter;
 
 	protected _h_type_imports: Dict = {};
 
-	protected abstract _reset(): void;
+	constructor(protected _h_types: TypesDict) {}
 
-	abstract lcd(
-		si_service: string,
+	abstract gateway(
 		sr_path_prefix: string,
 		g_method: AugmentedMethod,
 		g_input: AugmentedMessage,
@@ -37,24 +37,32 @@ export abstract class RpcImplementor {
 
 	abstract accepts(si_interface: string, s_alias: string): TypeNode;
 
-	pathToType(si_type: string): string {
-		let g_src!: AugmentedMessage | AugmentedEnum;
-
-		if(si_type in this._h_msgs) {
-			g_src = this.msg(si_type);
-		}
-		else if(si_type in this._h_enums) {
-			g_src = this.enum(si_type);
-		}
-		else {
-			throw new Error(`No type found "${si_type}"`);
-		}
-
-		return map_proto_path(g_src.source);
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	open(g_proto: AugmentedFile): void {
+		this._h_type_imports = {};
 	}
 
-	pathToFieldType(g_field: AugmentedField): string {
-		return this.pathToType(g_field.typeName!);
+	resolveType(si_type: string): AugmentedMessage | AugmentedEnum {
+		const g_type = this._h_types[si_type];
+
+		// if(si_type in this._h_msgs) {
+		// 	return this.msg(si_type);
+		// }
+		// else if(si_type in this._h_enums) {
+		// 	return this.enum(si_type);
+		// }
+
+		if(!g_type) throw new Error(`No type found "${si_type}"`);
+
+		return g_type;
+	}
+
+	pathOfType(si_type: string): string {
+		return map_proto_path(this.resolveType(si_type).source);
+	}
+
+	pathOfFieldType(g_field: AugmentedField): string {
+		return this.pathOfType(g_field.typeName!);
 	}
 
 	importType(sr_path: string, si_ident: string, a_type_args?: TypeNode[]): TypeNode {
@@ -66,59 +74,53 @@ export abstract class RpcImplementor {
 		return oderac(this._h_type_imports, (si_ident, sr_path) => importModule(sr_path, [si_ident], true)).map(yn => print(yn));
 	}
 
-	reset(): void {
-		this._h_type_imports = {};
-		this._reset();
-		return;
-	}
+	// msg(si_type: string, g_desc?: AugmentedMessage): AugmentedMessage {
+	// 	const {_h_msgs} = this;
 
-	msg(si_type: string, g_desc?: AugmentedMessage): AugmentedMessage {
-		const {_h_msgs} = this;
+	// 	// check for existing message
+	// 	let g_msg = _h_msgs[si_type];
 
-		// check for existing message
-		let g_msg = _h_msgs[si_type];
+	// 	// getter
+	// 	if(!g_desc) {
+	// 		if(!g_msg) throw new Error(`No message found "${si_type}"`);
+	// 		return g_msg;
+	// 	}
+	// 	// setter, but message exists
+	// 	else if(g_msg) {
+	// 		const si_version_local = g_desc.source.parts.version;
+	// 		const si_version_other = g_msg.source.parts.version;
 
-		// getter
-		if(!g_desc) {
-			if(!g_msg) throw new Error(`No message found "${si_type}"`);
-			return g_msg;
-		}
-		// setter, but message exists
-		else if(g_msg) {
-			const si_version_local = g_desc.source.parts.version;
-			const si_version_other = g_msg.source.parts.version;
+	// 		const s_warn = `Multiple definitions of ${si_type}`;
 
-			const s_warn = `Multiple definitions of ${si_type}`;
+	// 		// this version supercedes other; replace it
+	// 		if(version_supercedes(si_version_local, si_version_other)) {
+	// 			console.warn(`${s_warn}; picking ${si_version_local} over ${si_version_other}`);
+	// 			g_msg = _h_msgs[si_type] = g_desc;
+	// 		}
+	// 		// other version supercedes; keep it
+	// 		else {
+	// 			console.warn(`${s_warn}; picking ${si_version_other} over ${si_version_local}`);
+	// 		}
+	// 	}
+	// 	// no conflict
+	// 	else {
+	// 		g_msg = _h_msgs[si_type] = g_desc;
+	// 	}
 
-			// this version supercedes other; replace it
-			if(version_supercedes(si_version_local, si_version_other)) {
-				console.warn(`${s_warn}; picking ${si_version_local} over ${si_version_other}`);
-				g_msg = _h_msgs[si_type] = g_desc;
-			}
-			// other version supercedes; keep it
-			else {
-				console.warn(`${s_warn}; picking ${si_version_other} over ${si_version_local}`);
-			}
-		}
-		// no conflict
-		else {
-			g_msg = _h_msgs[si_type] = g_desc;
-		}
+	// 	// return message
+	// 	return g_msg;
+	// }
 
-		// return message
-		return g_msg;
-	}
+	// enum(si_type: string, g_desc?: AugmentedEnum): AugmentedEnum {
+	// 	// lookup or set message
+	// 	const g_enum = this._h_enums[si_type] ??= g_desc as AugmentedEnum;
+	// 	if(!g_enum) {
+	// 		throw new Error(`No enum found "${si_type}"`);
+	// 	}
 
-	enum(si_type: string, g_desc?: AugmentedEnum): AugmentedEnum {
-		// lookup or set message
-		const g_enum = this._h_enums[si_type] ??= g_desc as AugmentedEnum;
-		if(!g_enum) {
-			throw new Error(`No enum found "${si_type}"`);
-		}
-
-		// return message
-		return g_enum;
-	}
+	// 	// return message
+	// 	return g_enum;
+	// }
 
 	route(g_field: AugmentedField): TsThing {
 		// lookup transformer
@@ -152,8 +154,6 @@ export abstract class RpcImplementor {
 
 		// repeated field
 		if(g_field.repeated) {
-			if('preferences' === g_field.name) debugger;
-
 			// ref singular name format
 			const s_name_singular = g_calls.name;
 
@@ -216,8 +216,15 @@ export abstract class RpcImplementor {
 		}
 
 		// auto-fill calls
-		g_calls.to_json ||= ident(g_calls.name);
-		g_calls.from_json ||= F_IDENTITY;
+		if('b' === g_proto.writer) {
+			g_calls.to_json ||= call('safe_buffer_to_base64', [ident(g_calls.name)]);
+			g_calls.from_json ||= yn_data => call('safe_base64_to_buffer', [yn_data]);
+		}
+		else {
+			g_calls.to_json ||= ident(g_calls.name);
+			g_calls.from_json ||= F_IDENTITY;
+		}
+
 		g_calls.to_proto ||= ident(g_calls.name);
 		g_calls.return_type ||= g_calls.type;
 

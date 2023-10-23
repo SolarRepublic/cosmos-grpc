@@ -32,7 +32,7 @@ srd_types="$srd_lib/_types"
 
 # clean outputs
 rm -rf "$srd_annotations" "$srd_lib" "$srd_dist"
-mkdir -p "$srd_annotations" "$srd_lib" "$srd_dist"
+mkdir -p "$srd_annotations" "$srd_lib" "$srd_dist" "$srd_types"
 
 
 # define function for annotation

@@ -41,20 +41,29 @@ export const restful_grpc = <
 ) => async(z_req: string | {origin: string} & RequestInit, ...a_args: a_args): Promise<w_parsed> => {
 	let [sr_append, h_args] = f_req(...a_args);
 
-	// convert to POST request
-	if(1 === g_init) g_init = {method:'POST'};
+	// indicated submit action
+	if(1 === g_init) {
+		// convert to POST request
+		g_init = {method:'POST'};
+
+		// args were supplied; convert to JSON-encoded body
+		if(h_args) {
+			g_init = {
+				body: JSON.stringify(h_args),
+			};
+		}
+	}
+	// query action, args are defined
+	else if(h_args) {
+		// remove `undefined` values from args by round-trip (de)serializing as JSON, then append to query params
+		sr_append += '?'+new URLSearchParams(JSON.parse(JSON.stringify(h_args)) as Dict);
+	}
 
 	// normalize origin and request init
 	let p_origin = z_req as string;
 	if('string' !== typeof z_req) {
 		p_origin = z_req.origin;
 		g_init = {...z_req, ...g_init};
-	}
-
-	// args are defined
-	if(h_args) {
-		// remove `undefined` values from args by round-trip (de)serializing as JSON, then append to query params
-		sr_append += '?'+new URLSearchParams(JSON.parse(JSON.stringify(h_args)) as Dict);
 	}
 
 	// submit request
