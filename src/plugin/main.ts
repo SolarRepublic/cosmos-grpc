@@ -35,6 +35,9 @@ const A_GLOBAL_PREAMBLE = [
 			'WeakValidatorAddr',
 			'SlimCoin',
 		], true),
+		importModule('#/bech32', [
+			'bech32_decode',
+		]),
 		importModule('#/util', [
 			'safe_buffer_to_base64',
 			'safe_buffer_to_text',
@@ -85,34 +88,62 @@ export const main = () => {
 			encoder: string;
 		}> = {};
 
+		// [typePath: string]: serialized encoders
+		const h_decoders: Dict<{
+			message: AugmentedMessage;
+			decoder: string;
+		}> = {};
+
+		const h_destructors: Dict<{
+			message: AugmentedMessage;
+			destructor: string;
+		}> = {};
+
 		// 
-		const h_closure: Dict<AugmentedMessage> = {};
-		const h_enums: Dict<AugmentedEnum> = {};
+		type ClosureStruct = {
+			messages: Dict<AugmentedMessage>;
+			enums: Dict<AugmentedEnum>;
+		};
+
+		const g_encoders: ClosureStruct = {
+			messages: {},
+			enums: {},
+		};
+
+		const g_decoders: ClosureStruct = {
+			messages: {},
+			enums: {},
+		};
+
+		// const h_closure: Dict<AugmentedMessage> = {};
+		// const h_enums: Dict<AugmentedEnum> = {};
 
 		/**
 		 * add closures from given message type
 		 */
-		function mark_fields(g_msg: AugmentedMessage) {
+		function mark_fields(g_msg: AugmentedMessage, g_coders: ClosureStruct) {
 			// ensure every field's type has an encoder
 			for(const g_field of g_msg.fieldList) {
 				// ref type path
 				const si_type = g_field.typeName;
 
 				// type exists, is not encoded, and is not yet defined in closure/enum
-				if(si_type && !h_encoders[si_type] && !h_closure[si_type] && !h_enums[si_type]) {
+				if(si_type && !h_encoders[si_type] && !g_coders.messages[si_type] && !g_coders.enums[si_type]) {
 					// resolve type
 					const g_resolved = h_types[si_type];
 
 					// message
 					if('message' === g_resolved.form) {
-						h_closure[si_type] = g_resolved;
+						g_coders.messages[si_type] = g_resolved;
 
 						// recurse on message
-						mark_fields(g_resolved);
+						mark_fields(g_resolved, g_coders);
 					}
 					// enum
 					else {
-						h_enums[si_type] = g_resolved;
+						g_coders.enums[si_type] = g_resolved;
+
+						// TODO: what should happen here between encoders and decoders?
 
 						// add to draft
 						(h_drafts[g_msg.source.name!] ||= {
@@ -157,7 +188,7 @@ export const main = () => {
 					a_anys.push(k_impl.anyEncoder(g_msg));
 
 					// ensure its fields can be encoded
-					mark_fields(g_msg);
+					mark_fields(g_msg, g_encoders);
 				}
 			}
 
@@ -235,15 +266,21 @@ export const main = () => {
 						};
 
 						// ensure its fields can be encoded
-						mark_fields(g_input);
+						mark_fields(g_input, g_encoders);
 
 						// message has output content
 						if(g_output.fieldList.length) {
-							// add output decoder
+							// render decoder
 							const sx_decoder = k_impl.msgDecoder(g_output);
 
-							// closure is not needed since decoder handles everything
-							if(sx_decoder) a_decoders.push(sx_decoder);
+							// decoder is OK
+							if(sx_decoder) {
+								// add decoder
+								a_decoders.push(sx_decoder);
+
+								// ensure its fields can be decoded
+								mark_fields(g_output, g_decoders);
+							}
 						}
 					}
 				}
@@ -252,12 +289,37 @@ export const main = () => {
 
 
 		// each message in need of an encoder
-		for(const [, g_msg] of ode(h_closure)) {
+		for(const [, g_msg] of ode(g_encoders.messages)) {
 			// add encoder
 			h_encoders[g_msg.path] = {
 				message: g_msg,
 				encoder: k_impl.msgEncoder(g_msg),
 			};
+		}
+
+		debugger;
+		// each message in need of a decoder
+		for(const [, g_msg] of ode(g_decoders.messages)) {
+			const sx_decoder = k_impl.msgDecoder(g_msg);
+
+			if(sx_decoder) {
+				// add decoder
+				h_decoders[g_msg.path] = {
+					message: g_msg,
+					decoder: sx_decoder,
+				};
+			}
+			else {
+				debugger;
+			}
+
+			const sx_destructor = k_impl.msgDestructor(g_msg);
+			if(sx_destructor) {
+				h_destructors[g_msg.path] = {
+					message: g_msg,
+					destructor: sx_destructor,
+				};
+			}
 		}
 
 
@@ -269,7 +331,6 @@ export const main = () => {
 			const {
 				a_gateways,
 				a_anys,
-				a_decoders,
 			} = h_tmps[k_impl.path] || {};
 
 			// body
@@ -318,6 +379,37 @@ export const main = () => {
 				a_body.push(
 					...k_impl.body('encoder'),
 					...a_encoders
+				);
+			}
+
+			// decoders
+			const a_decoders: string[] = [];
+			for(const g_decoder of odv(h_decoders)) {
+				if(g_proto === g_decoder.message.source) {
+					a_decoders.push(g_decoder.decoder);
+				}
+			}
+
+			if(a_decoders.length) {
+				g_parts.head.push(...k_impl.head('decoder'));
+
+				a_body.push(
+					...k_impl.body('decoder'),
+					...a_decoders
+				);
+			}
+
+			// destructors
+			const a_destructors: string[] = [];
+			for(const g_destructor of odv(h_destructors)) {
+				if(g_proto === g_destructor.message.source) {
+					a_destructors.push(g_destructor.destructor);
+				}
+			}
+
+			if(a_destructors.length) {
+				a_body.push(
+					...a_destructors
 				);
 			}
 

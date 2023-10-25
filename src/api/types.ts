@@ -11,3 +11,5 @@ export type ImplementsInterfaces<
 export type Encoded<
 	p_type extends string,
 > = ImplementsInterfaces<p_type>;
+
+export type PropagateUndefined<z_any> = z_any extends undefined? undefined: never;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import type {Arrayable, Dict} from '@blake.regalia/belt';
 
 import type {
@@ -82,7 +83,22 @@ export const string = (s_value: string) => y_factory.createStringLiteral(s_value
 
 export const doReturn = (yn_expr: Expression) => y_factory.createReturnStatement(yn_expr);
 
-export const typeLit = (yn_lit: Parameters<ts.NodeFactory['createLiteralTypeNode']>[0]) => y_factory.createLiteralTypeNode(yn_lit);
+export const litType = (yn_lit: Parameters<ts.NodeFactory['createLiteralTypeNode']>[0]) => y_factory.createLiteralTypeNode(yn_lit);
+
+export const typeLit = (h_props: Dict<TypeNode>) => y_factory.createTypeLiteralNode(
+	oderac(h_props, (si_key, yn_type) => y_factory.createPropertySignature(
+		__UNDEFINED,
+		ident(si_key),
+		__UNDEFINED,
+		yn_type
+	)));
+
+export const declareAlias = (si_name: string, yn_assign: TypeNode, b_export?: boolean) => y_factory.createTypeAliasDeclaration(
+	b_export? [y_factory.createToken(SyntaxKind.ExportKeyword)]: __UNDEFINED,
+	ident(si_name),
+	__UNDEFINED,
+	yn_assign
+);
 
 export const declareConst = (z_binding: string | BindingName, yn_initializer: Expression, b_export?: boolean) => y_factory.createVariableStatement(
 	b_export? [y_factory.createToken(SyntaxKind.ExportKeyword)]: __UNDEFINED,

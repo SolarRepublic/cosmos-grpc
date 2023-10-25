@@ -91,48 +91,48 @@ find "$srd_annotations" -type f -name "*.js.map" | while read -r file; do
 done
 
 
-# define options for ts_proto
-s_opts="""
-env=browser
-esModuleInterop=true
-exportCommonSymbols=false
-forceLong=string
-useOptionals=all
-oneof=unions
-removeEnumPrefix=true
-snakeToCamel=false
-enumAsLiterals=true
-onlyTypes=true
-useJsonWireFormat=true
-outputServices=false
-outputTypeAnnotations=true
-"""
+# # define options for ts_proto
+# s_opts="""
+# env=browser
+# esModuleInterop=true
+# exportCommonSymbols=false
+# forceLong=string
+# useOptionals=all
+# oneof=unions
+# removeEnumPrefix=true
+# snakeToCamel=false
+# enumAsLiterals=true
+# onlyTypes=true
+# useJsonWireFormat=true
+# outputServices=false
+# outputTypeAnnotations=true
+# """
 
-# ignore certain warnings from protoc
-SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
-
-
-info "generating typings..."
-
-# generate typings
-protoc \
-	--plugin='protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto' \
-	--ts_proto_out="$srd_types" \
-	--ts_proto_opt="$(echo -n "${s_opts/$'\n'/}" | tr '\n' ',' | sed 's/,$//')" \
-	--proto_path="$srd_proto" \
-	$(find "${srd_chains[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
-	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
-
-# replace all interface defs with type literals
-find "$srd_types" -name "*.ts" \
-	-exec sed -i.del -E 's/export interface (\w+) /export type \1 = /g; s>\$type: ">"@type": "/>g' {} + \
-	# -exec rm -f {}.del \;
-
-find "$srd_types" -name "*.del" \
-	-exec rm {} \;
+# # ignore certain warnings from protoc
+# SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
 
 
-info "Done"
+# info "generating typings..."
+
+# # generate typings
+# protoc \
+# 	--plugin='protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto' \
+# 	--ts_proto_out="$srd_types" \
+# 	--ts_proto_opt="$(echo -n "${s_opts/$'\n'/}" | tr '\n' ',' | sed 's/,$//')" \
+# 	--proto_path="$srd_proto" \
+# 	$(find "${srd_chains[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
+# 	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
+
+# # replace all interface defs with type literals
+# find "$srd_types" -name "*.ts" \
+# 	-exec sed -i.del -E 's/export interface (\w+) /export type \1 = /g; s>\$type: ">"@type": "/>g' {} + \
+# 	# -exec rm -f {}.del \;
+
+# find "$srd_types" -name "*.del" \
+# 	-exec rm {} \;
+
+
+# info "Done"
 
 
 info "generating module..."
@@ -154,6 +154,7 @@ info "Done"
 cp -r src/api/* "$srd_lib"
 
 
+
 # run through linter with fix-all
 info "running eslint..."
 yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --fix build/lib
@@ -169,7 +170,14 @@ info " "
 # run through linter again with fix-all
 yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --fix build/lib
 
+info ""
 info "---- end of repeated lint cycle ----"
+info ""
+
+
+# for inspection
+cp .eslintrc.cjs build/lib/
+cp tsconfig.dist.json build/lib/tsconfig.json
 
 
 # compile to dist

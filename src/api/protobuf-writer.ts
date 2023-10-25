@@ -1,5 +1,6 @@
 import type {O} from 'ts-toolbelt';
 
+import type {PropagateUndefined} from './types';
 import type {SlimCoin} from '@solar-republic/types';
 
 import {ATU8_NIL, __UNDEFINED, buffer, text_to_buffer} from '@blake.regalia/belt';
@@ -211,13 +212,13 @@ export const any = (si_type: string, atu8_value: Uint8Array): Uint8Array => Prot
 
 export const coin = <
 	a_coin extends SlimCoin | undefined,
->(a_coin: a_coin): Uint8Array | (a_coin extends undefined? undefined: never) => (
+>(a_coin: a_coin): Uint8Array | PropagateUndefined<a_coin> => (
 	a_coin
 		? Protobuf()
 			.s(a_coin[1])
 			.s(a_coin[0])
 			.o
 		: __UNDEFINED
-) as Uint8Array | (a_coin extends undefined? undefined: never);
+) as Uint8Array | PropagateUndefined<a_coin>;
 
-export const coins = (a_coins: SlimCoin[]): Uint8Array[] | undefined => map(a_coins, coin);
+export const coins = (a_coins: SlimCoin[] | undefined): Uint8Array[] | undefined => map(a_coins, coin);

@@ -1,14 +1,30 @@
-// for linting and compiling typescript from build/lib → build/dist
+// tsconfig used for inspecting build/dist after being copied there
 {
-	"extends": "./tsconfig.json",
+	"extends": "@blake.regalia/tsconfig/tsconfig.node.json",
 
 	"compilerOptions": {
-		"baseUrl": "build",
-		"outDir": "build/lib",
-		"declarationDir": "build/lib",
+		"baseUrl": "./",
+
+		"outDir": "../dist",
+		"declarationDir": "../dist",
+
+		"declaration": true,
+		"noImplicitReturns": false,
+
+		"allowJs": false,
+
+		"module": "ESNext",
+
+		"paths": {
+			"#/*": ["./*"]
+		}
 	},
 
 	"include": [
-		"build/dist/**/*.ts",
+		"**/*.ts",
 	],
+
+	"ts-node": {
+		"experimentalSpecifierResolution": "node"
+	},
 }

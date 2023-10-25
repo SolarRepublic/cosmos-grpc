@@ -11,7 +11,7 @@ type Message = Field[][];
 export type DecodedProtobuf = Uint8Array | Message;
 
 /**
- * 
+ * Hints control the handling of decoded fields
  */
 export const enum ProtoHint {
 	/**

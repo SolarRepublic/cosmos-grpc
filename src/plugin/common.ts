@@ -8,10 +8,8 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {ProtoHint} from 'src/api/protobuf-reader';
-
-import {SR_IMPORT_TYPES_PROTO} from './constants';
-import {call, ident, literal, string, type, typeLit, typeRef, union} from './ts-factory';
+import {call, ident, literal, string, type, litType, typeRef, union} from './ts-factory';
+import {ProtoHint} from '../api/protobuf-reader';
 
 // destructure members from protobuf
 const {
@@ -33,7 +31,7 @@ export type TsThingBare = {
 		to_json?: Expression;
 
 		// how to encode the argument for use in protobuf
-		to_proto?: Expression;
+		to_proto?: (yn_expr: Expression) => Expression;
 
 		// how to convert a response value in JSON back to `type`
 		from_json?: (yn_expr: Expression) => Expression;
@@ -87,7 +85,7 @@ export type FieldRouter = Record<
 	(si_field: string, g_field: AugmentedField) => TsThingBare
 >;
 
-const A_SEMANTIC_ACCOUNT_ADDR = [
+const A_SEMANTIC_ACCOUNT_ADDR_STR = [
 	'sender',
 	'creator',
 	'delegator',
@@ -101,6 +99,11 @@ const A_SEMANTIC_ACCOUNT_ADDR = [
 	'new_owner',
 ];
 
+const A_SEMANTIC_ACCOUNT_ADDR_BYTES = [
+	'sender',
+	'contract',
+];
+
 type ThingDefMixin = Pick<TsThingBare, 'proto'> & Partial<Omit<TsThingBare, 'proto'>>;
 
 const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixin => {
@@ -109,7 +112,7 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 		calls: {
 			name: s_ident,
 			type: type('number'),
-			to_proto: call('timestamp', [ident(s_ident)]),
+			to_proto: yn_expr => call('timestamp', [yn_expr]),
 		},
 
 		proto: {
@@ -121,7 +124,7 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 		nests: {
 			name: `a_${snake(g_field.name!)}`,
 			hints: literal([ProtoHint.SINGULAR, ProtoHint.SINGULAR]),
-			parse: yn_data => call(ident('reduce_timestamp'), [yn_data]),
+			parse: yn_expr => call(ident('reduce_timestamp'), [yn_expr]),
 		},
 	};
 };
@@ -139,7 +142,7 @@ const H_OVERRIDE_MIXINS: Dict<
 			calls: {
 				name: s_ident,
 				type: typeRef('SlimCoin'),
-				to_proto: call('coin', [ident(s_ident)]),
+				to_proto: yn_expr => call('coin', [yn_expr]),
 			},
 
 			proto: {
@@ -171,7 +174,7 @@ const H_OVERRIDE_MIXINS: Dict<
 		if(si_accepts) {
 			yn_proto_type = typeRef('Encoded', [
 				union([
-					typeLit(string(si_accepts)),
+					litType(string(si_accepts)),
 				]),
 			]);
 
@@ -198,7 +201,16 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	[H_FIELD_TYPES.TYPE_GROUP]: route_not_impl,
 
 	[H_FIELD_TYPES.TYPE_FLOAT]: route_not_impl,
-	[H_FIELD_TYPES.TYPE_DOUBLE]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_DOUBLE]: si_field => ({
+		calls: {
+			name: `x_${si_field}`,
+			type: type('number'),
+		},
+
+		proto: {
+			writer: 'PROTO_ENCODING_FOR_DOUBLE_NOT_IMPLEMENTED' as 'v',  // TODO: fix this?
+		},
+	}),
 
 	[H_FIELD_TYPES.TYPE_FIXED32]: route_not_impl,
 	[H_FIELD_TYPES.TYPE_FIXED64]: route_not_impl,
@@ -289,7 +301,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			yn_return = typeRef('ValidatorAddr');
 		}
 		// account address
-		else if(/(_addr(ess)?|(^|_)receiver)$/.test(si_field) || A_SEMANTIC_ACCOUNT_ADDR.includes(si_field)) {
+		else if(/(_addr(ess)?|(^|_)receiver)$/.test(si_field) || A_SEMANTIC_ACCOUNT_ADDR_STR.includes(si_field)) {
 			si_name = `sa_${si_field.replace(/_address$/, '')}`;
 			yn_type = typeRef('WeakAccountAddr');
 			yn_return = typeRef('AccountAddr');
@@ -297,7 +309,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		else if(si_field.endsWith('_id')) {
 			si_name = `si_${si_field.replace(/_id$/, '')}`;
 		}
-		else if('code_hash' === si_field) {
+		else if(/code_hash$/.test(si_field)) {
 			si_name = `sb16_${si_field}`;
 			yn_type = typeRef('NaiveHexLower');
 		}
@@ -331,7 +343,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		return {
 			calls: {
 				name: `sc_${snake(si_field)}`,
-				type: k_impl.importType(`${SR_IMPORT_TYPES_PROTO}${sr_path}`, si_ref),
+				type: k_impl.importType(sr_path, si_ref),
 			},
 			proto: {
 				writer: 'v',
@@ -355,7 +367,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		return {
 			calls: {
 				name: `g_${si_name}`,
-				type: k_impl.importType(`${SR_IMPORT_TYPES_PROTO}${sr_path}`, si_ref),
+				type: k_impl.importType(sr_path, k_impl.exportedId(k_impl.resolveType(g_field.typeName!))),
 			},
 
 			nests: {
@@ -368,7 +380,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 				proto: {
 					writer: 'b',
 					type: typeRef('Encoded', [
-						typeLit(string(g_field.typeName!.replace(/^\./, '/'))),
+						litType(string(g_field.typeName!.replace(/^\./, '/'))),
 					]),
 					// type: k_impl.importType(k_impl.pathOfFieldType(g_field), `EncodedThing`),
 					// prefers_call: 1,
@@ -379,10 +391,29 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 
 	// bytes
 	[H_FIELD_TYPES.TYPE_BYTES](si_field, g_field) {
+		// prep name
+		const si_name = snake(si_field);
+
+		// special override
+		if(A_SEMANTIC_ACCOUNT_ADDR_BYTES.includes(si_field)) {
+			return {
+				calls: {
+					name: `sa_${si_name}`,
+					type: typeRef('WeakAccountAddr'),
+					to_proto: yn_expr => call('bech32_decode', [yn_expr]),
+				},
+
+				proto: {
+					writer: 'b',
+					prefers_call: 1,
+				},
+			};
+		}
+
 		// default to `unknown`
 		const yn_type: TypeNode = typeRef('Uint8Array');
 
-		const si_self = `atu8_${snake(si_field)}`;
+		const si_self = `atu8_${snake(si_name)}`;
 
 		// construct ts field
 		return {

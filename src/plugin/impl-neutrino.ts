@@ -6,24 +6,20 @@ import type {FileCategory} from './rpc-impl';
 import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
 
 import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from '@blake.regalia/belt';
-import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
-import {ProtoHint} from 'src/api/protobuf-reader';
+
 import {ts} from 'ts-morph';
 
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
+import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareAlias, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, type, litType, typeRef, union, y_factory, typeLit} from './ts-factory';
+import {ProtoHint} from '../api/protobuf-reader';
 
 type ReturnThing = {
 	type: TypeNode;
 	parser: Expression | null;
 	things: TsThing[];
 };
-
-const {
-	FieldDescriptorProto,
-} = pb;
 
 const {
 	SyntaxKind,
@@ -83,7 +79,11 @@ export class NeutrinoImpl extends RpcImplementor {
 			const g_thing = this.route(g_field);
 
 			// prep args
-			const a_args: Expression[] = [g_thing.calls.to_proto];
+			const a_args: Expression[] = [
+				g_thing.calls.to_proto(g_thing.proto.prefers_call
+					? g_thing.calls.id
+					: g_thing.proto.id
+				)];
 
 			// field number does not immediately follow previous
 			const i_number = g_field.number!;
@@ -271,13 +271,11 @@ export class NeutrinoImpl extends RpcImplementor {
 	override accepts(si_interface: string, s_alias: string) {
 		const si_type = `Accepts${proper(s_alias)}`;
 
-		const yn_type = y_factory.createTypeAliasDeclaration([
-			y_factory.createToken(SyntaxKind.ExportKeyword),
-		], ident(si_type), __UNDEFINED, typeRef('Encoded', [
+		const yn_type = declareAlias(si_type, typeRef('Encoded', [
 			union([
 				string(si_interface),
 				// ...g_opts.implementsInterfaceList.map(si_interface => string(si_interface)),
-			].map(yn => typeLit(yn))),
+			].map(yn => litType(yn))),
 		]));
 
 		// add to preamble
@@ -499,14 +497,12 @@ export class NeutrinoImpl extends RpcImplementor {
 		const p_type = `/${g_msg.source.pb_package}.${g_msg.name}`;
 
 		// declare unique type
-		const yn_type = y_factory.createTypeAliasDeclaration([
-			y_factory.createToken(SyntaxKind.ExportKeyword),
-		], ident(si_singleton), __UNDEFINED, intersection([
+		const yn_type = declareAlias(si_singleton, intersection([
 			// Encoded<si_message | ...as_interfaces>
 			typeRef('Encoded', [
 				union([
-					typeLit(string(p_type)),
-					...a_interfaces.map(si_interface => typeLit(string(si_interface))),
+					litType(string(p_type)),
+					...a_interfaces.map(si_interface => litType(string(si_interface))),
 				]),
 			]),
 		]));
@@ -549,10 +545,8 @@ export class NeutrinoImpl extends RpcImplementor {
 		const si_singleton = `Encoded${proper(g_parts.vendor)}${g_method.name}`;
 
 		// declare unique type
-		const yn_type = y_factory.createTypeAliasDeclaration([
-			y_factory.createToken(SyntaxKind.ExportKeyword),
-		], ident(si_singleton), __UNDEFINED, typeRef('Encoded', [
-			typeLit(string(`/${g_method.service.source.pb_package}.${g_method.name!}`)),
+		const yn_type = declareAlias(si_singleton, typeRef('Encoded', [
+			litType(string(`/${g_method.service.source.pb_package}.${g_method.name!}`)),
 		]));
 
 		// add type decl to preamble
@@ -581,14 +575,12 @@ export class NeutrinoImpl extends RpcImplementor {
 		const g_parts = g_msg.source.parts;
 
 		// prep unique type
-		const si_singleton = `Encoded${proper(g_parts.vendor)}${g_msg.name}`;
+		const si_singleton = `Encoded${this.exportedId(g_msg)}`;
 
 		// declare unique type
-		const yn_type = y_factory.createTypeAliasDeclaration([
-			y_factory.createToken(SyntaxKind.ExportKeyword),
-		], ident(si_singleton), __UNDEFINED, typeRef('Encoded', [
-			typeLit(string(`/${g_msg.source.pb_package}.${g_msg.name!}`)),
-		]));
+		const yn_type = declareAlias(si_singleton, typeRef('Encoded', [
+			litType(string(`/${g_msg.source.pb_package}.${g_msg.name!}`)),
+		]), true);
 
 		// add type decl to preamble
 		this._g_heads.encoder.push(print(yn_type));
@@ -600,7 +592,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)), typeRef(si_singleton));
 
 		// create statement
-		const yn_const = declareConst(`msg${proper(g_parts.vendor)}${g_msg.name!}`, yn_writer, true);
+		const yn_const = declareConst(`msg${this.exportedId(g_msg)}`, yn_writer, true);
 
 		return print(yn_const, [
 			`Encodes a \`${g_msg.name}\` protobuf message: ${g_msg.comments}`,
@@ -774,7 +766,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			)
 			: yn_destructure;
 
-		const yn_statement = declareConst(`decode${proper(g_msg.source.parts.vendor)}${g_msg.name}`, yn_init, true);
+		const yn_statement = declareConst(`decode${this.exportedId(g_msg)}`, yn_init, true);
 
 		return print(yn_statement, [
 			`Decodes a protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} response message`,
@@ -791,10 +783,24 @@ export class NeutrinoImpl extends RpcImplementor {
 		]);
 	}
 
+	msgDestructor(g_msg: AugmentedMessage): string {
+		const g_parts = g_msg.source.parts;
+		const si_name = this.exportedId(g_msg);
+
+		const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, g_field => ({
+			[g_field.name!]: this.route(g_field).calls.return_type,
+		}))), true);
+
+		return print(yn_alias, [
+			g_msg.comments,
+			...g_msg.fieldList.map(g_field => `@param ${g_field.name} - ${g_field.comments}`),
+		]);
+	}
+
 	enumId(g_enum: AugmentedEnum) {
 		const g_parts = g_enum.source.parts;
 
-		return `ProtoEnum${proper(g_parts.vendor)}${proper(g_parts.purpose)}${g_enum.name!}`;
+		return `ProtoEnum${this.exportedId(g_enum)}`;
 	}
 
 	protoEnum(g_enum: AugmentedEnum) {

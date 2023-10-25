@@ -9,7 +9,6 @@ import {oderac, F_IDENTITY, proper, __UNDEFINED} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
 
-import {SR_IMPORT_TYPES_PROTO} from './constants';
 import {access, arrayType, arrow, call, ident, importModule, param, print, type, typeRef, union, y_factory} from './ts-factory';
 
 
@@ -37,6 +36,12 @@ export abstract class RpcImplementor {
 
 	clashFreeTypeId(g_type: RefableType): string {
 		return g_type.path.split('.').filter(F_IDENTITY).map(proper).join('').replace(/[^A-Za-z0-9$_]+/g, '');
+	}
+
+	exportedId(g_thing: {name?: string | undefined; source: AugmentedFile}): string {
+		const g_parts = g_thing.source.parts;
+
+		return `${proper(g_parts.vendor)}${proper(g_parts.module)}${g_thing.name!}`.replace(/[^A-Za-z0-9$_]+/g, '');
 	}
 
 	importJsonTypesImplementing(si_interface: string): TypeNode {
@@ -79,7 +84,7 @@ export abstract class RpcImplementor {
 			[si_prop, si_name] = z_ident;
 		}
 
-		this._h_type_imports[si_name] = [`${SR_IMPORT_TYPES_PROTO}${sr_path}`, y_factory.createImportSpecifier(
+		this._h_type_imports[si_name] = [`#/${sr_path}`, y_factory.createImportSpecifier(
 			false,  // never directly, handled in import clause
 			si_prop? ident(si_prop): __UNDEFINED,
 			ident(si_name)
@@ -175,13 +180,15 @@ export abstract class RpcImplementor {
 			if(g_calls.to_proto) {
 				// special wrap for Coin[]
 				if('.cosmos.base.v1beta1.Coin' === g_field.typeName) {
-					g_calls.to_proto = call('coins', [ident(g_calls.name)]);
+					g_calls.to_proto = yn_expr => call('coins', [yn_expr]);
 				}
 				// map items
 				else {
-					g_calls.to_proto = call(
+					const f_original = g_calls.to_proto;
+
+					g_calls.to_proto = yn_expr => call(
 						access(g_calls.name, 'map'),
-						[arrow([param(s_name_singular)], g_calls.to_proto)]
+						[arrow([param(s_name_singular)], f_original(yn_expr))]
 					);
 				}
 			}
@@ -196,7 +203,7 @@ export abstract class RpcImplementor {
 		g_calls.to_json ||= ident(g_calls.name);
 		g_calls.from_json ||= F_IDENTITY;
 
-		g_calls.to_proto ||= ident(g_proto.prefers_call? g_calls.name: g_proto.name);
+		g_calls.to_proto ||= F_IDENTITY;  // ident(g_proto.prefers_call? g_calls.name: g_proto.name);
 		g_calls.return_type ||= g_calls.type;
 
 
