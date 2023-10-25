@@ -7,10 +7,11 @@ import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclarat
 
 import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from '@blake.regalia/belt';
 import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
+import {ProtoHint} from 'src/api/protobuf-reader';
 import {ts} from 'ts-morph';
 
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
-import {XC_HINT_NUMBER, XC_HINT_STRING, XC_HINT_BIGINT, XC_HINT_SINGULAR, XC_HINT_BYTES, N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
+import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
 import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
 
@@ -671,10 +672,10 @@ export class NeutrinoImpl extends RpcImplementor {
 			}
 			else {
 				// infer hint from write type
-				a_hints.push(literal((g_field.repeated? 0: XC_HINT_SINGULAR) | ({
-					v: 's' === g_thing.calls.name[0]? XC_HINT_BIGINT: XC_HINT_NUMBER,
-					s: XC_HINT_STRING,
-					b: XC_HINT_BYTES,
+				a_hints.push(literal((g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR) | ({
+					v: 's' === g_thing.calls.name[0]? ProtoHint.BIGINT: ProtoHint.NONE,
+					s: ProtoHint.STRING,
+					b: ProtoHint.NONE,
 				}[g_thing.proto.writer.toLowerCase()] || 0)));
 
 				// add expression to return list

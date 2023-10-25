@@ -13,3 +13,4 @@ export const safe_buffer_to_text = (atu8_buffer: Uint8Array | undefined): string
 export const safe_base64_to_buffer = (sb64_data: string | undefined): Uint8Array | undefined => sb64_data? base64_to_buffer(sb64_data): __UNDEFINED;
 
 export const safe_base64_to_text = (sb64_data: string | undefined): string | undefined => sb64_data? base64_to_text(sb64_data): __UNDEFINED;
+

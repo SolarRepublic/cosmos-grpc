@@ -125,11 +125,11 @@ protoc \
 
 # replace all interface defs with type literals
 find "$srd_types" -name "*.ts" \
-	-exec sed -i.del -E 's/export interface (\w+) /export type \1 = /g' {} +
+	-exec sed -i.del -E 's/export interface (\w+) /export type \1 = /g; s>\$type: ">"@type": "/>g' {} + \
 	# -exec rm -f {}.del \;
 
 find "$srd_types" -name "*.del" \
-	-exec rm -f {}.del \;
+	-exec rm {} \;
 
 
 info "Done"

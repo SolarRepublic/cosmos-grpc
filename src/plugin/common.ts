@@ -8,7 +8,9 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {SR_IMPORT_TYPES_PROTO, XC_HINT_SINGULAR_NUMBER, XC_HINT_SINGULAR_STRING} from './constants';
+import {ProtoHint} from 'src/api/protobuf-reader';
+
+import {SR_IMPORT_TYPES_PROTO} from './constants';
 import {call, ident, literal, string, type, typeLit, typeRef, union} from './ts-factory';
 
 // destructure members from protobuf
@@ -118,7 +120,7 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 
 		nests: {
 			name: `a_${snake(g_field.name!)}`,
-			hints: literal([XC_HINT_SINGULAR_NUMBER, XC_HINT_SINGULAR_NUMBER]),
+			hints: literal([ProtoHint.SINGULAR, ProtoHint.SINGULAR]),
 			parse: yn_data => call(ident('reduce_timestamp'), [yn_data]),
 		},
 	};
@@ -148,7 +150,7 @@ const H_OVERRIDE_MIXINS: Dict<
 
 			nests: {
 				name: `a_${si_name}`,
-				hints: literal([XC_HINT_SINGULAR_STRING, XC_HINT_SINGULAR_STRING]),
+				hints: literal([ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING]),
 				parse: yn_data => call(ident('decode_coin'), [yn_data], [typeRef('SlimCoin')]),
 			},
 		};

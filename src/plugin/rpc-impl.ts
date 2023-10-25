@@ -47,9 +47,7 @@ export abstract class RpcImplementor {
 			return type('never');
 		}
 
-		return typeRef('AnyJson', [
-			union(a_msgs.map(g_msg => this.importType(this.pathOfType(g_msg.path), [g_msg.name!, this.clashFreeTypeId(g_msg)]))),
-		]);
+		return union(a_msgs.map(g_msg => this.importType(this.pathOfType(g_msg.path), [g_msg.name!, this.clashFreeTypeId(g_msg)])));
 	}
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
