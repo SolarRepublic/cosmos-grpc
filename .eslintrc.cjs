@@ -8,6 +8,7 @@ module.exports = {
 	},
 	plugins: ['unused-imports'],
 	rules: {
+		'@typescript-eslint/no-unsafe-argument': 'off',
 		'unused-imports/no-unused-imports': 'warn',
 		'@typescript-eslint/naming-convention': 'off',
 	},

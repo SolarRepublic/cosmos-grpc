@@ -1,8 +1,8 @@
-import type {L, O} from 'ts-toolbelt';
+import type {O} from 'ts-toolbelt';
 
-import type {SlimCoin} from './types';
+import type {SlimCoin} from '@solar-republic/types';
 
-import {ATU8_NIL, F_IDENTITY, __UNDEFINED, buffer, text_to_buffer} from '@blake.regalia/belt';
+import {ATU8_NIL, __UNDEFINED, buffer, text_to_buffer} from '@blake.regalia/belt';
 
 type NodeValue = number | bigint | number[] | Uint8Array;
 
@@ -209,9 +209,15 @@ export const any = (si_type: string, atu8_value: Uint8Array): Uint8Array => Prot
 	.b(atu8_value)
 	.o;
 
-export const coin = (a_coin: SlimCoin): Uint8Array => Protobuf()
-	.s(a_coin[1])
-	.s(a_coin[0])
-	.o;
+export const coin = <
+	a_coin extends SlimCoin | undefined,
+>(a_coin: a_coin): Uint8Array | (a_coin extends undefined? undefined: never) => (
+	a_coin
+		? Protobuf()
+			.s(a_coin[1])
+			.s(a_coin[0])
+			.o
+		: __UNDEFINED
+) as Uint8Array | (a_coin extends undefined? undefined: never);
 
 export const coins = (a_coins: SlimCoin[]): Uint8Array[] | undefined => map(a_coins, coin);

@@ -20,6 +20,8 @@ export type RefableType = AugmentedMessage | AugmentedEnum;
 
 export type TypesDict = Dict<RefableType>;
 
+export type InterfacesDict = Dict<AugmentedMessage[]>;
+
 const {
 	CodeGeneratorRequest,
 	CodeGeneratorResponse,
@@ -93,6 +95,7 @@ function preprocess_messages(
 	g_proto: AugmentedFile,
 	sr_package: string,
 	h_types: TypesDict,
+	h_interfaces: InterfacesDict,
 	a_path: number[]=[]
 ) {
 	// each message
@@ -107,6 +110,11 @@ function preprocess_messages(
 		// append to path
 		const a_local = [...a_path, 4, i_msg];
 
+		// save data for implemented_by
+		for(const si_implements of (g_msg as AugmentedMessage).options?.implementsInterfaceList || []) {
+			(h_interfaces[si_implements] ||= []).push(g_msg as AugmentedMessage);
+		}
+
 		// each field
 		g_msg.fieldList.forEach((g_field, i_field) => {
 			// augment it
@@ -120,7 +128,7 @@ function preprocess_messages(
 		preprocess_enums(g_msg.enumTypeList, g_proto, p_msg, h_types, a_local);
 
 		// process nested types
-		preprocess_messages(g_msg.nestedTypeList, g_proto, p_msg, h_types, a_local);
+		preprocess_messages(g_msg.nestedTypeList, g_proto, p_msg, h_types, h_interfaces, a_local);
 
 		// augment message type and save to global lookup
 		h_types[p_msg] = augment(g_msg, {
@@ -174,7 +182,8 @@ export const plugin = async(
 	f_plugin: (
 		a_protos: AugmentedFile[],
 		a_includes: Dict<AugmentedFile>,
-		h_types: TypesDict
+		h_types: TypesDict,
+		h_interfaces: InterfacesDict
 	) => Promisable<Dict>
 ): Promise<void> => {
 	// parse stdin
@@ -202,6 +211,7 @@ export const plugin = async(
 
 	// prep global lookup for types
 	const h_types: TypesDict = {};
+	const h_interfaces: InterfacesDict = {};
 
 	// each included file
 	const h_augmented = fodemtv(h_files, (g_proto_raw) => {
@@ -213,7 +223,7 @@ export const plugin = async(
 		const g_proto = parse_file_parts(g_proto_raw);
 
 		// preprocess each message type
-		preprocess_messages(g_proto_raw.messageTypeList, g_proto, '.'+si_package, h_types);
+		preprocess_messages(g_proto_raw.messageTypeList, g_proto, '.'+si_package, h_types, h_interfaces);
 
 		// preprocess each enum
 		preprocess_enums(g_proto_raw.enumTypeList, g_proto, '.'+si_package, h_types);
@@ -244,7 +254,7 @@ export const plugin = async(
 	const a_protos = g_req.fileToGenerateList.map(sr_file => h_augmented[sr_file]);
 
 	// call plugin
-	const h_results = await f_plugin(a_protos, h_augmented, h_types);
+	const h_results = await f_plugin(a_protos, h_augmented, h_types, h_interfaces);
 
 	// process results
 	try {
@@ -289,6 +299,6 @@ export const comments_at = (
 	.map(l => l.leadingComments)
 	.pop() || '')
 	.replace(/\s*\n\s*/g, ' ')
-	.replace(s_name? new RegExp('^\\s*'+escape_regex(s_name || '')+'(?:\\s+is\\s+)?'): /^/i, '')
+	.replace(s_name? new RegExp('^\\s*'+escape_regex(s_name || '')+'(\\s+(is|are)\\s+)?'): /^/i, '')
 	.trim();
 

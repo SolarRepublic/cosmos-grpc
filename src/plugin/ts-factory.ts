@@ -12,7 +12,7 @@ import type {
 	Node,
 	ArrayBindingElement,
 	MemberName,
-	TypeParameterDeclaration,
+	ImportSpecifier,
 } from 'typescript';
 
 import {__UNDEFINED, fodemtv, oderac} from '@blake.regalia/belt';
@@ -40,7 +40,7 @@ const H_TYPE_KEYWORDS = {
 
 
 // shortcuts
-export const ident = (z_indent: string | Identifier) => 'string' === typeof z_indent? y_factory.createIdentifier(z_indent): z_indent;
+export const ident = (z_indent: string | Identifier) => 'string' === typeof z_indent? y_factory.createIdentifier(z_indent.replace(/[^a-zA-Z0-9$_]/g, '')): z_indent;
 export const type = (si_type: keyof typeof H_TYPE_KEYWORDS) => y_factory.createKeywordTypeNode(H_TYPE_KEYWORDS[si_type] as KeywordTypeSyntaxKind);
 export const unknown = () => type('unknown');
 export const typeRef = (si_ref: string, a_type_args?: TypeNode[]) => y_factory.createTypeReferenceNode(si_ref, a_type_args);
@@ -181,13 +181,18 @@ export const binding = (yn_inner: BindingName) => y_factory.createBindingElement
 
 export const arrayBinding = (a_bidings: ArrayBindingElement[]) => y_factory.createArrayBindingPattern(a_bidings);
 
-export const importModule = (sx_specifier: string, a_imports: string[], b_type_only=false) => y_factory.createImportDeclaration(
+export const importModule = (sx_specifier: string, a_imports: Array<string | ImportSpecifier>, b_type_only=false) => y_factory.createImportDeclaration(
 	__UNDEFINED,
 	y_factory.createImportClause(
 		b_type_only,
 		__UNDEFINED,
-		y_factory.createNamedImports(
-			a_imports.map(si => y_factory.createImportSpecifier(false, __UNDEFINED, ident(si))))
+		y_factory.createNamedImports(a_imports.map(z_import => 'string' === typeof z_import
+			? y_factory.createImportSpecifier(
+				false,  // never directly, handled in import clause
+				__UNDEFINED,
+				ident(z_import)
+			)
+			: z_import))
 	),
 	string(sx_specifier),
 	__UNDEFINED
@@ -218,9 +223,18 @@ export const print = (yn_stmt: Statement, a_comment_lines?: string[]): string =>
 	const sx_print = y_printer.printNode(ts.EmitHint.Unspecified, yn_stmt, y_source_anon)
 		.replace(/\n(  {2,})/g, (s_line, s_spaces) => '\n'+'\t'.repeat((s_spaces.length / 4) | 0))
 		.replace(/(const \w+ = \(.*)/g, s_line => s_line
-			.replace(/(\()?(\w+\??: [^,)]+)(?:(, )|\))/g, (s_match, s_lparen, s_main, s_comma) => ''
+			.replace(/(\()?(\w+\??: [^,"`)]+(?:["`][^"`]*["`][^,)]*)?)(?:(, )|\))/g, (s_match, s_lparen, s_main, s_comma) => ''
 				+`${s_lparen? s_lparen+'\n\t': ''}${s_main}${s_comma? ',\n\t': '\n)'}`))
 		.replace(/\[\s+\]/g, '[]');
 
 	return sx_print;
 };
+
+export const enumDecl = (si_enum: string, h_values: Dict<Expression | undefined>, b_const: boolean, b_export: boolean) => y_factory.createEnumDeclaration(
+	[
+		...b_export? [y_factory.createToken(SyntaxKind.ExportKeyword)]: [],
+		...b_const? [y_factory.createToken(SyntaxKind.ConstKeyword)]: [],
+	],
+	ident(si_enum),
+	oderac(h_values, (si_key, w_value) => y_factory.createEnumMember(ident(si_key), w_value))
+);

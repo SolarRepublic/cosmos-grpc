@@ -23,9 +23,23 @@ const A_GLOBAL_PREAMBLE = [
 			'base64_to_buffer',
 			'text_to_buffer',
 		]),
+		importModule('@blake.regalia/belt', [
+			'NaiveHexLower',
+		], true),
+		importModule('@solar-republic/types', [
+			'WeakInt64Str',
+			'WeakUint64Str',
+			'WeakInt128Str',
+			'WeakUint128Str',
+			'WeakAccountAddr',
+			'WeakValidatorAddr',
+			'SlimCoin',
+		], true),
 		importModule('#/util', [
 			'safe_buffer_to_base64',
 			'safe_buffer_to_text',
+			'safe_base64_to_buffer',
+			'safe_base64_to_text',
 		]),
 		importModule('#/protobuf-writer', [
 			'Protobuf',
@@ -47,19 +61,6 @@ const A_GLOBAL_PREAMBLE = [
 			'restful_grpc',
 		]),
 		importModule('#/types', [
-			'WeakInt64Str',
-			'WeakUint64Str',
-			'WeakInt128Str',
-			'WeakUint128Str',
-			'Int64Str',
-			'Uint64Str',
-			'Int128Str',
-			'Uint128Str',
-			'WeakAccountAddr',
-			'WeakValidatorAddr',
-			'AccountAddr',
-			'ValidatorAddr',
-			'HexLower',
 			'ImplementsInterface',
 			'Encoded',
 		], true),
@@ -68,11 +69,13 @@ const A_GLOBAL_PREAMBLE = [
 
 
 export const main = () => {
-	void plugin((a_protos, h_inputs, h_types) => {
+	void plugin((a_protos, h_inputs, h_types, h_interfaces) => {
 		// new impl
-		const k_impl = new NeutrinoImpl(h_types);
+		const k_impl = new NeutrinoImpl(h_types, h_interfaces);
 
-		// const h_drafts: Dict<
+		const h_drafts: Dict<{
+			enums: string[];
+		}> = {};
 
 		const h_outputs: Dict<string> = {};
 
@@ -110,6 +113,11 @@ export const main = () => {
 					// enum
 					else {
 						h_enums[si_type] = g_resolved;
+
+						// add to draft
+						(h_drafts[g_msg.source.name!] ||= {
+							enums: [],
+						}).enums.push(si_type);
 					}
 				}
 			}
@@ -124,7 +132,7 @@ export const main = () => {
 
 		// each proto file
 		for(const g_proto of a_protos) {
-			// reset instance's internal file stuff
+			// open file for path
 			k_impl.open(g_proto);
 
 			// new string lists
@@ -242,49 +250,14 @@ export const main = () => {
 			}
 		}
 
-		debugger;
 
 		// each message in need of an encoder
 		for(const [, g_msg] of ode(h_closure)) {
-			// open message's source
-			k_impl.open(g_msg.source);
-
 			// add encoder
 			h_encoders[g_msg.path] = {
 				message: g_msg,
 				encoder: k_impl.msgEncoder(g_msg),
 			};
-
-			// 	// normal message
-			// 	else {
-			// 		// produce encoder but 
-			// 		a_encoders.push(k_impl.msgEncoder(g_msg));
-			// 	}
-
-			// 	// recurse on nested types
-			// 	gen_encoders(g_msg.nestedTypeList);
-			// function gen_encoders(a_msgs: AugmentedMessage[]) {
-			// 	for(const g_msg of a_msgs) {
-			// 		// ref message options
-			// 		const g_opts = g_msg.options;
-
-			// 		// implements interface; produce 'any' encoder
-			// 		if(g_opts?.implementsInterfaceList) {
-			// 			a_encoders.push(k_impl.anyEncoder(g_msg)!);
-			// 		}
-			// 		// normal message
-			// 		else {
-			// 			// produce encoder but 
-			// 			a_encoders.push(k_impl.msgEncoder(g_msg));
-			// 		}
-
-			// 		// recurse on nested types
-			// 		gen_encoders(g_msg.nestedTypeList);
-
-			// 		// // recurse on nested enums
-			// 		// gen_enums(g_msg.enumTypeList);
-			// 	}
-			// }
 		}
 
 
@@ -358,6 +331,19 @@ export const main = () => {
 			// 	);
 			// }
 
+
+			const g_draft = h_drafts[g_proto.name!] || {};
+
+			// enums
+			const a_enums = g_draft.enums;
+			if(a_enums) {
+				for(const si_enum of a_enums) {
+					const g_enum = h_types[si_enum] as AugmentedEnum;
+
+					a_body.push(print(k_impl.protoEnum(g_enum)));
+				}
+			}
+
 			// there are contents to write to the file
 			if(a_body.length) {
 				h_outputs[k_impl.path] = [g_parts.head.join('\n'), ...g_parts.body].join('\n\n');
@@ -365,52 +351,6 @@ export const main = () => {
 		}
 
 		debugger;
-
-		// // process closures
-		// let h_search = h_closure;
-		// for(;;) {
-		// 	const h_discovered: Dict<AugmentedMessage> = {};
-
-		// 	for(const [, g_msg] of ode(h_search)) {
-		// 		// each field in message
-		// 		for(const g_field of g_msg.fieldList) {
-		// 			const si_type = g_field.typeName!;
-
-		// 			// not yet in closure/dicosvered
-		// 			if(si_type && !h_closure[si_type] && !h_discovered[si_type]) {
-		// 				// resolve
-		// 				const g_resolved = k_impl.resolveType(si_type);
-
-		// 				// message
-		// 				if('fieldList' in g_resolved) {
-		// 					h_discovered[si_type] = g_resolved;
-		// 				}
-		// 				// enum
-		// 				else {
-		// 					h_enums[si_type] = g_resolved;
-		// 				}
-		// 			}
-		// 		}
-		// 	}
-
-		// 	// new messages were discovered
-		// 	if(Object.keys(h_discovered).length) {
-		// 		// merge with closure
-		// 		Object.assign(h_closure, h_discovered);
-
-		// 		// repeat search on newly discovered ones
-		// 		h_search = h_discovered;
-		// 	}
-		// 	else {
-		// 		break;
-		// 	}
-		// }
-
-		// // each closure type
-		// for(const [, g_msg] of ode(h_closure)) {
-		// 	k_impl.msgEncoder(g_msg);
-		// }
-
 
 		return h_outputs;
 	});

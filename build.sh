@@ -13,7 +13,7 @@ mkdir -p build/proto
 # protos from submodules
 ###############################
 function copy() {
-	rsync -a submodules/$1/ build/proto/$2
+	rsync -a --include="*/" --include="*.proto" --exclude="*" submodules/$1/ build/proto/$2
 }
 
 copy protobuf

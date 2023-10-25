@@ -1,15 +1,16 @@
 import type {FieldRouter, TsThing} from './common';
-import type {AugmentedEnum, AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod} from './env';
-import type {TypesDict} from './plugin';
+import type {AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod} from './env';
+import type {InterfacesDict, RefableType, TypesDict} from './plugin';
 import type {Dict} from '@blake.regalia/belt';
 
-import type {TypeNode} from 'typescript';
+import type {TypeNode, ImportSpecifier} from 'typescript';
 
-import {oderac, F_IDENTITY} from '@blake.regalia/belt';
+import {oderac, F_IDENTITY, proper, __UNDEFINED} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
 
-import {access, arrayType, arrow, call, ident, importModule, param, print, typeRef} from './ts-factory';
+import {SR_IMPORT_TYPES_PROTO} from './constants';
+import {access, arrayType, arrow, call, ident, importModule, param, print, type, typeRef, union, y_factory} from './ts-factory';
 
 
 export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
@@ -17,9 +18,9 @@ export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
 export abstract class RpcImplementor {
 	protected _h_router!: FieldRouter;
 
-	protected _h_type_imports: Dict = {};
+	protected _h_type_imports: Dict<[string, ImportSpecifier]> = {};
 
-	constructor(protected _h_types: TypesDict) {}
+	constructor(protected _h_types: TypesDict, protected _h_interfaces: InterfacesDict) {}
 
 	abstract gateway(
 		sr_path_prefix: string,
@@ -34,20 +35,30 @@ export abstract class RpcImplementor {
 
 	abstract accepts(si_interface: string, s_alias: string): TypeNode;
 
+	clashFreeTypeId(g_type: RefableType): string {
+		return g_type.path.split('.').filter(F_IDENTITY).map(proper).join('').replace(/[^A-Za-z0-9$_]+/g, '');
+	}
+
+	importJsonTypesImplementing(si_interface: string): TypeNode {
+		const a_msgs = this._h_interfaces[si_interface];
+
+		if(!a_msgs) {
+			console.warn(`WARNING: No messages implement the interface "${si_interface}"`);
+			return type('never');
+		}
+
+		return typeRef('AnyJson', [
+			union(a_msgs.map(g_msg => this.importType(this.pathOfType(g_msg.path), [g_msg.name!, this.clashFreeTypeId(g_msg)]))),
+		]);
+	}
+
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	open(g_proto: AugmentedFile): void {
 		this._h_type_imports = {};
 	}
 
-	resolveType(si_type: string): AugmentedMessage | AugmentedEnum {
+	resolveType(si_type: string): RefableType {
 		const g_type = this._h_types[si_type];
-
-		// if(si_type in this._h_msgs) {
-		// 	return this.msg(si_type);
-		// }
-		// else if(si_type in this._h_enums) {
-		// 	return this.enum(si_type);
-		// }
 
 		if(!g_type) throw new Error(`No type found "${si_type}"`);
 
@@ -62,62 +73,26 @@ export abstract class RpcImplementor {
 		return this.pathOfType(g_field.typeName!);
 	}
 
-	importType(sr_path: string, si_ident: string, a_type_args?: TypeNode[]): TypeNode {
-		this._h_type_imports[si_ident] = sr_path;
-		return typeRef(si_ident, a_type_args);
+	importType(sr_path: string, z_ident: string | [ident: string, rename: string], a_type_args?: TypeNode[]): TypeNode {
+		let si_name = z_ident as string;
+		let si_prop: string | undefined;
+
+		if('string' !== typeof z_ident) {
+			[si_prop, si_name] = z_ident;
+		}
+
+		this._h_type_imports[si_name] = [`${SR_IMPORT_TYPES_PROTO}${sr_path}`, y_factory.createImportSpecifier(
+			false,  // never directly, handled in import clause
+			si_prop? ident(si_prop): __UNDEFINED,
+			ident(si_name)
+		)];
+
+		return typeRef(si_name, a_type_args);
 	}
 
 	imports(): string[] {
-		return oderac(this._h_type_imports, (si_ident, sr_path) => importModule(sr_path, [si_ident], true)).map(yn => print(yn));
+		return oderac(this._h_type_imports, (si_ident, [sr_path, yn_import]) => importModule(sr_path, [yn_import], true)).map(yn => print(yn));
 	}
-
-	// msg(si_type: string, g_desc?: AugmentedMessage): AugmentedMessage {
-	// 	const {_h_msgs} = this;
-
-	// 	// check for existing message
-	// 	let g_msg = _h_msgs[si_type];
-
-	// 	// getter
-	// 	if(!g_desc) {
-	// 		if(!g_msg) throw new Error(`No message found "${si_type}"`);
-	// 		return g_msg;
-	// 	}
-	// 	// setter, but message exists
-	// 	else if(g_msg) {
-	// 		const si_version_local = g_desc.source.parts.version;
-	// 		const si_version_other = g_msg.source.parts.version;
-
-	// 		const s_warn = `Multiple definitions of ${si_type}`;
-
-	// 		// this version supercedes other; replace it
-	// 		if(version_supercedes(si_version_local, si_version_other)) {
-	// 			console.warn(`${s_warn}; picking ${si_version_local} over ${si_version_other}`);
-	// 			g_msg = _h_msgs[si_type] = g_desc;
-	// 		}
-	// 		// other version supercedes; keep it
-	// 		else {
-	// 			console.warn(`${s_warn}; picking ${si_version_other} over ${si_version_local}`);
-	// 		}
-	// 	}
-	// 	// no conflict
-	// 	else {
-	// 		g_msg = _h_msgs[si_type] = g_desc;
-	// 	}
-
-	// 	// return message
-	// 	return g_msg;
-	// }
-
-	// enum(si_type: string, g_desc?: AugmentedEnum): AugmentedEnum {
-	// 	// lookup or set message
-	// 	const g_enum = this._h_enums[si_type] ??= g_desc as AugmentedEnum;
-	// 	if(!g_enum) {
-	// 		throw new Error(`No enum found "${si_type}"`);
-	// 	}
-
-	// 	// return message
-	// 	return g_enum;
-	// }
 
 	route(g_field: AugmentedField): TsThing {
 		// lookup transformer
@@ -235,6 +210,7 @@ export abstract class RpcImplementor {
 			// explictly optional
 			if(g_field.proto3Optional) {
 				debugger;
+				throw new Error(`Unsupported proto3Optional on ${g_field.typeName}`);
 			}
 			// not repeated
 			else if(!g_field.repeated) {
@@ -247,8 +223,6 @@ export abstract class RpcImplementor {
 			field: g_field,
 
 			optional: b_optional,
-			// optional: (!g_field.repeated && !(g_field.options as {nullable?: boolean})?.nullable)
-			// 	&& (pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label || g_field.proto3Optional || false),
 
 			calls: {
 				...g_calls,

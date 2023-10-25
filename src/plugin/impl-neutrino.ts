@@ -1,18 +1,18 @@
 import type {TsThing} from './common';
-import type {AugmentedFile, AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
+import type {AugmentedEnum, AugmentedFile, AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
 
-import type {TypesDict} from './plugin';
+import type {InterfacesDict, TypesDict} from './plugin';
 import type {FileCategory} from './rpc-impl';
-import type {Statement, TypeNode, Expression, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
+import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
 
 import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from '@blake.regalia/belt';
 import {default as pb} from 'google-protobuf/google/protobuf/descriptor_pb';
 import {ts} from 'ts-morph';
 
-import {H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
+import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {XC_HINT_NUMBER, XC_HINT_STRING, XC_HINT_BIGINT, XC_HINT_SINGULAR, XC_HINT_BYTES, N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
+import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, type, typeLit, typeRef, union, y_factory} from './ts-factory';
 
 type ReturnThing = {
 	type: TypeNode;
@@ -29,7 +29,7 @@ const {
 } = ts;
 
 type Draft = {
-	imports: Dict;
+	imports: Dict<[string, ImportSpecifier]>;
 	heads: Record<FileCategory, string[]>;
 	consts: Record<FileCategory, Dict<Statement>>;
 };
@@ -58,127 +58,83 @@ export class NeutrinoImpl extends RpcImplementor {
 
 	protected _p_output = '';
 
-	constructor(h_types: TypesDict) {
-		super(h_types);
+	constructor(h_types: TypesDict, h_interfaces: InterfacesDict) {
+		super(h_types, h_interfaces);
 
 		this._h_router = field_router(this);
 	}
 
-	override open(g_proto: AugmentedFile): void {
-		super.open(g_proto);
 
-		// would-be output file nam
-		const p_output = this._p_output = map_proto_path(g_proto)+'.ts';
+	protected encode_params(g_msg: AugmentedMessage): [ParameterDeclaration[], Expression] {
+		// instantiate writer
+		let yn_chain = call('Protobuf', [], __UNDEFINED, '...');
 
-		// open draft
-		const g_draft = this._h_drafts[p_output] ||= {
-			imports: this._h_type_imports,
-			heads: reset_heads(),
-			consts: reset_consts(),
-		};
+		// prep params lists
+		const a_params_required: ParameterDeclaration[]= [];
+		const a_params_optional: ParameterDeclaration[] = [];
 
-		this._h_type_imports = g_draft.imports;
+		// keep track of the expected field number to determine when there are gaps
+		let n_field_expected = 1;
 
-		// destructure parts
-		const {
-			consts: g_consts,
-			heads: g_heads,
-		} = g_draft;
+		// each field
+		g_msg.fieldList.forEach((g_field) => {
+			// convert field to thing
+			const g_thing = this.route(g_field);
 
-		// set fields
-		this._g_consts = g_consts;
-		this._g_heads = g_heads;
-	}
+			// prep args
+			const a_args: Expression[] = [g_thing.calls.to_proto];
 
-	override head(si_category: FileCategory): string[] {
-		return [
-			...this._g_heads[si_category],
-		];
-	}
+			// field number does not immediately follow previous
+			const i_number = g_field.number!;
+			if(i_number !== n_field_expected++) {
+				// append the correct number to the calll args
+				a_args.push(numericLit(i_number));
 
-	override body(si_category: FileCategory): string[] {
-		return [
-			...oderac(this._g_consts[si_category], (si_const, yn_const) => print(yn_const)),
-		];
-	}
-
-	override accepts(si_interface: string, s_alias: string) {
-		const si_type = `Accepts${proper(s_alias)}`;
-
-		const yn_type = y_factory.createTypeAliasDeclaration([
-			y_factory.createToken(SyntaxKind.ExportKeyword),
-		], ident(si_type), __UNDEFINED, typeRef('ImplementsInterfaces', [
-			union([
-				string(si_interface),
-				// ...g_opts.implementsInterfaceList.map(si_interface => string(si_interface)),
-			].map(yn => typeLit(yn))),
-		]));
-
-		// add to preamble
-		this._g_heads.encoder.push(print(yn_type));
-
-		return typeRef(si_type);
-	}
-
-	get path(): string {
-		return this._p_output;
-	}
-
-	generate_return(g_output: AugmentedMessage, g_input: AugmentedMessage): ReturnThing {
-		// remove redundant fields
-		const a_fields = g_output.fieldList.filter((g_field) => {
-			// test each field in input
-			for(const g_test of g_input.fieldList) {
-				// same type and identical name; remove
-				if(g_test.type === g_field.type && g_test.name === g_field.name) {
-					return false;
+				// no number
+				if('number' !== typeof i_number) {
+					throw new Error(`Field is missing explicit number: ${g_field.name}`);
 				}
 			}
 
-			// pass; keep
-			return true;
+			// human-readable field type for comment
+			const s_comment_type = g_field.typeName?.split('.').at(-1)
+				|| H_FIELD_TYPE_TO_HUMAN_READABLE[g_field.type!] || 'unknown';
+
+			// append to protobuf-building call chain
+			yn_chain = call(
+				access(yn_chain, g_thing.proto.writer),
+				a_args,
+				__UNDEFINED,
+				`${s_comment_type}${g_field.repeated? '[]': ''} ${g_field.name} = ${g_field.number}`
+			);
+
+			// create parameter
+			const yn_param = g_thing.proto.prefers_call
+				? param(g_thing.calls.id, g_thing.calls.type, g_thing.optional)
+				: param(g_thing.proto.id, g_thing.proto.type, g_thing.optional);
+
+			// extend
+			(yn_param as any).thing = g_thing;
+
+			// add to optional/required params list, depending on which one it is
+			if(g_thing.optional) {
+				a_params_optional.push(yn_param);
+			}
+			else {
+				a_params_required.push(yn_param);
+			}
 		});
 
-		const a_returns = a_fields.map((g_field) => {
-			const g_thing = this.route(g_field);
-
-			return {
-				thing: g_thing,
-
-				type: g_thing.calls.type,
-
-				parser: g_thing.calls.from_json(
-					access('g', snake(g_field.name!))
-				),
-			};
-		});
-
-		// single return type
-		if(1 === a_returns.length) {
-			const g_return = a_returns[0];
-
-			return {
-				type: g_return.type,
-				parser: g_return.parser,
-				things: [g_return.thing],
-			};
-		}
-
-		// handle multiple returns as tuple
-		return {
-			type: tuple(a_returns.map(g => [
-				g.thing.calls.id,
-				g.thing.optional,
-				g.type,
-			])),
-			parser: a_returns.length? y_factory.createArrayLiteralExpression(a_returns.map(g => g.parser)): null,
-			things: a_returns.map(g => g.thing),
-		};
+		return [[
+			...a_params_required,
+			...a_params_optional,
+		], access(yn_chain, 'o')];
 	}
 
 
+
 	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-	pattern_string_to_ast_node(sx_pattern: string, g_input: AugmentedMessage) {
+	protected pattern_string_to_ast_node(sx_pattern: string, g_input: AugmentedMessage) {
 		const {
 			_si_const,
 			_s_path_prefix,
@@ -273,6 +229,132 @@ export class NeutrinoImpl extends RpcImplementor {
 		};
 	}
 
+	override open(g_proto: AugmentedFile): void {
+		super.open(g_proto);
+
+		// would-be output file nam
+		const p_output = this._p_output = map_proto_path(g_proto)+'.ts';
+
+		// open draft
+		const g_draft = this._h_drafts[p_output] ||= {
+			imports: this._h_type_imports,
+			heads: reset_heads(),
+			consts: reset_consts(),
+		};
+
+		this._h_type_imports = g_draft.imports;
+
+		// destructure parts
+		const {
+			consts: g_consts,
+			heads: g_heads,
+		} = g_draft;
+
+		// set fields
+		this._g_consts = g_consts;
+		this._g_heads = g_heads;
+	}
+
+	override head(si_category: FileCategory): string[] {
+		return [
+			...this._g_heads[si_category],
+		];
+	}
+
+	override body(si_category: FileCategory): string[] {
+		return [
+			...oderac(this._g_consts[si_category], (si_const, yn_const) => print(yn_const)),
+		];
+	}
+
+	override accepts(si_interface: string, s_alias: string) {
+		const si_type = `Accepts${proper(s_alias)}`;
+
+		const yn_type = y_factory.createTypeAliasDeclaration([
+			y_factory.createToken(SyntaxKind.ExportKeyword),
+		], ident(si_type), __UNDEFINED, typeRef('Encoded', [
+			union([
+				string(si_interface),
+				// ...g_opts.implementsInterfaceList.map(si_interface => string(si_interface)),
+			].map(yn => typeLit(yn))),
+		]));
+
+		// add to preamble
+		this._g_heads.encoder.push(print(yn_type));
+
+		return typeRef(si_type);
+	}
+
+	get path(): string {
+		return this._p_output;
+	}
+
+	generate_return(g_output: AugmentedMessage, g_input: AugmentedMessage): ReturnThing {
+		// // remove redundant fields
+		// const a_fields = g_output.fieldList.filter((g_field) => {
+		// 	// test each field in input
+		// 	for(const g_test of g_input.fieldList) {
+		// 		// same type and identical name
+		// 		if(g_test.name === g_field.name && g_test.type === g_field.type && g_test.typeName === g_field.typeName) {
+		// 			// not exceptional
+		// 			if(!A_EXCEPTIONAL_RETURNS.includes(g_field.typeName!)) {
+		// 				console.warn(`WARNING: Omitting redundant response field [${g_field.name}: ${g_field.typeName}] from ${g_output.path}`);
+		// 				return false;
+		// 			}
+		// 		}
+		// 	}
+
+		// 	// pass; keep
+		// 	return true;
+		// });
+
+		const a_fields = g_output.fieldList;
+
+		const a_returns = a_fields.map((g_field) => {
+			const g_thing = this.route(g_field);
+
+			let yn_parser = (yn: Expression) => yn;
+
+			// bytes
+			if(H_FIELD_TYPES.TYPE_BYTES === g_field.type) {
+				yn_parser = yn => call('safe_base64_to_buffer', [yn]);
+			}
+
+			return {
+				thing: g_thing,
+
+				type: g_thing.calls.type,
+
+				parser: yn_parser(access('g', snake(g_field.name!))),
+
+				// parser: g_thing.calls.from_json(
+				// 	access('g', snake(g_field.name!))
+				// ),
+			};
+		});
+
+		// single return type
+		if(1 === a_returns.length) {
+			const g_return = a_returns[0];
+
+			return {
+				type: g_return.type,
+				parser: g_return.parser,
+				things: [g_return.thing],
+			};
+		}
+
+		// handle multiple returns as tuple
+		return {
+			type: tuple(a_returns.map(g => [
+				g.thing.calls.id,
+				g.thing.optional,
+				g.type,
+			])),
+			parser: a_returns.length? y_factory.createArrayLiteralExpression(a_returns.map(g => g.parser)): null,
+			things: a_returns.map(g => g.thing),
+		};
+	}
 
 
 	override gateway(
@@ -281,6 +363,9 @@ export class NeutrinoImpl extends RpcImplementor {
 		g_input: AugmentedMessage,
 		g_output: AugmentedMessage
 	): string {
+		// open proto source of service
+		this.open(g_method.service.source);
+
 		// ref path parts
 		const g_parts = g_method.service.source.parts;
 
@@ -340,9 +425,6 @@ export class NeutrinoImpl extends RpcImplementor {
 			...sx_path_http_post
 				? [
 					numericLit(1),
-					// objectLit({
-					// 	method: string('POST'),
-					// }),
 				]
 				: [],
 		], [
@@ -359,13 +441,8 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// const si_action_prefix = si_service
 		const si_action_prefix = sx_path_http_get? 'query': 'submit';
-		const yn_statement = declareConst(`${si_action_prefix}${proper(g_parts.vendor)}${proper(si_module_ident)}${si_method}`, yn_call, true);
-
-		// service, reflectionService
-		// if(sx_path_http_get && 'query' !== si_service.toLowerCase()) debugger;
-
-		// service, 
-		// if(sx_path_http_post) debugger;
+		const si_action = `${si_action_prefix}${proper(g_parts.vendor)}${proper(si_module_ident)}${si_method}`;
+		const yn_statement = declareConst(si_action, yn_call, true);
 
 		// upper-case first letter of comment if present
 		let s_line_0 = g_method.comments;
@@ -404,75 +481,12 @@ export class NeutrinoImpl extends RpcImplementor {
 		return print(yn_statement, a_comment_lines);
 	}
 
-	encodeParams(g_msg: AugmentedMessage): [ParameterDeclaration[], Expression] {
-		// instantiate writer
-		let yn_chain = call('Protobuf', [], __UNDEFINED, '...');
-
-		// prep params lists
-		const a_params_required: ParameterDeclaration[]= [];
-		const a_params_optional: ParameterDeclaration[] = [];
-
-		// keep track of the expected field number to determine when there are gaps
-		let n_field_expected = 1;
-
-		// each field
-		g_msg.fieldList.forEach((g_field) => {
-			// convert field to thing
-			const g_thing = this.route(g_field);
-
-			// prep args
-			const a_args: Expression[] = [g_thing.calls.to_proto];
-
-			// field number does not immediately follow previous
-			const i_number = g_field.number!;
-			if(i_number !== n_field_expected++) {
-				// append the correct number to the calll args
-				a_args.push(numericLit(i_number));
-
-				// no number
-				if('number' !== typeof i_number) {
-					throw new Error(`Field is missing explicit number: ${g_field.name}`);
-				}
-			}
-
-			// human-readable field type for comment
-			const s_comment_type = g_field.typeName?.split('.').at(-1)
-				|| H_FIELD_TYPE_TO_HUMAN_READABLE[g_field.type!] || 'unknown';
-
-			// append to protobuf-building call chain
-			yn_chain = call(
-				access(yn_chain, g_thing.proto.writer),
-				a_args,
-				__UNDEFINED,
-				`${s_comment_type}${g_field.repeated? '[]': ''} ${g_field.name} = ${g_field.number}`
-			);
-
-			// create parameter
-			const yn_param = g_thing.proto.prefers_call
-				? param(g_thing.calls.id, g_thing.calls.type, g_thing.optional)
-				: param(g_thing.proto.id, g_thing.proto.type, g_thing.optional);
-
-			// extend
-			(yn_param as any).thing = g_thing;
-
-			// add to optional/required params list, depending on which one it is
-			if(g_thing.optional) {
-				a_params_optional.push(yn_param);
-			}
-			else {
-				a_params_required.push(yn_param);
-			}
-		});
-
-		return [[
-			...a_params_required,
-			...a_params_optional,
-		], access(yn_chain, 'o')];
-	}
-
 	anyEncoder(
 		g_msg: AugmentedMessage
 	): string {
+		// open proto source of msg
+		this.open(g_msg.source);
+
 		// implements interface
 		const a_interfaces = g_msg.options?.implementsInterfaceList;
 		if(!a_interfaces) throw new Error('No interface option');
@@ -487,13 +501,12 @@ export class NeutrinoImpl extends RpcImplementor {
 		const yn_type = y_factory.createTypeAliasDeclaration([
 			y_factory.createToken(SyntaxKind.ExportKeyword),
 		], ident(si_singleton), __UNDEFINED, intersection([
-			// Encoded<si_message>
+			// Encoded<si_message | ...as_interfaces>
 			typeRef('Encoded', [
-				typeLit(string(p_type)),
-			]),
-			// ImplementsInterfaces<as_interfaces>
-			typeRef('ImplementsInterfaces', [
-				union(a_interfaces.map(si_interface => typeLit(string(si_interface)))),
+				union([
+					typeLit(string(p_type)),
+					...a_interfaces.map(si_interface => typeLit(string(si_interface))),
+				]),
 			]),
 		]));
 
@@ -501,7 +514,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		this._g_heads.any.push(print(yn_type));
 
 		// encode params and build chain
-		const [a_params, yn_chain] = this.encodeParams(g_msg);
+		const [a_params, yn_chain] = this.encode_params(g_msg);
 
 		// wrap in any
 		const yn_any = call('any', [
@@ -526,6 +539,9 @@ export class NeutrinoImpl extends RpcImplementor {
 		g_method: AugmentedMethod,
 		g_input: AugmentedMessage
 	): string {
+		// open proto source of method
+		this.open(g_method.service.source);
+
 		const g_parts = g_method.service.source.parts;
 
 		// prep unique type
@@ -542,7 +558,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		this._g_heads.encoder.push(print(yn_type));
 
 		// encode params and build chain
-		const [a_params, yn_chain] = this.encodeParams(g_input);
+		const [a_params, yn_chain] = this.encode_params(g_input);
 
 		// construct call chain
 		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)), typeRef(si_singleton));
@@ -558,6 +574,9 @@ export class NeutrinoImpl extends RpcImplementor {
 	}
 
 	msgEncoder(g_msg: AugmentedMessage): string {
+		// open proto source of msg
+		this.open(g_msg.source);
+
 		const g_parts = g_msg.source.parts;
 
 		// prep unique type
@@ -574,7 +593,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		this._g_heads.encoder.push(print(yn_type));
 
 		// encode params and build chain
-		const [a_params, yn_chain] = this.encodeParams(g_msg);
+		const [a_params, yn_chain] = this.encode_params(g_msg);
 
 		// construct call chain
 		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)), typeRef(si_singleton));
@@ -591,6 +610,9 @@ export class NeutrinoImpl extends RpcImplementor {
 
 	// 
 	msgDecoder(g_msg: AugmentedMessage): string | undefined {
+		// open proto source of msg
+		this.open(g_msg.source);
+
 		let b_monotonic = true;
 
 		let b_flat = true;
@@ -766,5 +788,23 @@ export class NeutrinoImpl extends RpcImplementor {
 					...a_types.map((g_type, i_type) => `  - ${i_type}: ${g_type.field.name} - ${g_type.field.comments}`),
 				],
 		]);
+	}
+
+	enumId(g_enum: AugmentedEnum) {
+		const g_parts = g_enum.source.parts;
+
+		return `ProtoEnum${proper(g_parts.vendor)}${proper(g_parts.purpose)}${g_enum.name!}`;
+	}
+
+	protoEnum(g_enum: AugmentedEnum) {
+		const h_values: Dict<Expression> = {};
+
+		for(const g_value of g_enum.valueList) {
+			h_values[g_value.name!] = numericLit(g_value.number!);
+		}
+
+		const yn_enum = enumDecl(this.enumId(g_enum), h_values, true, true);
+
+		return yn_enum;
 	}
 }

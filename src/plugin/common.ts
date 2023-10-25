@@ -1,15 +1,14 @@
-import type {AugmentedField, AugmentedFile} from './env';
+import type {AugmentedEnum, AugmentedField, AugmentedFile} from './env';
+import type {NeutrinoImpl} from './impl-neutrino';
 import type {RpcImplementor} from './rpc-impl';
 import type {ProtoWriterMethod} from '../api/protobuf-writer';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
 
-// type ProtoWriterMethod = string;
-
 import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {SR_IMPORT_TYPES_PROTO, SR_IMPORT_TYPES_LIB, XC_HINT_SINGULAR_NUMBER, XC_HINT_SINGULAR_STRING} from './constants';
+import {SR_IMPORT_TYPES_PROTO, XC_HINT_SINGULAR_NUMBER, XC_HINT_SINGULAR_STRING} from './constants';
 import {call, ident, literal, string, type, typeLit, typeRef, union} from './ts-factory';
 
 // destructure members from protobuf
@@ -37,6 +36,11 @@ export type TsThingBare = {
 		// how to convert a response value in JSON back to `type`
 		from_json?: (yn_expr: Expression) => Expression;
 	};
+
+	// // when using the type to submit gateway request or parse a response
+	// json: {
+
+	// },
 
 	proto: {
 		// which method to use on the `Protobuf` writer
@@ -132,7 +136,7 @@ const H_OVERRIDE_MIXINS: Dict<
 		return {
 			calls: {
 				name: s_ident,
-				type: k_impl.importType(SR_IMPORT_TYPES_LIB, 'SlimCoin'),
+				type: typeRef('SlimCoin'),
 				to_proto: call('coin', [ident(s_ident)]),
 			},
 
@@ -158,24 +162,28 @@ const H_OVERRIDE_MIXINS: Dict<
 
 	// Any
 	'.google.protobuf.Any'(g_field, k_impl) {
-		let yn_type: TypeNode = typeRef('Uint8Array');
+		let yn_proto_type: TypeNode = typeRef('Uint8Array');
+		let yn_json_type: TypeNode = type('string');
 
 		const si_accepts = g_field.options?.acceptsInterface;
 		if(si_accepts) {
-			yn_type = typeRef('ImplementsInterfaces', [
+			yn_proto_type = typeRef('Encoded', [
 				union([
 					typeLit(string(si_accepts)),
 				]),
 			]);
+
+			yn_json_type = k_impl.importJsonTypesImplementing(si_accepts);
 		}
 
 		return {
 			calls: {
 				name: `atu8_${g_field.name!}`,
-				type: yn_type,
+				type: yn_json_type,
 			},
 
 			proto: {
+				type: yn_proto_type,
 				writer: 'b',
 				prefers_call: 1,
 			},
@@ -289,7 +297,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		}
 		else if('code_hash' === si_field) {
 			si_name = `sb16_${si_field}`;
-			yn_type = typeRef('HexLower');
+			yn_type = typeRef('NaiveHexLower');
 		}
 
 		// construct ts field
@@ -315,6 +323,8 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		// extract type reference ident
 		const si_ref = g_field.typeName!.split('.').at(-1)!;
 
+		const g_enum = k_impl.resolveType(g_field.typeName!) as AugmentedEnum;
+
 		// construct ts field
 		return {
 			calls: {
@@ -323,11 +333,8 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			},
 			proto: {
 				writer: 'v',
-				type: typeRef(`SPECIAL_ENUM_PROTO`),
+				type: typeRef((k_impl as NeutrinoImpl).enumId(g_enum)),
 			},
-			// nests: {
-			// 	yn_data => call(ident('decode_protobuf'), [yn_data]),
-			// }
 		};
 	},
 

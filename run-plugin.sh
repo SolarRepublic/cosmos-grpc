@@ -30,6 +30,25 @@ srd_annotations="$srd_gen/annotations"
 srd_types="$srd_lib/_types"
 
 
+# portable method for getting current datetime
+now() {
+	date +%s
+}
+
+# define functions for printing messages to console
+xt_start=$(now)
+log() {
+	channel="$1"; shift
+	xt_elapsed=$(echo "$(now) - $xt_start" | bc | awk '{printf "%.3f", $0}')
+	echo "[+${xt_elapsed}s $channel] $@"
+}
+
+# alias printing info
+info() {
+	log INFO $1
+}
+
+
 # clean outputs
 rm -rf "$srd_annotations" "$srd_lib" "$srd_dist"
 mkdir -p "$srd_annotations" "$srd_lib" "$srd_dist" "$srd_types"
@@ -47,7 +66,7 @@ add_annotation() {
 		"./build/proto/$sr_path.proto"
 
 	# verbose
-	echo "[INFO] generated annotation: $sr_js"
+	info "generated annotation: $sr_js"
 
 	# replace relative .js imports
 	sed -i.delete -e 's/\(require(['"'"'"]\.[^)]*\)\.js/\1.cjs/' "$sr_js"
@@ -86,13 +105,14 @@ enumAsLiterals=true
 onlyTypes=true
 useJsonWireFormat=true
 outputServices=false
+outputTypeAnnotations=true
 """
 
 # ignore certain warnings from protoc
 SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
 
 
-echo "[INFO] generating typings..."
+info "generating typings..."
 
 # generate typings
 protoc \
@@ -104,13 +124,18 @@ protoc \
 	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
 
 # replace all interface defs with type literals
-find "$srd_types" -name "*.ts" -exec \
-	sed -i.del -E 's/export interface (\w+) /export type \1 = /g' {} +
+find "$srd_types" -name "*.ts" \
+	-exec sed -i.del -E 's/export interface (\w+) /export type \1 = /g' {} +
+	# -exec rm -f {}.del \;
 
-echo "[INFO] Done"
+find "$srd_types" -name "*.del" \
+	-exec rm -f {}.del \;
 
 
-echo "[INFO] generating module..."
+info "Done"
+
+
+info "generating module..."
 
 # generate neutrino lib
 protoc \
@@ -123,15 +148,32 @@ protoc \
 	# --include_imports \
 	# --descriptor_set_out=dist/descriptors.pb \
 
-echo "[INFO] Done"
+info "Done"
 
 # copy compiled api to lib
 cp -r src/api/* "$srd_lib"
 
 
-echo "[INFO] running eslint..."
-
 # run through linter with fix-all
+info "running eslint..."
+yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --fix build/lib
+if [[ $? -ne 0 ]]; then
+	>&2 echo "[ERROR] Errors encountered during linting"
+	exit 1
+fi
+
+info " "
+info "---- end of first lint cycle ----"
+info " "
+
+# run through linter again with fix-all
 yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --fix build/lib
 
-echo "[INFO] Done"
+info "---- end of repeated lint cycle ----"
+
+
+# compile to dist
+tsc -p tsconfig.lib.json
+
+
+info "Done"
