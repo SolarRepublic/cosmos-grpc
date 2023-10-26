@@ -8,7 +8,7 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {call, ident, literal, string, type, litType, typeRef, union} from './ts-factory';
+import {call, ident, literal, string, keyword, litType, typeRef, union, numericLit} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 // destructure members from protobuf
@@ -37,10 +37,10 @@ export type TsThingBare = {
 		from_json?: (yn_expr: Expression) => Expression;
 	};
 
-	// // when using the type to submit gateway request or parse a response
-	// json: {
-
-	// },
+	// when using the type to submit gateway request or parse a response
+	json?: {
+		type: TypeNode;
+	};
 
 	proto: {
 		// which method to use on the `Protobuf` writer
@@ -66,6 +66,8 @@ export type TsThing = {
 	calls: Required<TsThingBare['calls']> & {
 		id: Identifier;
 	};
+
+	json: Required<TsThingBare['json']>;
 
 	proto: Required<TsThingBare['proto']> & {
 		name: string;
@@ -111,8 +113,8 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 	return {
 		calls: {
 			name: s_ident,
-			type: type('number'),
-			to_proto: yn_expr => call('timestamp', [yn_expr]),
+			type: keyword('number'),
+			to_proto: yn_expr => call('temporal', [yn_expr]),
 		},
 
 		proto: {
@@ -124,7 +126,7 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 		nests: {
 			name: `a_${snake(g_field.name!)}`,
 			hints: literal([ProtoHint.SINGULAR, ProtoHint.SINGULAR]),
-			parse: yn_expr => call(ident('reduce_timestamp'), [yn_expr]),
+			parse: yn_expr => call(ident('reduce_temporal'), [yn_expr]),
 		},
 	};
 };
@@ -168,7 +170,7 @@ const H_OVERRIDE_MIXINS: Dict<
 	// Any
 	'.google.protobuf.Any'(g_field, k_impl) {
 		let yn_proto_type: TypeNode = typeRef('Uint8Array');
-		let yn_json_type: TypeNode = type('string');
+		let yn_json_type: TypeNode = keyword('string');
 
 		const si_accepts = g_field.options?.acceptsInterface;
 		if(si_accepts) {
@@ -204,7 +206,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	[H_FIELD_TYPES.TYPE_DOUBLE]: si_field => ({
 		calls: {
 			name: `x_${si_field}`,
-			type: type('number'),
+			type: keyword('number'),
 		},
 
 		proto: {
@@ -225,7 +227,8 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	[H_FIELD_TYPES.TYPE_BOOL]: si_field => ({
 		calls: {
 			name: `b_${si_field}`,
-			type: type('boolean'),
+			type: keyword('boolean'),
+			return_type: union([0, 1].map(x => litType(numericLit(x)))),
 		},
 
 		proto: {
@@ -237,7 +240,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	[H_FIELD_TYPES.TYPE_UINT32]: si_field => ({
 		calls: {
 			name: `n_${si_field}`,
-			type: type('number'),
+			type: keyword('number'),
 		},
 
 		proto: {
@@ -249,7 +252,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	[H_FIELD_TYPES.TYPE_INT32]: si_field => ({
 		calls: {
 			name: `n_${si_field}`,
-			type: type('number'),
+			type: keyword('number'),
 		},
 
 		proto: {
@@ -262,13 +265,12 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		calls: {
 			name: `sg_${si_field}`,
 			type: typeRef('WeakUint64Str'),
+			return_type: typeRef(`CwUint64`),
 		},
 
 		proto: {
 			writer: 'g',
 		},
-
-		return_type: typeRef('Uint64Str'),
 	}),
 
 	// int64
@@ -276,13 +278,12 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		calls: {
 			name: `sg_${si_field}`,
 			type: typeRef('WeakInt64Str'),
+			return_type: typeRef(`CwInt64`),
 		},
 
 		proto: {
 			writer: 'g',
 		},
-
-		return_type: typeRef('Int64Str'),
 	}),
 
 	// string
@@ -291,7 +292,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		let si_name = `s_${si_field}`;
 
 		// create default type
-		let yn_type: TypeNode = type('string');
+		let yn_type: TypeNode = keyword('string');
 		let yn_return!: TypeNode;
 
 		// validator address
@@ -304,7 +305,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		else if(/(_addr(ess)?|(^|_)receiver)$/.test(si_field) || A_SEMANTIC_ACCOUNT_ADDR_STR.includes(si_field)) {
 			si_name = `sa_${si_field.replace(/_address$/, '')}`;
 			yn_type = typeRef('WeakAccountAddr');
-			yn_return = typeRef('AccountAddr');
+			yn_return = typeRef('CwAccountAddr');
 		}
 		else if(si_field.endsWith('_id')) {
 			si_name = `si_${si_field.replace(/_id$/, '')}`;
@@ -319,13 +320,12 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			calls: {
 				name: si_name,
 				type: yn_type,
+				return_type: yn_return,
 			},
 
 			proto: {
 				writer: 's',
 			},
-
-			return_type: yn_return,
 		};
 	},
 
@@ -342,8 +342,8 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		// construct ts field
 		return {
 			calls: {
-				name: `sc_${snake(si_field)}`,
-				type: k_impl.importType(sr_path, si_ref),
+				name: `si_${snake(si_field)}`,
+				type: k_impl.importType(sr_path, (k_impl as NeutrinoImpl).enumId(g_enum)),
 			},
 			proto: {
 				writer: 'v',
@@ -401,6 +401,8 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 					name: `sa_${si_name}`,
 					type: typeRef('WeakAccountAddr'),
 					to_proto: yn_expr => call('bech32_decode', [yn_expr]),
+					from_json: yn_expr => call('bech32_encode', [call('safe_base64_to_buffer', [yn_expr])]),
+					return_type: typeRef('CwAccountAddr'),
 				},
 
 				proto: {
@@ -420,7 +422,13 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			calls: {
 				name: si_self,
 				type: yn_type,
+				from_json: yn_expr => call('safe_base64_to_buffer', [yn_expr]),
+				return_type: typeRef('CwBase64'),
 			},
+
+			// json: {
+			// 	type: typeRef('CwBase64'),
+			// },
 
 			proto: {
 				writer: 'b',

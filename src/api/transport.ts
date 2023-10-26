@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 import type {Dict, JsonObject, JsonValue} from '@blake.regalia/belt';
 
 import {safe_json, ode, buffer_to_base64} from '@blake.regalia/belt';

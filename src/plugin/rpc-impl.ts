@@ -9,7 +9,7 @@ import {oderac, F_IDENTITY, proper, __UNDEFINED} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
 
-import {access, arrayType, arrow, call, ident, importModule, param, print, type, typeRef, union, y_factory} from './ts-factory';
+import {access, arrayType, arrow, call, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory} from './ts-factory';
 
 
 export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
@@ -18,6 +18,8 @@ export abstract class RpcImplementor {
 	protected _h_router!: FieldRouter;
 
 	protected _h_type_imports: Dict<[string, ImportSpecifier]> = {};
+
+	protected _g_opened!: AugmentedFile;
 
 	constructor(protected _h_types: TypesDict, protected _h_interfaces: InterfacesDict) {}
 
@@ -41,7 +43,8 @@ export abstract class RpcImplementor {
 	exportedId(g_thing: {name?: string | undefined; source: AugmentedFile}): string {
 		const g_parts = g_thing.source.parts;
 
-		return `${proper(g_parts.vendor)}${proper(g_parts.module)}${g_thing.name!}`.replace(/[^A-Za-z0-9$_]+/g, '');
+		return [g_parts.vendor, g_parts.module, g_thing.name].join('/')
+			.split(/[^A-Za-z0-9]+/g).map(proper).join('');
 	}
 
 	importJsonTypesImplementing(si_interface: string): TypeNode {
@@ -49,14 +52,17 @@ export abstract class RpcImplementor {
 
 		if(!a_msgs) {
 			console.warn(`WARNING: No messages implement the interface "${si_interface}"`);
-			return type('never');
+			return keyword('never');
 		}
 
-		return union(a_msgs.map(g_msg => this.importType(this.pathOfType(g_msg.path), [g_msg.name!, this.clashFreeTypeId(g_msg)])));
+		// return union(a_msgs.map(g_msg => this.importType(this.pathOfType(g_msg.path), [g_msg.name!, this.clashFreeTypeId(g_msg)])));
+		return typeRef('Encoded', [litType(string(si_interface))]);
 	}
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	open(g_proto: AugmentedFile): void {
+		this._g_opened = g_proto;
+
 		this._h_type_imports = {};
 	}
 
@@ -84,11 +90,13 @@ export abstract class RpcImplementor {
 			[si_prop, si_name] = z_ident;
 		}
 
-		this._h_type_imports[si_name] = [`#/${sr_path}`, y_factory.createImportSpecifier(
-			false,  // never directly, handled in import clause
-			si_prop? ident(si_prop): __UNDEFINED,
-			ident(si_name)
-		)];
+		if(this._g_opened.name!.replace(/\.proto$/, '') !== sr_path) {
+			this._h_type_imports[si_name] = [`#/${sr_path}`, y_factory.createImportSpecifier(
+				false,  // never directly, handled in import clause
+				si_prop? ident(si_prop): __UNDEFINED,
+				ident(si_name)
+			)];
+		}
 
 		return typeRef(si_name, a_type_args);
 	}
@@ -170,9 +178,10 @@ export abstract class RpcImplementor {
 			}
 
 			// wrap from_json
-			if(g_calls.from_json) {
+			const f_from_json = g_calls.from_json;
+			if(f_from_json) {
 				g_calls.from_json = yn_data => call(access(yn_data, 'map'), [
-					arrow([param(s_name_singular)], g_calls.from_json(ident(s_name_singular))),
+					arrow([param(s_name_singular)], f_from_json(ident(s_name_singular))),
 				]);
 			}
 
@@ -197,7 +206,7 @@ export abstract class RpcImplementor {
 		// auto-fill calls
 		if(si_snake.startsWith('atu8_')) {
 			g_calls.to_json ||= call('safe_buffer_to_base64', [ident(g_calls.name)]);
-			g_calls.from_json ||= yn_data => call('safe_base64_to_buffer', [yn_data]);
+			// g_calls.from_json ||= yn_data => call('safe_base64_to_buffer', [yn_data]);
 		}
 
 		g_calls.to_json ||= ident(g_calls.name);
@@ -235,6 +244,10 @@ export abstract class RpcImplementor {
 				get id() {
 					return ident(g_calls.name);
 				},
+			},
+
+			json: {
+				type: g_bare.json?.type || g_calls.type,
 			},
 
 			proto: {

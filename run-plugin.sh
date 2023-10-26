@@ -91,6 +91,10 @@ find "$srd_annotations" -type f -name "*.js.map" | while read -r file; do
 done
 
 
+# ignore certain warnings from protoc
+SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
+
+
 # # define options for ts_proto
 # s_opts="""
 # env=browser
@@ -107,9 +111,6 @@ done
 # outputServices=false
 # outputTypeAnnotations=true
 # """
-
-# # ignore certain warnings from protoc
-# SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
 
 
 # info "generating typings..."
@@ -145,21 +146,31 @@ protoc \
 	$(find "${srd_chains[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
 	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
 
-	# --include_imports \
-	# --descriptor_set_out=dist/descriptors.pb \
+if [[ $? -ne 0 ]]; then
+	>&2 echo "[ERROR] Errors encountered during generation"
+	exit 1
+fi
 
 info "Done"
 
 # copy compiled api to lib
 cp -r src/api/* "$srd_lib"
 
+# for inspection
+inspect_lib() {
+	cp .eslintrc.cjs build/lib/
+	cp tsconfig.dist.json build/lib/tsconfig.json
+}
 
 
 # run through linter with fix-all
 info "running eslint..."
-yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --fix build/lib
+yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --color --fix build/lib \
+	| grep -v "warning"  # ignore warnings from initial lint cycle
+
 if [[ $? -ne 0 ]]; then
 	>&2 echo "[ERROR] Errors encountered during linting"
+	inspect_lib
 	exit 1
 fi
 
@@ -175,9 +186,7 @@ info "---- end of repeated lint cycle ----"
 info ""
 
 
-# for inspection
-cp .eslintrc.cjs build/lib/
-cp tsconfig.dist.json build/lib/tsconfig.json
+inspect_lib
 
 
 # compile to dist

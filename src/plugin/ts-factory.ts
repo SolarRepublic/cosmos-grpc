@@ -30,6 +30,7 @@ const {
 } = ts;
 
 const H_TYPE_KEYWORDS = {
+	any: SyntaxKind.AnyKeyword,
 	boolean: SyntaxKind.BooleanKeyword,
 	number: SyntaxKind.NumberKeyword,
 	bigint: SyntaxKind.BigIntKeyword,
@@ -37,13 +38,14 @@ const H_TYPE_KEYWORDS = {
 	unknown: SyntaxKind.UnknownKeyword,
 	never: SyntaxKind.NeverKeyword,
 	undefined: SyntaxKind.UndefinedKeyword,
+	void: SyntaxKind.VoidKeyword,
 };
 
 
 // shortcuts
 export const ident = (z_indent: string | Identifier) => 'string' === typeof z_indent? y_factory.createIdentifier(z_indent.replace(/[^a-zA-Z0-9$_]/g, '')): z_indent;
-export const type = (si_type: keyof typeof H_TYPE_KEYWORDS) => y_factory.createKeywordTypeNode(H_TYPE_KEYWORDS[si_type] as KeywordTypeSyntaxKind);
-export const unknown = () => type('unknown');
+export const keyword = (si_type: keyof typeof H_TYPE_KEYWORDS) => y_factory.createKeywordTypeNode(H_TYPE_KEYWORDS[si_type] as KeywordTypeSyntaxKind);
+export const unknown = () => keyword('unknown');
 export const typeRef = (si_ref: string, a_type_args?: TypeNode[]) => y_factory.createTypeReferenceNode(si_ref, a_type_args);
 // export const token = <
 // 	w_kind extends Token<SyntaxKind>,
@@ -112,15 +114,17 @@ export const declareConst = (z_binding: string | BindingName, yn_initializer: Ex
 	], NodeFlags.Const)
 );
 
-export const tuple = (a_members: [z_ident: string | Identifier, b_opt: boolean, yn_type: TypeNode][]) => y_factory
+export const tuple = (a_members: Array<TypeNode | [z_ident: string | Identifier, b_opt: boolean, yn_type: TypeNode]>) => y_factory
 	.createTupleTypeNode(
-		a_members.map(a_member => y_factory
-			.createNamedTupleMember(
-				__UNDEFINED,
-				ident(a_member[0]),
-				a_member[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
-				a_member[2]
-			)
+		a_members.map(z_member => Array.isArray(z_member)
+			? y_factory
+				.createNamedTupleMember(
+					__UNDEFINED,
+					ident(z_member[0]),
+					z_member[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
+					z_member[2]
+				)
+			: z_member
 		)
 	);
 

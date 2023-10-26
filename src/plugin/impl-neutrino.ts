@@ -9,10 +9,10 @@ import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from 
 
 import {ts} from 'ts-morph';
 
-import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
+import {H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareAlias, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, type, litType, typeRef, union, y_factory, typeLit} from './ts-factory';
+import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, call, castAs, declareAlias, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 type ReturnThing = {
@@ -312,12 +312,13 @@ export class NeutrinoImpl extends RpcImplementor {
 		const a_returns = a_fields.map((g_field) => {
 			const g_thing = this.route(g_field);
 
+			// eslint-disable-next-line prefer-const
 			let yn_parser = (yn: Expression) => yn;
 
-			// bytes
-			if(H_FIELD_TYPES.TYPE_BYTES === g_field.type) {
-				yn_parser = yn => call('safe_base64_to_buffer', [yn]);
-			}
+			// // bytes
+			// if(H_FIELD_TYPES.TYPE_BYTES === g_field.type) {
+			// 	yn_parser = yn => call('safe_base64_to_buffer', [yn]);
+			// }
 
 			return {
 				thing: g_thing,
@@ -559,7 +560,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)), typeRef(si_singleton));
 
 		// create statement
-		const yn_const = declareConst(`msg${proper(g_parts.vendor)}${g_method.name!}`, yn_writer, true);
+		const yn_const = declareConst(`encodeAny${proper(g_parts.vendor)}${g_method.name!}`, yn_writer, true);
 
 		return print(yn_const, [
 			`Encodes a \`${g_method.name}\` protobuf message: ${g_method.comments}`,
@@ -571,8 +572,6 @@ export class NeutrinoImpl extends RpcImplementor {
 	msgEncoder(g_msg: AugmentedMessage): string {
 		// open proto source of msg
 		this.open(g_msg.source);
-
-		const g_parts = g_msg.source.parts;
 
 		// prep unique type
 		const si_singleton = `Encoded${this.exportedId(g_msg)}`;
@@ -592,7 +591,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)), typeRef(si_singleton));
 
 		// create statement
-		const yn_const = declareConst(`msg${this.exportedId(g_msg)}`, yn_writer, true);
+		const yn_const = declareConst(`encode${this.exportedId(g_msg)}`, yn_writer, true);
 
 		return print(yn_const, [
 			`Encodes a \`${g_msg.name}\` protobuf message: ${g_msg.comments}`,
@@ -610,7 +609,12 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		let b_flat = true;
 
+		// determine whether the decoded values are processed before being returned
+		// eslint-disable-next-line prefer-const
+		let b_processed = false;
+
 		const a_types: TsThing[] = [];
+		const a_generics: TypeNode[] = [];
 		const a_returns: Expression[] = [];
 		const a_hints: Expression[] = [];
 
@@ -631,8 +635,14 @@ export class NeutrinoImpl extends RpcImplementor {
 				if(n_gap < N_MAX_PROTO_FIELD_NUMBER_GAP) {
 					// clear the gap
 					for(let i_omit=0; i_omit<n_gap; i_omit++) {
+						// type should not be used
+						a_generics.push(keyword('void'));
+
+						// omit binding
 						a_bindings.push(y_factory.createOmittedExpression());
-						a_hints.push(literal(0));
+
+						// add hint to arg
+						a_hints.push(literal(ProtoHint.NONE));
 					}
 				}
 				// gap is not skippable; flag as not monotonic
@@ -659,8 +669,14 @@ export class NeutrinoImpl extends RpcImplementor {
 				// overwrite identifier
 				yn_ident = ident(g_nests.name);
 
+				// defer
+				a_generics.push(keyword('any'));
+
 				// add expression to return list
 				a_returns.push(g_nests.parse(yn_ident));
+
+				// mark as processed
+				b_processed = true;
 			}
 			else {
 				// infer hint from write type
@@ -669,6 +685,16 @@ export class NeutrinoImpl extends RpcImplementor {
 					s: ProtoHint.STRING,
 					b: ProtoHint.NONE,
 				}[g_thing.proto.writer.toLowerCase()] || 0)));
+
+				// apply same logic to generic parameter
+				const yn_primitive = {
+					v: 's' === g_thing.calls.name[0]? keyword('string'): keyword('number'),
+					s: keyword('string'),
+					b: typeRef('Uint8Array'),
+				}[g_thing.proto.writer.toLowerCase()] || keyword('unknown');
+
+				// add to generic type arg
+				a_generics.push(g_field.repeated? arrayType(yn_primitive): yn_primitive);
 
 				// add expression to return list
 				a_returns.push(yn_ident);
@@ -696,13 +722,14 @@ export class NeutrinoImpl extends RpcImplementor {
 			return;
 		}
 
+		// call expression to decode payload
 		const yn_decode = call('decode_protobuf', [
 			ident('atu8_payload'),
 			// ...b_worthy? [arrayLit(a_hints)]: [],
 			arrayLit(a_hints),
-		]);
+		], [tuple(a_generics)]);
 
-		let yn_init: Expression;
+		let yn_init!: Expression;
 		let yn_body!: ConciseBody;
 
 		// prep function params
@@ -714,9 +741,10 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		const yn_return = 1 === a_types.length
 			? a_types[0].calls.id
-				? union([a_types[0].calls.return_type, type('undefined')])
+				? union([a_types[0].calls.return_type, keyword('undefined')])
 				: a_types[0].calls.return_type
 			: tuple(a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type]));
+
 
 		// single field; use simplified response
 		if(1 === a_bindings.length) {
@@ -729,7 +757,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				yn_body = arrayAccess(yn_decode, numericLit(0));
 			}
 		}
-		else {
+		else if(b_processed) {
 			// add init param
 			g_param_destructure = param(arrayBinding(a_bindings), __UNDEFINED, false, yn_decode);
 
@@ -745,26 +773,29 @@ export class NeutrinoImpl extends RpcImplementor {
 
 			yn_body = arrayLit(a_returns);
 		}
+		else {
+			yn_body = yn_decode;
+		}
 
-		const yn_destructure = yn_body
-			? arrow([
+		if(yn_body) {
+			const yn_destructure = arrow([
 				...a_params,
 				...g_param_destructure? [g_param_destructure]: [],
-			], yn_body, g_param_destructure? __UNDEFINED: yn_return)
-			: string('ERROR');
+			], yn_body, g_param_destructure? __UNDEFINED: yn_return);
 
-		yn_init ||= g_param_destructure
-			? castAs(
-				castAs(
-					parens(yn_destructure),
-					type('unknown')
-				),
-				funcType([
-					...a_params,
-					param('RESERVED', type('never'), true),
-				], yn_return)
-			)
-			: yn_destructure;
+			yn_init ||= g_param_destructure
+				? castAs(
+					castAs(
+						parens(yn_destructure),
+						keyword('unknown')
+					),
+					funcType([
+						...a_params,
+						param('RESERVED', keyword('never'), true),
+					], yn_return)
+				)
+				: castAs(yn_destructure, yn_return);
+		}
 
 		const yn_statement = declareConst(`decode${this.exportedId(g_msg)}`, yn_init, true);
 
@@ -783,23 +814,94 @@ export class NeutrinoImpl extends RpcImplementor {
 		]);
 	}
 
-	msgDestructor(g_msg: AugmentedMessage): string {
-		const g_parts = g_msg.source.parts;
+	msgDestructor(g_msg: AugmentedMessage): string[] {
 		const si_name = this.exportedId(g_msg);
 
 		const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, g_field => ({
 			[g_field.name!]: this.route(g_field).calls.return_type,
 		}))), true);
 
-		return print(yn_alias, [
-			g_msg.comments,
-			...g_msg.fieldList.map(g_field => `@param ${g_field.name} - ${g_field.comments}`),
-		]);
+		// continuous sequence
+		const a_sequence: Expression[] = [];
+		const h_assigns: Record<number, Expression> = {};
+		const a_returns: [string, boolean, TypeNode][] = [];
+		const h_indicies: Record<number, TypeNode> = {};
+
+		// keep track of the expected field number to determine when there are gaps
+		let n_field_expected = 1;
+		let b_monotonic = true;
+
+		// each field
+		for(const g_field of g_msg.fieldList) {
+			const g_thing = this.route(g_field);
+
+			// prep expr
+			const yn_access = g_thing.calls.from_json(access('g_struct', g_field.name!));
+
+			// field number does not immediately follow previous
+			const i_number = g_field.number!;
+			if(!b_monotonic || i_number !== n_field_expected++) {
+				// set monotonicity break
+				b_monotonic = false;
+
+				// add to assign
+				h_assigns[i_number] = yn_access;
+
+				// add to return
+				h_indicies[i_number] = g_thing.calls.return_type;
+
+				// next
+				continue;
+			}
+
+			// no number
+			if('number' !== typeof i_number) {
+				throw new Error(`Field is missing explicit number: ${g_field.name}`);
+			}
+
+			// add to sequence
+			a_sequence.push(yn_access);
+
+			// add to returns
+			a_returns.push([g_field.name!, g_thing.optional, g_thing.calls.return_type]);
+		}
+
+		// base array
+		const yn_base = arrayLit(a_sequence);
+
+		// function body
+		const yn_body = Object.keys(h_assigns).length
+			? call('oda', [yn_base, objectLit(h_assigns)])
+			: yn_base;
+
+		// final return type
+		let yn_return: TypeNode = tuple(a_returns);
+
+		// non-monotonic field numbers, wrap in intersection type
+		if(Object.keys(h_indicies).length) {
+			yn_return = intersection([yn_return, typeLit(h_indicies)]);
+		}
+
+		// content
+		const yn_const = declareConst(`destruct${si_name}`, arrow([
+			param('g_struct', typeRef(si_name)),
+		], castAs(yn_body, yn_return), yn_return), true);
+
+		return [
+			print(yn_const, [
+				`Destructures the fields of a {@link ${si_name}} JSON message into a tuple of parsed ES equivalents`,
+				`@param g_struct - the JSON message`,
+				`@returns a tuple where:`,
+				...g_msg.fieldList.map(g_field => `  - ${g_field.number! - 1}: ${g_field.name!} - ${g_field.comments}`),
+			]),
+			print(yn_alias, [
+				`JSON serialization of \`/${g_msg.path.slice(1)}\` - ${g_msg.comments}`,
+				// ...g_msg.fieldList.map(g_field => `@param ${g_field.name} - ${g_field.comments}`),
+			]),
+		];
 	}
 
 	enumId(g_enum: AugmentedEnum) {
-		const g_parts = g_enum.source.parts;
-
 		return `ProtoEnum${this.exportedId(g_enum)}`;
 	}
 

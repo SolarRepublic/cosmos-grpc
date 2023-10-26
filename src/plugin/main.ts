@@ -1,8 +1,9 @@
 
 import type {AugmentedEnum, AugmentedMessage} from './env';
 
-import {ode, type Dict, odv} from '@blake.regalia/belt';
+import type {Dict} from '@blake.regalia/belt';
 
+import {ode, odv} from '@blake.regalia/belt';
 
 import {NeutrinoImpl} from './impl-neutrino';
 import {plugin} from './plugin';
@@ -20,6 +21,7 @@ const A_GLOBAL_PREAMBLE = [
 		importModule('@blake.regalia/belt', [
 			'F_IDENTITY',
 			'__UNDEFINED',
+			'oda',
 			'base64_to_buffer',
 			'text_to_buffer',
 		]),
@@ -34,6 +36,10 @@ const A_GLOBAL_PREAMBLE = [
 			'WeakAccountAddr',
 			'WeakValidatorAddr',
 			'SlimCoin',
+			'CwInt64',
+			'CwUint64',
+			'CwBase64',
+			'CwAccountAddr',
 		], true),
 		importModule('#/bech32', [
 			'bech32_decode',
@@ -82,22 +88,15 @@ export const main = () => {
 
 		const h_outputs: Dict<string> = {};
 
-		// [typePath: string]: serialized encoders
-		const h_encoders: Dict<{
+		type SerializedMessages = Dict<{
 			message: AugmentedMessage;
-			encoder: string;
-		}> = {};
+			contents: string[];
+		}>;
 
-		// [typePath: string]: serialized encoders
-		const h_decoders: Dict<{
-			message: AugmentedMessage;
-			decoder: string;
-		}> = {};
-
-		const h_destructors: Dict<{
-			message: AugmentedMessage;
-			destructor: string;
-		}> = {};
+		// [typePath: string]: serialized message
+		const h_encoders: SerializedMessages = {};
+		const h_decoders: SerializedMessages = {};
+		const h_destructors: SerializedMessages = {};
 
 		// 
 		type ClosureStruct = {
@@ -111,6 +110,11 @@ export const main = () => {
 		};
 
 		const g_decoders: ClosureStruct = {
+			messages: {},
+			enums: {},
+		};
+
+		const g_destructors: ClosureStruct = {
 			messages: {},
 			enums: {},
 		};
@@ -255,14 +259,18 @@ export const main = () => {
 							g_output
 						);
 
+						// add gateway method
 						a_gateways.push(sx_gateway);
+
+						// ensure its output can be destructured
+						mark_fields(g_output, g_destructors);
 					}
 					// otherwise, ensure user can encode method inputs and decode method outputs
 					else {
 						// add input encoder
 						h_encoders[g_input.path] = {
 							message: g_input,
-							encoder: k_impl.msgEncoder(g_input),
+							contents: [k_impl.msgEncoder(g_input)],
 						};
 
 						// ensure its fields can be encoded
@@ -293,7 +301,7 @@ export const main = () => {
 			// add encoder
 			h_encoders[g_msg.path] = {
 				message: g_msg,
-				encoder: k_impl.msgEncoder(g_msg),
+				contents: [k_impl.msgEncoder(g_msg)],
 			};
 		}
 
@@ -306,18 +314,31 @@ export const main = () => {
 				// add decoder
 				h_decoders[g_msg.path] = {
 					message: g_msg,
-					decoder: sx_decoder,
+					contents: [sx_decoder],
 				};
 			}
 			else {
-				debugger;
+				// debugger;
+				console.warn(`Skipping decoder for ${g_msg.path}`);
 			}
 
-			const sx_destructor = k_impl.msgDestructor(g_msg);
-			if(sx_destructor) {
+			const a_destructor = k_impl.msgDestructor(g_msg);
+			if(a_destructor) {
 				h_destructors[g_msg.path] = {
 					message: g_msg,
-					destructor: sx_destructor,
+					contents: a_destructor,
+				};
+			}
+		}
+
+		// each message in need of a destructor
+		// each message in need of a decoder
+		for(const [, g_msg] of ode(g_destructors.messages)) {
+			const a_destructor = k_impl.msgDestructor(g_msg);
+			if(a_destructor) {
+				h_destructors[g_msg.path] = {
+					message: g_msg,
+					contents: a_destructor,
 				};
 			}
 		}
@@ -369,7 +390,7 @@ export const main = () => {
 			const a_encoders: string[] = [];
 			for(const g_encoder of odv(h_encoders)) {
 				if(g_proto === g_encoder.message.source) {
-					a_encoders.push(g_encoder.encoder);
+					a_encoders.push(...g_encoder.contents);
 				}
 			}
 
@@ -386,7 +407,7 @@ export const main = () => {
 			const a_decoders: string[] = [];
 			for(const g_decoder of odv(h_decoders)) {
 				if(g_proto === g_decoder.message.source) {
-					a_decoders.push(g_decoder.decoder);
+					a_decoders.push(...g_decoder.contents);
 				}
 			}
 
@@ -403,7 +424,7 @@ export const main = () => {
 			const a_destructors: string[] = [];
 			for(const g_destructor of odv(h_destructors)) {
 				if(g_proto === g_destructor.message.source) {
-					a_destructors.push(g_destructor.destructor);
+					a_destructors.push(...g_destructor.contents);
 				}
 			}
 

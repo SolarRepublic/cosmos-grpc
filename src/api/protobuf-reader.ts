@@ -1,14 +1,16 @@
 /* eslint-disable prefer-const */
 
+import type {NestedArrayable} from '@blake.regalia/belt';
 import type {SlimCoin} from '@solar-republic/types';
 
 import {buffer_to_text} from '@blake.regalia/belt';
 
-export type Field = boolean | number | bigint | string | DecodedProtobuf;
+export type DecodedProtobufFieldPrimitive = number | string | Uint8Array;
 
-type Message = Field[][];
+export type DecodedProtobufField = NestedArrayable<DecodedProtobufFieldPrimitive>;
 
-export type DecodedProtobuf = Uint8Array | Message;
+export type DecodedProtobufMessage = DecodedProtobufField[];
+
 
 /**
  * Hints control the handling of decoded fields
@@ -45,6 +47,22 @@ export const enum ProtoHint {
 	SINGULAR_STRING=5,  // SINGULAR | STRING
 }
 
+
+// type HintsApplied<
+// 	a_hints extends ProtoHint[],
+// > = {
+// 	[i_key in keyof a_hints & number]: [
+// 		DecodedProtobufFieldPrimitive[],  // unknown
+// 		DecodedProtobufFieldPrimitive,  // singular
+// 		string[],  // bigint
+// 		string[],  // string
+// 		string,  // singular bigint
+// 		string,  // singular bigint
+// 	][a_hints[i_key]];
+// }[keyof a_hints & number];
+
+// type test = HintsApplied<[0, 1, 2, 3, 4, 5]>;
+
 /**
  * Decodes a protobuf buffer without requiring a schema. By default, every field is assumed to be repeatable,
  * and thus is returned as an array of values (without a schema, the decoder has no way of knowing if there
@@ -78,7 +96,7 @@ export const enum ProtoHint {
  * ```
  */
 export const decode_protobuf = <
-	w_return extends DecodedProtobuf | Field[],
+	w_return extends DecodedProtobufMessage,
 >(atu8_data: Uint8Array, a_hints?: ProtoHint[]): w_return => {
 	let varint = <
 		w_format extends string | number=number,
@@ -101,7 +119,7 @@ export const decode_protobuf = <
 	let ib_read = 0;
 
 	let i_field = 0;
-	let a_out: Message | Field[] = [];
+	let a_out: DecodedProtobufField[] = [];
 
 	for(; ib_read<atu8_data.length;) {
 		let xn_field_and_type = varint();
@@ -110,7 +128,7 @@ export const decode_protobuf = <
 
 		// not the expected field index or expected type
 		if(xn_field < i_field || xn_field > i_field + 1 || xn_type > 2) {
-			return atu8_data as w_return;
+			return atu8_data as unknown as w_return;
 		}
 
 		// original
@@ -125,6 +143,7 @@ export const decode_protobuf = <
 
 			// i64
 			// @ts-expect-error paren-less param
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			_ => 'i64',
 
 			// len (string, bytes, embedded, etc.)
@@ -139,7 +158,7 @@ export const decode_protobuf = <
 					((w_hint as number) > 0? []: w_hint) as ProtoHint[]
 				);
 
-				return ProtoHint.STRING & (w_hint as number)? buffer_to_text(w_read as Uint8Array): w_read;
+				return ProtoHint.STRING & (w_hint as number)? buffer_to_text(w_read as unknown as Uint8Array): w_read;
 			},
 		][xn_type](xc_hint_local);
 
@@ -147,7 +166,7 @@ export const decode_protobuf = <
 			a_out[i_field=xn_field] = w_value;
 		}
 		else {
-			((a_out[i_field=xn_field] || (a_out[i_field] = [])) as Field[]).push(w_value as Field);
+			((a_out[i_field=xn_field] || (a_out[i_field] = [])) as DecodedProtobufField[]).push(w_value as DecodedProtobufField);
 		}
 	}
 
@@ -156,21 +175,20 @@ export const decode_protobuf = <
 
 
 export const decode_protobuf_r0 = <
-	w_return extends DecodedProtobuf,
+	w_return extends DecodedProtobufField,
 >(
 	atu8_payload: Uint8Array,
 	a_hints?: ProtoHint[]
-): w_return => decode_protobuf<Message>(atu8_payload, a_hints)[0] as w_return;
+): w_return => decode_protobuf<DecodedProtobufMessage>(atu8_payload, a_hints)[0] as w_return;
 
 
 export const decode_protobuf_r0_0 = <
-	w_return extends DecodedProtobuf,
+	w_return extends DecodedProtobufField,
 >(
 	atu8_payload: Uint8Array,
 	a_hints?: ProtoHint[]
-): w_return => decode_protobuf<Message>(atu8_payload, a_hints)[0][0] as w_return;
+): w_return => decode_protobuf<DecodedProtobufField[][]>(atu8_payload, a_hints)[0][0] as w_return;
 
-// export const decode_timestamp = (atu8_payload: Uint8Array, [[xt_seconds]]=decode_protobuf(atu8_payload)) => xt_seconds;
 
 export const decode_coin = <
 	s_denom extends string=string,

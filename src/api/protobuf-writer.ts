@@ -20,7 +20,7 @@ type BufNode = [
 
 type WireType = 0 | 1 | 2 | 5;
 
-type Nester = (k_writer: ProtoWriter, ...a_args: any[]) => ProtoWriter;
+// type Nester = (k_writer: ProtoWriter, ...a_args: any[]) => ProtoWriter;
 
 export interface ProtoWriterScalar {
 	v(xn_value?: boolean | number, i_field?: number): this;
