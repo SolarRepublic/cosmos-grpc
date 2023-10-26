@@ -630,13 +630,16 @@ export class NeutrinoImpl extends RpcImplementor {
 
 			// found a gap, fields are not monotonic
 			if(i_number !== i_field + 1) {
+				// mark as processed
+				b_processed = true;
+
 				// gap is skippable
 				const n_gap = i_number - (i_field + 1);
 				if(n_gap < N_MAX_PROTO_FIELD_NUMBER_GAP) {
 					// clear the gap
 					for(let i_omit=0; i_omit<n_gap; i_omit++) {
 						// type should not be used
-						a_generics.push(keyword('void'));
+						a_generics.push(keyword('any'));
 
 						// omit binding
 						a_bindings.push(y_factory.createOmittedExpression());

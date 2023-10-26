@@ -120,7 +120,7 @@ export const tuple = (a_members: Array<TypeNode | [z_ident: string | Identifier,
 			? y_factory
 				.createNamedTupleMember(
 					__UNDEFINED,
-					ident(z_member[0]),
+					'package' === z_member[0]? ident('package_'): ident(z_member[0]),
 					z_member[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
 					z_member[2]
 				)

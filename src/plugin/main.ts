@@ -83,7 +83,7 @@ export const main = () => {
 		const k_impl = new NeutrinoImpl(h_types, h_interfaces);
 
 		const h_drafts: Dict<{
-			enums: string[];
+			enums: Set<string>;
 		}> = {};
 
 		const h_outputs: Dict<string> = {};
@@ -151,8 +151,8 @@ export const main = () => {
 
 						// add to draft
 						(h_drafts[g_msg.source.name!] ||= {
-							enums: [],
-						}).enums.push(si_type);
+							enums: new Set(),
+						}).enums.add(si_type);
 					}
 				}
 			}
@@ -448,9 +448,9 @@ export const main = () => {
 			const g_draft = h_drafts[g_proto.name!] || {};
 
 			// enums
-			const a_enums = g_draft.enums;
-			if(a_enums) {
-				for(const si_enum of a_enums) {
+			const as_enums = g_draft.enums;
+			if(as_enums) {
+				for(const si_enum of as_enums) {
 					const g_enum = h_types[si_enum] as AugmentedEnum;
 
 					a_body.push(print(k_impl.protoEnum(g_enum)));

@@ -5,11 +5,11 @@ import type {SlimCoin} from '@solar-republic/types';
 
 import {buffer_to_text} from '@blake.regalia/belt';
 
-export type DecodedProtobufFieldPrimitive = number | string | Uint8Array;
+export type DecodedProtobufFieldPrimitive<w_inject=never> = w_inject | number | string | Uint8Array;
 
-export type DecodedProtobufField = NestedArrayable<DecodedProtobufFieldPrimitive>;
+export type DecodedProtobufField<w_inject=never> = NestedArrayable<DecodedProtobufFieldPrimitive<w_inject>>;
 
-export type DecodedProtobufMessage = DecodedProtobufField[];
+export type DecodedProtobufMessage<w_inject=never> = DecodedProtobufField<w_inject>[];
 
 
 /**
@@ -96,7 +96,7 @@ export const enum ProtoHint {
  * ```
  */
 export const decode_protobuf = <
-	w_return extends DecodedProtobufMessage,
+	w_return extends DecodedProtobufMessage<void>=DecodedProtobufMessage,
 >(atu8_data: Uint8Array, a_hints?: ProtoHint[]): w_return => {
 	let varint = <
 		w_format extends string | number=number,
