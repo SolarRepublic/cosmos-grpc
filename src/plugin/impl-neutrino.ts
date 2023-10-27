@@ -730,7 +730,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			ident('atu8_payload'),
 			// ...b_worthy? [arrayLit(a_hints)]: [],
 			arrayLit(a_hints),
-		], [tuple(a_generics)]);
+		]);  // , [tuple(a_generics)]);
 
 		let yn_init!: Expression;
 		let yn_body!: ConciseBody;
@@ -784,7 +784,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			const yn_destructure = arrow([
 				...a_params,
 				...g_param_destructure? [g_param_destructure]: [],
-			], yn_body, g_param_destructure? __UNDEFINED: yn_return);
+			], yn_body);  // , g_param_destructure? __UNDEFINED: yn_return);
 
 			yn_init ||= g_param_destructure
 				? castAs(
@@ -818,6 +818,9 @@ export class NeutrinoImpl extends RpcImplementor {
 	}
 
 	msgDestructor(g_msg: AugmentedMessage): string[] {
+		// open proto source of msg
+		this.open(g_msg.source);
+
 		const si_name = this.exportedId(g_msg);
 
 		const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, g_field => ({
@@ -851,7 +854,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				h_assigns[i_number] = yn_access;
 
 				// add to return
-				h_indicies[i_number] = g_thing.calls.return_type;
+				h_indicies[i_number] = g_thing.destruct_type;
 
 				// next
 				continue;
@@ -866,7 +869,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			a_sequence.push(yn_access);
 
 			// add to returns
-			a_returns.push([g_field.name!, g_thing.optional, g_thing.calls.return_type]);
+			a_returns.push([g_field.name!, g_thing.optional, g_thing.destruct_type]);
 		}
 
 		// base array
@@ -888,7 +891,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		// content
 		const yn_const = declareConst(`destruct${si_name}`, arrow([
 			param('g_struct', typeRef(si_name)),
-		], castAs(yn_body, yn_return), yn_return), true);
+		], castAs(yn_body, yn_return)), true);
 
 		return [
 			print(yn_const, [
@@ -898,25 +901,62 @@ export class NeutrinoImpl extends RpcImplementor {
 				...g_msg.fieldList.map(g_field => `  - ${g_field.number! - 1}: ${g_field.name!} - ${g_field.comments}`),
 			]),
 			print(yn_alias, [
-				`JSON serialization of \`/${g_msg.path.slice(1)}\` - ${g_msg.comments}`,
+				`JSON serialization of \`${g_msg.path.slice(1)}\` - ${g_msg.comments}`,
 				// ...g_msg.fieldList.map(g_field => `@param ${g_field.name} - ${g_field.comments}`),
 			]),
 		];
 	}
 
-	enumId(g_enum: AugmentedEnum) {
-		return `ProtoEnum${this.exportedId(g_enum)}`;
+	enumId(g_enum: AugmentedEnum, si_mode: 'Proto' | 'Json') {
+		return `${si_mode}Enum${this.exportedId(g_enum)}`;
 	}
 
-	protoEnum(g_enum: AugmentedEnum) {
-		const h_values: Dict<Expression> = {};
+	enums(g_enum: AugmentedEnum): string[] {
+		// open proto source of msg
+		this.open(g_enum.source);
+
+		const h_values_proto: Dict<Expression> = {};
+		const h_values_json: Dict<Expression> = {};
+		const a_types: TypeNode[] = [];
 
 		for(const g_value of g_enum.valueList) {
-			h_values[g_value.name!] = numericLit(g_value.number!);
+			h_values_proto[g_value.name!] = numericLit(g_value.number!);
+
+			const s_value = g_value.options?.enumvalueCustomname || g_value.name!;
+			h_values_json[g_value.name!] = literal(s_value);
+			a_types.push(litType(string(s_value)));
 		}
 
-		const yn_enum = enumDecl(this.enumId(g_enum), h_values, true, true);
+		const yn_enum_proto = enumDecl(this.enumId(g_enum, 'Proto'), h_values_proto, true, true);
 
-		return yn_enum;
+		const yn_enum_json = enumDecl(this.enumId(g_enum, 'Json'), h_values_json, true, true);
+
+		return [
+			print(yn_enum_proto, [
+				`Raw protobuf enum values for \`${g_enum.path.slice(1)}\` to be used when passing to an encoder or comparing to a decoded protobuf value.`,
+				g_enum.comments,
+			]),
+			print(yn_enum_json, [
+				`JSON enum values for \`${g_enum.path.slice(1)}\` to be used when passing to a gRPC-gateway method or comparing to a response value`,
+				g_enum.comments,
+			]),
+		];
+	}
+
+	msgAccessor(g_msg: AugmentedMessage): string[] {
+		// open proto source of msg
+		this.open(g_msg.source);
+
+		const si_name = this.exportedId(g_msg);
+
+		const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, g_field => ({
+			[g_field.name!]: this.route(g_field).calls.type,
+		}))), true);
+
+		return [
+			print(yn_alias, [
+				`JSON serialization of \`${g_msg.path.slice(1)}\` - ${g_msg.comments}`,
+			]),
+		];
 	}
 }

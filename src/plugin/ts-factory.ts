@@ -102,13 +102,18 @@ export const declareAlias = (si_name: string, yn_assign: TypeNode, b_export?: bo
 	yn_assign
 );
 
-export const declareConst = (z_binding: string | BindingName, yn_initializer: Expression, b_export?: boolean) => y_factory.createVariableStatement(
+export const declareConst = (
+	z_binding: string | BindingName,
+	yn_initializer: Expression,
+	b_export?: boolean,
+	yn_type?: TypeNode
+) => y_factory.createVariableStatement(
 	b_export? [y_factory.createToken(SyntaxKind.ExportKeyword)]: __UNDEFINED,
 	y_factory.createVariableDeclarationList([
 		y_factory.createVariableDeclaration(
 			'string' === typeof z_binding? ident(z_binding): z_binding,
 			__UNDEFINED,
-			__UNDEFINED,
+			yn_type,
 			yn_initializer
 		),
 	], NodeFlags.Const)
@@ -258,3 +263,9 @@ export const enumDecl = (si_enum: string, h_values: Dict<Expression | undefined>
 	ident(si_enum),
 	oderac(h_values, (si_key, w_value) => y_factory.createEnumMember(ident(si_key), w_value))
 );
+
+export const typeOf = (z_ref: string | Identifier) => y_factory.createTypeQueryNode(ident(z_ref));
+
+export const keyOf = (yn_type: TypeNode) => y_factory.createTypeOperatorNode(SyntaxKind.KeyOfKeyword, yn_type);
+
+export const accessIndexed = (yn_obj: TypeNode, yn_index: TypeNode) => y_factory.createIndexedAccessTypeNode(yn_obj, yn_index);

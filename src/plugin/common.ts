@@ -75,6 +75,8 @@ export type TsThing = {
 	};
 
 	nests: Required<TsThingBare['nests']>;
+
+	destruct_type: TypeNode;
 };
 
 const route_not_impl = (si_field: string) => {
@@ -343,11 +345,11 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		return {
 			calls: {
 				name: `si_${snake(si_field)}`,
-				type: k_impl.importType(sr_path, (k_impl as NeutrinoImpl).enumId(g_enum)),
+				type: k_impl.importType(sr_path, (k_impl as NeutrinoImpl).enumId(g_enum, 'Json')),
 			},
 			proto: {
 				writer: 'v',
-				type: typeRef((k_impl as NeutrinoImpl).enumId(g_enum)),
+				type: k_impl.importType(sr_path, (k_impl as NeutrinoImpl).enumId(g_enum, 'Proto')),
 			},
 		};
 	},

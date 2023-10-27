@@ -9,6 +9,7 @@ import type {
 	EnumDescriptorProto,
 	FieldOptions,
 	EnumValueDescriptorProto,
+	EnumValueOptions,
 } from 'google-protobuf/google/protobuf/descriptor_pb';
 
 // ################################
@@ -75,6 +76,7 @@ export interface EnumAugmentations extends AugmentSource {
 
 export interface EnumValueAugmentations extends AugmentComments {
 	enum: EnumAugmentations;
+	options?: ExtendedEnumValueOptions;
 }
 
 
@@ -103,6 +105,10 @@ interface ExtendedFieldOptions extends FieldOptions.AsObject {
 
 	// `gogoproto.nullable`
 	nullable?: boolean;
+}
+
+interface ExtendedEnumValueOptions extends EnumValueOptions.AsObject {
+	enumvalueCustomname?: string;
 }
 
 

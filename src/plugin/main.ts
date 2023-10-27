@@ -70,7 +70,6 @@ const A_GLOBAL_PREAMBLE = [
 			'restful_grpc',
 		]),
 		importModule('#/types', [
-			'ImplementsInterface',
 			'Encoded',
 		], true),
 	].map(yn => print(yn)),
@@ -97,6 +96,7 @@ export const main = () => {
 		const h_encoders: SerializedMessages = {};
 		const h_decoders: SerializedMessages = {};
 		const h_destructors: SerializedMessages = {};
+		const h_accessors: SerializedMessages = {};
 
 		// 
 		type ClosureStruct = {
@@ -104,20 +104,15 @@ export const main = () => {
 			enums: Dict<AugmentedEnum>;
 		};
 
-		const g_encoders: ClosureStruct = {
+		const init_closure = (): ClosureStruct => ({
 			messages: {},
 			enums: {},
-		};
+		});
 
-		const g_decoders: ClosureStruct = {
-			messages: {},
-			enums: {},
-		};
-
-		const g_destructors: ClosureStruct = {
-			messages: {},
-			enums: {},
-		};
+		const g_encoders = init_closure();
+		const g_decoders = init_closure();
+		const g_destructors = init_closure();
+		const g_accessible = init_closure();
 
 		// const h_closure: Dict<AugmentedMessage> = {};
 		// const h_enums: Dict<AugmentedEnum> = {};
@@ -148,6 +143,10 @@ export const main = () => {
 						g_coders.enums[si_type] = g_resolved;
 
 						// TODO: what should happen here between encoders and decoders?
+
+						if(g_msg.source.name!.startsWith('akash/escrow/v1beta1/types')) {
+							debugger;
+						}
 
 						// add to draft
 						(h_drafts[g_msg.source.name!] ||= {
@@ -264,6 +263,9 @@ export const main = () => {
 
 						// ensure its output can be destructured
 						mark_fields(g_output, g_destructors);
+
+						// ensure its inputs are typed and enums accessible
+						mark_fields(g_input, g_accessible);
 					}
 					// otherwise, ensure user can encode method inputs and decode method outputs
 					else {
@@ -332,7 +334,6 @@ export const main = () => {
 		}
 
 		// each message in need of a destructor
-		// each message in need of a decoder
 		for(const [, g_msg] of ode(g_destructors.messages)) {
 			const a_destructor = k_impl.msgDestructor(g_msg);
 			if(a_destructor) {
@@ -343,6 +344,16 @@ export const main = () => {
 			}
 		}
 
+		// each message in need of an accessor
+		for(const [, g_msg] of ode(g_accessible.messages)) {
+			const a_accessors = k_impl.msgAccessor(g_msg);
+			if(a_accessors) {
+				h_accessors[g_msg.path] = {
+					message: g_msg,
+					contents: a_accessors,
+				};
+			}
+		}
 
 		// every file
 		for(const [, g_proto] of ode(h_inputs)) {
@@ -434,6 +445,24 @@ export const main = () => {
 				);
 			}
 
+
+			// accessors
+			const a_accessors: string[] = [];
+			for(const [p_accessor, g_accessor] of ode(h_accessors)) {
+				// skip redundant
+				if(h_destructors[p_accessor]) continue;
+
+				if(g_proto === g_accessor.message.source) {
+					a_accessors.push(...g_accessor.contents);
+				}
+			}
+
+			if(a_accessors.length) {
+				a_body.push(
+					...a_accessors
+				);
+			}
+
 			// // decoders
 			// if(a_decoders?.length) {
 			// 	g_parts.head.push(...k_impl.head('decoder'));
@@ -453,7 +482,7 @@ export const main = () => {
 				for(const si_enum of as_enums) {
 					const g_enum = h_types[si_enum] as AugmentedEnum;
 
-					a_body.push(print(k_impl.protoEnum(g_enum)));
+					a_body.push(...k_impl.enums(g_enum));
 				}
 			}
 

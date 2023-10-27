@@ -5,7 +5,7 @@ import type {Dict} from '@blake.regalia/belt';
 
 import type {TypeNode, ImportSpecifier} from 'typescript';
 
-import {oderac, F_IDENTITY, proper, __UNDEFINED} from '@blake.regalia/belt';
+import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
 
@@ -40,10 +40,14 @@ export abstract class RpcImplementor {
 		return g_type.path.split('.').filter(F_IDENTITY).map(proper).join('').replace(/[^A-Za-z0-9$_]+/g, '');
 	}
 
-	exportedId(g_thing: {name?: string | undefined; source: AugmentedFile}): string {
+	exportedId(g_thing: {name?: string | undefined; path: string; source: AugmentedFile}): string {
 		const g_parts = g_thing.source.parts;
 
-		return [g_parts.vendor, g_parts.module, g_thing.name].join('/')
+		// handle sub-types
+		const sr_reparted = `.${[g_parts.vendor, g_parts.module, g_parts.version].join('.')}.`;
+		const si_name = g_thing.path.replace(new RegExp(`^${escape_regex(sr_reparted)}`), '');
+
+		return [g_parts.vendor, g_parts.module, si_name].join('/')
 			.split(/[^A-Za-z0-9]+/g).map(proper).join('');
 	}
 
@@ -215,7 +219,6 @@ export abstract class RpcImplementor {
 		g_calls.to_proto ||= F_IDENTITY;  // ident(g_proto.prefers_call? g_calls.name: g_proto.name);
 		g_calls.return_type ||= g_calls.type;
 
-
 		// optionality (everything in proto3 is optional by default)
 		let b_optional = true;  // pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label;
 
@@ -256,6 +259,10 @@ export abstract class RpcImplementor {
 				get id() {
 					return ident(g_proto.name);
 				},
+			},
+
+			get destruct_type(): TypeNode {
+				return g_calls.from_json !== F_IDENTITY? g_calls.type: g_calls.return_type;
 			},
 
 			nests: g_bare.nests || null,
