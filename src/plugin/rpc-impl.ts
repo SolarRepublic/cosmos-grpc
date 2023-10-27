@@ -1,6 +1,6 @@
 import type {FieldRouter, TsThing} from './common';
 import type {AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod} from './env';
-import type {InterfacesDict, RefableType, TypesDict} from './plugin';
+import {parse_package_parts, type InterfacesDict, type RefableType, type TypesDict} from './plugin';
 import type {Dict} from '@blake.regalia/belt';
 
 import type {TypeNode, ImportSpecifier} from 'typescript';
@@ -41,13 +41,16 @@ export abstract class RpcImplementor {
 	}
 
 	exportedId(g_thing: {name?: string | undefined; path: string; source: AugmentedFile}): string {
-		const g_parts = g_thing.source.parts;
+		const si_thing = g_thing.path.slice(1);
 
-		// handle sub-types
-		const sr_reparted = `.${[g_parts.vendor, g_parts.module, g_parts.version].join('.')}.`;
-		const si_name = g_thing.path.replace(new RegExp(`^${escape_regex(sr_reparted)}`), '');
+		const g_parts = parse_package_parts(si_thing, '.');
 
-		return [g_parts.vendor, g_parts.module, si_name].join('/')
+		const sr_reparted = [g_parts.vendor, g_parts.module, g_parts.version]
+			.map(s => s+'.').join('').replace(/[^A-Za-z0-9_.]+/g, '');
+
+		const s_name = si_thing.replace(new RegExp(`^${escape_regex(sr_reparted)}`), '');
+
+		return [g_parts.vendor, g_parts.module, s_name].join('/')
 			.split(/[^A-Za-z0-9]+/g).map(proper).join('');
 	}
 
@@ -103,6 +106,21 @@ export abstract class RpcImplementor {
 		}
 
 		return typeRef(si_name, a_type_args);
+	}
+
+	importMessage(g_msg: AugmentedMessage): TypeNode {
+		const si_name = this.exportedId(g_msg);
+
+		if(g_msg.source !== this._g_opened) {
+
+			this._h_type_imports[si_name] = [`#/${map_proto_path(g_msg.source)}`, y_factory.createImportSpecifier(
+				false,
+				__UNDEFINED,
+				ident(si_name),
+			)]
+		}
+
+		return typeRef(si_name);
 	}
 
 	imports(): string[] {
@@ -175,17 +193,18 @@ export abstract class RpcImplementor {
 			g_proto.writer = g_proto.writer.toUpperCase();
 
 			// wrap to_json
-			if(g_calls.to_json) {
-				g_calls.to_json = callExpr(
-					access(g_calls.name, 'map'),
-					[arrow([param(s_name_singular)], g_calls.to_json)]
+			const f_json = g_calls.to_json;
+			if(f_json) {
+				g_calls.to_json = yn_expr => callChain(
+					chain(yn_expr, 'map'),
+					[arrow([param(s_name_singular)], f_json(ident(s_name_singular)))]
 				);
 			}
 
 			// wrap from_json
 			const f_from_json = g_calls.from_json;
 			if(f_from_json) {
-				g_calls.from_json = yn_data => callChain(chain(yn_data, 'map'), [
+				g_calls.from_json = yn_expr => callChain(chain(yn_expr, 'map'), [
 					arrow([param(s_name_singular)], f_from_json(ident(s_name_singular))),
 				]);
 			}
@@ -207,7 +226,7 @@ export abstract class RpcImplementor {
 				}
 			}
 
-			if(g_nests?.parse) {
+			if(g_nests?.parse && F_IDENTITY !== g_nests.parse) {
 				const f_parse = g_nests.parse;
 
 				g_nests.parse = yn_data => callExpr(
@@ -223,11 +242,11 @@ export abstract class RpcImplementor {
 
 		// auto-fill calls
 		if(si_snake.startsWith('atu8_')) {
-			g_calls.to_json ||= callExpr('safe_buffer_to_base64', [ident(g_calls.name)]);
+			g_calls.to_json ||= yn_expr => callExpr('safe_buffer_to_base64', [yn_expr]);
 			// g_calls.from_json ||= yn_data => call('safe_base64_to_buffer', [yn_data]);
 		}
 
-		g_calls.to_json ||= ident(g_calls.name);
+		g_calls.to_json ||= F_IDENTITY;
 		g_calls.from_json ||= F_IDENTITY;
 
 		g_calls.to_proto ||= F_IDENTITY;  // ident(g_proto.prefers_call? g_calls.name: g_proto.name);

@@ -5,10 +5,10 @@ import type {ProtoWriterMethod} from '../api/protobuf-writer';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
 
-import {snake, type Dict} from '@blake.regalia/belt';
+import {snake, type Dict, F_IDENTITY} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, typeLit} from './ts-factory';
+import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, typeLit, tuple} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 // destructure members from protobuf
@@ -28,7 +28,7 @@ export type TsThingBare = {
 		return_type?: TypeNode;
 
 		// how to encode the argument for use in JSON
-		to_json?: Expression;
+		to_json?: (yn_expr: Expression) => Expression;
 
 		// how to encode the argument for use in protobuf
 		to_proto?: (yn_expr: Expression) => Expression;
@@ -54,6 +54,7 @@ export type TsThingBare = {
 
 	nests?: null | {
 		name: string;
+		type: TypeNode;
 		hints: Expression;
 		parse: (yn_data: Expression) => Expression;
 	};  // the field uses some other message for its type (for decoding)
@@ -107,6 +108,7 @@ const A_SEMANTIC_ACCOUNT_ADDR_STR = [
 const A_SEMANTIC_ACCOUNT_ADDR_BYTES = [
 	'sender',
 	'contract',
+	'owner',
 ];
 
 type ThingDefMixin = Pick<TsThingBare, 'proto'> & Partial<Omit<TsThingBare, 'proto'>>;
@@ -128,7 +130,8 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 
 		nests: {
 			name: `a_${snake(g_field.name!)}`,
-			hints: literal([ProtoHint.SINGULAR, ProtoHint.SINGULAR]),
+			type: tuple([keyword('string'), keyword('number')]),
+			hints: literal([ProtoHint.SINGULAR_BIGINT, ProtoHint.SINGULAR]),
 			parse: yn_expr => callExpr(ident('reduce_temporal'), [yn_expr]),
 		},
 	};
@@ -148,6 +151,7 @@ const H_OVERRIDE_MIXINS: Dict<
 				name: s_ident,
 				type: typeRef('SlimCoin'),
 				to_proto: yn_expr => callExpr('coin', [yn_expr]),
+				to_json: yn_expr => callExpr('restruct_coin', [yn_expr]),
 			},
 
 			proto: {
@@ -158,8 +162,10 @@ const H_OVERRIDE_MIXINS: Dict<
 
 			nests: {
 				name: `a_${si_name}`,
+				type: tuple([keyword('string'), keyword('string')]),
 				hints: literal([ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING]),
-				parse: yn_data => callExpr(ident('decode_coin'), [yn_data], [typeRef('SlimCoin')]),
+				// parse: yn_data => callExpr(ident('decode_coin'), [yn_data]),
+				parse: F_IDENTITY,
 			},
 		};
 	},
@@ -192,7 +198,8 @@ const H_OVERRIDE_MIXINS: Dict<
 		return {
 			calls: {
 				name: `atu8_${g_field.name!}`,
-				type: yn_json_type,
+				// type: yn_json_type,
+				type: yn_proto_type,
 			},
 
 			json: {
@@ -385,6 +392,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			
 			nests: {
 				name: `a_${si_name}`,
+				type: typeRef('Uint8Array'),
 				hints: literal(0),
 				parse: yn_data => callExpr(ident('decode_protobuf'), [yn_data]),
 			},
@@ -414,7 +422,8 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 					name: `sa_${si_name}`,
 					type: typeRef('WeakAccountAddr'),
 					to_proto: yn_expr => callExpr('bech32_decode', [yn_expr]),
-					from_json: yn_expr => callExpr('bech32_encode', [callExpr('safe_base64_to_buffer', [yn_expr])]),
+					from_json: yn_expr => callExpr('bech32_encode', [string('DYNAMIC_HRP_NOT_IMPLEMENTED'), callExpr('safe_base64_to_buffer', [yn_expr])]),
+					to_json: yn_expr => callExpr('safe_buffer_to_base64', [callExpr('bech32_decode', [yn_expr])]),
 					return_type: typeRef('CwAccountAddr'),
 				},
 

@@ -5,7 +5,7 @@ import type {InterfacesDict, TypesDict} from './plugin';
 import type {FileCategory} from './rpc-impl';
 import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
 
-import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex} from '@blake.regalia/belt';
+import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex, F_IDENTITY} from '@blake.regalia/belt';
 
 import {ts} from 'ts-morph';
 
@@ -176,8 +176,11 @@ export class NeutrinoImpl extends RpcImplementor {
 			// lookup field
 			const g_field = h_fields[si_param];
 
+			// convert to thing
+			const g_thing = this.route(g_field);
+
 			// push param
-			a_parts.push(this.route(g_field).calls.to_json);
+			a_parts.push(g_thing.calls.to_json(g_thing.calls.id));
 
 			// remove from unused
 			delete h_fields_unused[si_param];
@@ -207,10 +210,14 @@ export class NeutrinoImpl extends RpcImplementor {
 		// other params remain
 		if(Object.keys(h_fields_unused).length) {
 			// convert each to property signature
-			const a_properties = oderac(h_fields_unused, (si_param, g_field) => y_factory.createPropertyAssignment(
-				ident(si_param),
-				this.route(g_field).calls.to_json
-			));
+			const a_properties = oderac(h_fields_unused, (si_param, g_field) => {
+				const g_thing = this.route(g_field);
+
+				return y_factory.createPropertyAssignment(
+					ident(si_param),
+					g_thing.calls.to_json(g_thing.calls.id)
+				);
+			});
 
 			a_members.push(y_factory.createObjectLiteralExpression(a_properties, true));
 
@@ -435,11 +442,8 @@ export class NeutrinoImpl extends RpcImplementor {
 				g_arg.calls.type,
 			])),
 
-			// // 2nd generics param is parsed response
-			// g_return.type,
-
 			// 2nd generics param is raw response data
-			typeRef(this.exportedId(g_output)),
+			this.importMessage(g_output),
 		]);
 
 		// const si_action_prefix = si_service
@@ -676,14 +680,15 @@ export class NeutrinoImpl extends RpcImplementor {
 				yn_ident = ident(g_nests.name);
 
 				// defer
-				const yn_buffer = typeRef('Uint8Array');
-				a_generics.push(g_thing.field.repeated? arrayType(yn_buffer): yn_buffer);
+				a_generics.push(g_thing.field.repeated? arrayType(g_nests.type): g_nests.type);
 
 				// add expression to return list
 				a_returns.push(g_nests.parse(yn_ident));
 
-				// mark as processed
-				b_processed = true;
+				// mark as processed if processing occurs
+				if(F_IDENTITY !== g_nests.parse) {
+					b_processed = true;
+				}
 			}
 			else {
 				// infer hint from write type
@@ -699,7 +704,7 @@ export class NeutrinoImpl extends RpcImplementor {
 					v: 's' === g_thing.calls.name[0]? keyword('string'): keyword('number'),
 					g: keyword('string'),
 					s: keyword('string'),
-					b: typeRef('Uint8Array'),
+					b: H_FIELD_TYPES.TYPE_MESSAGE === g_field.type? keyword('any'): typeRef('Uint8Array'),
 				}[g_thing.proto.writer.toLowerCase()] || keyword('unknown');
 
 				// add to generic type arg
@@ -748,14 +753,15 @@ export class NeutrinoImpl extends RpcImplementor {
 			param(ident('atu8_payload'), typeRef('Uint8Array')),
 		];
 
+		// const yn_return = 1 === a_types.length
+		// 	? a_types[0].calls.id
+		// 		? union([a_types[0].calls.return_type, keyword('undefined')])
+		// 		: a_types[0].calls.return_type
+		// 	: tuple(a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type]));
+
+		const yn_return = tuple(a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type]));
+
 		let g_param_destructure!: ParameterDeclaration;
-
-		const yn_return = 1 === a_types.length
-			? a_types[0].calls.id
-				? union([a_types[0].calls.return_type, keyword('undefined')])
-				: a_types[0].calls.return_type
-			: tuple(a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type]));
-
 
 		if(b_processed) {
 			// add init param
@@ -773,17 +779,17 @@ export class NeutrinoImpl extends RpcImplementor {
 
 			yn_body = arrayLit(a_returns);
 		}
-		// single field; use simplified response
-		else if(1 === a_bindings.length) {
-			// flat type
-			if(b_flat) {
-				yn_init = castAs(ident('decode_protobuf_r0'), funcType(a_params, yn_return));
-			}
-			// not flat
-			else {
-				yn_body = arrayAccess(yn_decode, numericLit(0));
-			}
-		}
+		// // single field; use simplified response
+		// else if(1 === a_bindings.length) {
+		// 	// flat type
+		// 	if(b_flat) {
+		// 		yn_init = castAs(ident('decode_protobuf_r0'), funcType(a_params, yn_return));
+		// 	}
+		// 	// not flat
+		// 	else {
+		// 		yn_body = arrayAccess(yn_decode, numericLit(0));
+		// 	}
+		// }
 		else {
 			yn_body = yn_decode;
 		}
@@ -843,20 +849,46 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// keep track of the expected field number to determine when there are gaps
 		let n_field_expected = 1;
-		let b_monotonic = true;
+		let b_continuous = true;
 
 		// each field
+		FIELDS:
 		for(const g_field of g_msg.fieldList) {
 			const g_thing = this.route(g_field);
 
 			// prep expr
 			const yn_access = g_thing.calls.from_json(access('g_struct', g_field.name!));
 
-			// field number does not immediately follow previous
+			// no number
 			const i_number = g_field.number!;
-			if(!b_monotonic || i_number !== n_field_expected++) {
+			if('number' !== typeof i_number) {
+				throw new Error(`Field is missing explicit number: ${g_field.name}`);
+			}
+
+			// field number does not immediately follow previous
+			GAPS:
+			if(i_number !== n_field_expected++) {
+				debugger;
+				// still continuous and gap is clearable
+				if(b_continuous && (i_number - (n_field_expected -1)) < N_MAX_PROTO_FIELD_NUMBER_GAP) {
+					// clear the gap
+					for(let i_fill=n_field_expected-1; i_fill<i_number; i_fill++) {
+						// add to sequence
+						a_sequence.push(ident('__UNDEFINED'));
+
+						// void return
+						a_returns.push(['EMPTY', true, keyword('void')]);
+					}
+
+					// update expected field
+					n_field_expected = i_number + 1;
+
+					// proceed
+					break GAPS;
+				}
+
 				// set monotonicity break
-				b_monotonic = false;
+				b_continuous = false;
 
 				// add to assign
 				h_assigns[i_number] = yn_access;
@@ -865,12 +897,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				h_indicies[i_number] = [g_thing.destruct_type, g_thing.optional];
 
 				// next
-				continue;
-			}
-
-			// no number
-			if('number' !== typeof i_number) {
-				throw new Error(`Field is missing explicit number: ${g_field.name}`);
+				continue FIELDS;
 			}
 
 			// add to sequence

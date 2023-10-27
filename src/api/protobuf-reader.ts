@@ -204,6 +204,6 @@ export const decode_coin = <
  * Reduces a parsed google.protobuf.Timestamp into whole milliseconds
  */
 export const reduce_temporal = (
-	[xn_seconds, xn_nanos]: [number, number]
-): number => (xn_seconds * 1e3) + ((xn_nanos / 1e6) | 0);
+	[sg_seconds, xn_nanos]: [string, number]
+): number => (+(sg_seconds) * 1e3) + ((xn_nanos / 1e6) | 0);
 

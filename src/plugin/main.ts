@@ -43,6 +43,7 @@ const A_GLOBAL_PREAMBLE = [
 			'CwValidatorAddr',
 		], true),
 		importModule('#/bech32', [
+			'bech32_encode',
 			'bech32_decode',
 		]),
 		importModule('#/util', [
@@ -69,6 +70,8 @@ const A_GLOBAL_PREAMBLE = [
 		importModule('#/transport', [
 			'F_RPC_REQ_NO_ARGS',
 			'restful_grpc',
+			'restruct_coin',
+			'restruct_temporal',
 		]),
 		importModule('#/types', [
 			'Encoded',

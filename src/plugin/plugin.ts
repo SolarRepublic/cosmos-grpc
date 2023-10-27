@@ -160,6 +160,39 @@ function preprocess_messages(
 	});
 }
 
+export function parse_package_parts(si_thing: string, s_char: string) {
+	const a_path = si_thing.split(s_char);
+
+	// prep path parts
+	const si_vendor = a_path[0]!;
+	let si_module = a_path[1];
+	let s_version = '';
+	let s_purpose = '';
+
+	// determine separation between parts
+	for(let i_part=2; i_part<a_path.length-1; i_part++) {
+		const s_part = a_path[i_part];
+
+		// found version
+		if(/^v\d/.test(s_part)) {
+			s_version = s_part;
+			s_purpose = a_path.slice(i_part+1).join(s_char).split(/[./]/)[0];
+			break;
+		}
+
+		// part of module
+		si_module += s_char+s_part;
+	}
+
+	// save path parts to file
+	return {
+		vendor: si_vendor,
+		module: si_module,
+		version: s_version,
+		purpose: s_purpose,
+	};
+}
+
 
 function parse_file_parts(g_proto_raw: FileDescriptorProto.AsObject): AugmentedFile {
 	// split path => [vendor, module, version, purpose]

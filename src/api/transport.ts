@@ -1,7 +1,8 @@
 /* eslint-disable prefer-const */
 import type {Dict, JsonObject, JsonValue} from '@blake.regalia/belt';
 
-import {safe_json, ode, buffer_to_base64} from '@blake.regalia/belt';
+import {safe_json, ode, buffer_to_base64, __UNDEFINED} from '@blake.regalia/belt';
+import type { SlimCoin } from '@solar-republic/types';
 
 
 export type RpcRequest<
@@ -51,6 +52,7 @@ const json_object_to_flatdot = (h_object: JsonObject<Uint8Array | undefined>, h_
 
 	return h_root;
 };
+
 
 /**
  * Submits a query to the RESTful gRPC-gateway endpoint
@@ -120,3 +122,17 @@ export const restful_grpc = <
 
 	return g_res as w_parsed;
 };
+
+
+
+export const restruct_coin = (a_coin: SlimCoin | undefined) => a_coin? ({
+	amount: a_coin[0],
+	denom: a_coin[1],
+}): __UNDEFINED;
+
+export const restruct_temporal = (xt_temporal: number | undefined) => __UNDEFINED === xt_temporal
+	? xt_temporal
+	: ({
+		seconds: Math.floor(xt_temporal / 1e3)+'',
+		nanos: (xt_temporal % 1e3) * 1e6,
+	});
