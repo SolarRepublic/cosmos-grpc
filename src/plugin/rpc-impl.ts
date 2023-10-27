@@ -9,7 +9,7 @@ import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex} from '@blake.rega
 
 import {map_proto_path} from './common';
 
-import {access, arrayType, arrow, call, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory} from './ts-factory';
+import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory, chain, callChain} from './ts-factory';
 
 
 export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
@@ -126,6 +126,7 @@ export abstract class RpcImplementor {
 		// ref parts
 		const g_calls = g_bare.calls as TsThing['calls'];
 		const g_proto = g_bare.proto as TsThing['proto'];
+		const g_nests = g_bare.nests as TsThing['nests'] || null;
 
 		// auto-fill proto
 		{
@@ -175,7 +176,7 @@ export abstract class RpcImplementor {
 
 			// wrap to_json
 			if(g_calls.to_json) {
-				g_calls.to_json = call(
+				g_calls.to_json = callExpr(
 					access(g_calls.name, 'map'),
 					[arrow([param(s_name_singular)], g_calls.to_json)]
 				);
@@ -184,7 +185,7 @@ export abstract class RpcImplementor {
 			// wrap from_json
 			const f_from_json = g_calls.from_json;
 			if(f_from_json) {
-				g_calls.from_json = yn_data => call(access(yn_data, 'map'), [
+				g_calls.from_json = yn_data => callChain(chain(yn_data, 'map'), [
 					arrow([param(s_name_singular)], f_from_json(ident(s_name_singular))),
 				]);
 			}
@@ -193,23 +194,36 @@ export abstract class RpcImplementor {
 			if(g_calls.to_proto) {
 				// special wrap for Coin[]
 				if('.cosmos.base.v1beta1.Coin' === g_field.typeName) {
-					g_calls.to_proto = yn_expr => call('coins', [yn_expr]);
+					g_calls.to_proto = yn_expr => callExpr('coins', [yn_expr]);
 				}
 				// map items
 				else {
 					const f_original = g_calls.to_proto;
 
-					g_calls.to_proto = yn_expr => call(
+					g_calls.to_proto = yn_expr => callExpr(
 						access(g_calls.name, 'map'),
 						[arrow([param(s_name_singular)], f_original(yn_expr))]
 					);
 				}
 			}
+
+			if(g_nests?.parse) {
+				const f_parse = g_nests.parse;
+
+				g_nests.parse = yn_data => callExpr(
+					access(yn_data, 'map'),
+					[
+						arrow([
+							param('atu8'),
+						], f_parse(ident('atu8')))
+					],
+				);
+			}
 		}
 
 		// auto-fill calls
 		if(si_snake.startsWith('atu8_')) {
-			g_calls.to_json ||= call('safe_buffer_to_base64', [ident(g_calls.name)]);
+			g_calls.to_json ||= callExpr('safe_buffer_to_base64', [ident(g_calls.name)]);
 			// g_calls.from_json ||= yn_data => call('safe_base64_to_buffer', [yn_data]);
 		}
 
@@ -219,27 +233,18 @@ export abstract class RpcImplementor {
 		g_calls.to_proto ||= F_IDENTITY;  // ident(g_proto.prefers_call? g_calls.name: g_proto.name);
 		g_calls.return_type ||= g_calls.type;
 
-		// optionality (everything in proto3 is optional by default)
-		let b_optional = true;  // pb.FieldDescriptorProto.Label.LABEL_OPTIONAL === g_field.label;
-
-		// explicitly not nullable
-		if(false === g_field.options?.nullable) {
-			// explictly optional
-			if(g_field.proto3Optional) {
-				debugger;
-				throw new Error(`Unsupported proto3Optional on ${g_field.typeName}`);
-			}
-			// not repeated
-			else if(!g_field.repeated) {
-				b_optional = true;
-			}
+		let yn_json = g_bare.json?.type || g_calls.return_type;
+		if(g_field.repeated) {
+			yn_json = arrayType(yn_json);
 		}
 
 		// create and return thing
 		return {
 			field: g_field,
 
-			optional: b_optional,
+			get optional() {
+				return g_field.optional;
+			},
 
 			calls: {
 				...g_calls,
@@ -250,7 +255,7 @@ export abstract class RpcImplementor {
 			},
 
 			json: {
-				type: g_bare.json?.type || g_calls.type,
+				type: yn_json,
 			},
 
 			proto: {
@@ -262,10 +267,10 @@ export abstract class RpcImplementor {
 			},
 
 			get destruct_type(): TypeNode {
-				return g_calls.from_json !== F_IDENTITY? g_calls.type: g_calls.return_type;
+				return g_calls.from_json !== F_IDENTITY? g_calls.type: yn_json;
 			},
 
-			nests: g_bare.nests || null,
+			nests: g_nests,
 		};
 	}
 }

@@ -97,7 +97,7 @@ export const enum ProtoHint {
  */
 export const decode_protobuf = <
 	w_return extends DecodedProtobufMessage<void>=DecodedProtobufMessage,
->(atu8_data: Uint8Array, a_hints?: ProtoHint[]): w_return => {
+>(atu8_data: Uint8Array, a_hints?: NestedArrayable<ProtoHint>[]): w_return => {
 	let varint = <
 		w_format extends string | number=number,
 	>(xc_hint?: ProtoHint): w_format => {

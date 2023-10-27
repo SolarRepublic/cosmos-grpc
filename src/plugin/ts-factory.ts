@@ -61,13 +61,23 @@ export const trailingLineComment = <
 	return yn_node;
 };
 
-export const call = (z_method: string | Expression, a_args?: Expression[], a_types?: TypeNode[] | undefined, s_comment?: string) => trailingLineComment(
+export const callExpr = (z_method: string | Expression, a_args?: Expression[], a_types?: TypeNode[] | undefined, s_comment?: string) => trailingLineComment(
 	y_factory.createCallExpression(
 		'string' === typeof z_method? ident(z_method): z_method,
 		a_types,
 		a_args
 	), s_comment
 );
+
+export const callChain = (yn_prime: Expression, a_args?: Expression[], a_types?: TypeNode[] | undefined, s_comment?: string) => trailingLineComment(
+	y_factory.createCallChain(
+		yn_prime,
+		__UNDEFINED,
+		a_types,
+		a_args
+	), s_comment
+);
+
 
 export const castAs = (yn_subject: Expression, yn_type: TypeNode) => y_factory.createAsExpression(yn_subject, yn_type);
 
@@ -87,12 +97,12 @@ export const doReturn = (yn_expr: Expression) => y_factory.createReturnStatement
 
 export const litType = (yn_lit: Parameters<ts.NodeFactory['createLiteralTypeNode']>[0]) => y_factory.createLiteralTypeNode(yn_lit);
 
-export const typeLit = (h_props: Dict<TypeNode>) => y_factory.createTypeLiteralNode(
-	oderac(h_props, (si_key, yn_type) => y_factory.createPropertySignature(
+export const typeLit = (h_props: Dict<TypeNode | [TypeNode, boolean]>) => y_factory.createTypeLiteralNode(
+	oderac(h_props, (si_key, z_type) => y_factory.createPropertySignature(
 		__UNDEFINED,
 		ident(si_key),
-		__UNDEFINED,
-		yn_type
+		Array.isArray(z_type) && z_type[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
+		Array.isArray(z_type)? z_type[0]: z_type
 	)));
 
 export const declareAlias = (si_name: string, yn_assign: TypeNode, b_export?: boolean) => y_factory.createTypeAliasDeclaration(
@@ -125,7 +135,9 @@ export const tuple = (a_members: Array<TypeNode | [z_ident: string | Identifier,
 			? y_factory
 				.createNamedTupleMember(
 					__UNDEFINED,
-					'package' === z_member[0]? ident('package_'): ident(z_member[0]),
+					'string' === typeof z_member[0] && ['class', 'package'].includes(z_member[0])
+						? ident(z_member[0]+'_')
+						: ident(z_member[0]),
 					z_member[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
 					z_member[2]
 				)
@@ -189,6 +201,15 @@ export const access = (
 ) => a_rest.reduce(
 	(yn_prev, z_part) => y_factory.createPropertyAccessExpression(yn_prev, 'string' === typeof z_part? ident(z_part): z_part),
 	'string' === typeof z_prime? ident(z_prime) as Expression: z_prime);
+
+export const chain = (
+	yn_prime: Expression,
+	yn_access: string | Identifier,
+) => y_factory.createPropertyAccessChain(
+	yn_prime,
+	y_factory.createToken(SyntaxKind.QuestionDotToken),
+	ident(yn_access)
+);
 
 export const arrayAccess = (
 	z_prime: string | Expression,

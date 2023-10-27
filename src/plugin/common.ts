@@ -8,7 +8,7 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {call, ident, literal, string, keyword, litType, typeRef, union, numericLit} from './ts-factory';
+import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, typeLit} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 // destructure members from protobuf
@@ -62,6 +62,7 @@ export type TsThingBare = {
 export type TsThing = {
 	field: AugmentedField;
 	optional: boolean;
+	// actual_type: TypeNode;
 
 	calls: Required<TsThingBare['calls']> & {
 		id: Identifier;
@@ -116,7 +117,7 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 		calls: {
 			name: s_ident,
 			type: keyword('number'),
-			to_proto: yn_expr => call('temporal', [yn_expr]),
+			to_proto: yn_expr => callExpr('temporal', [yn_expr]),
 		},
 
 		proto: {
@@ -128,7 +129,7 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 		nests: {
 			name: `a_${snake(g_field.name!)}`,
 			hints: literal([ProtoHint.SINGULAR, ProtoHint.SINGULAR]),
-			parse: yn_expr => call(ident('reduce_temporal'), [yn_expr]),
+			parse: yn_expr => callExpr(ident('reduce_temporal'), [yn_expr]),
 		},
 	};
 };
@@ -146,7 +147,7 @@ const H_OVERRIDE_MIXINS: Dict<
 			calls: {
 				name: s_ident,
 				type: typeRef('SlimCoin'),
-				to_proto: yn_expr => call('coin', [yn_expr]),
+				to_proto: yn_expr => callExpr('coin', [yn_expr]),
 			},
 
 			proto: {
@@ -158,7 +159,7 @@ const H_OVERRIDE_MIXINS: Dict<
 			nests: {
 				name: `a_${si_name}`,
 				hints: literal([ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING]),
-				parse: yn_data => call(ident('decode_coin'), [yn_data], [typeRef('SlimCoin')]),
+				parse: yn_data => callExpr(ident('decode_coin'), [yn_data], [typeRef('SlimCoin')]),
 			},
 		};
 	},
@@ -174,6 +175,8 @@ const H_OVERRIDE_MIXINS: Dict<
 		let yn_proto_type: TypeNode = typeRef('Uint8Array');
 		let yn_json_type: TypeNode = keyword('string');
 
+		let b_prefers_call = 0;
+
 		const si_accepts = g_field.options?.acceptsInterface;
 		if(si_accepts) {
 			yn_proto_type = typeRef('Encoded', [
@@ -183,6 +186,7 @@ const H_OVERRIDE_MIXINS: Dict<
 			]);
 
 			yn_json_type = k_impl.importJsonTypesImplementing(si_accepts);
+			b_prefers_call = 1;
 		}
 
 		return {
@@ -191,10 +195,14 @@ const H_OVERRIDE_MIXINS: Dict<
 				type: yn_json_type,
 			},
 
+			json: {
+				type: typeRef('JsonAny'),
+			},
+
 			proto: {
 				type: yn_proto_type,
 				writer: 'b',
-				prefers_call: 1,
+				prefers_call: b_prefers_call,
 			},
 		};
 	},
@@ -301,7 +309,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		if(/(^val(idator)?_.*?|val(idator)?)_addr(ess)?$/.test(si_field)) {
 			si_name = `sa_${si_field.replace(/_addr(ess)?$/, '')}`;
 			yn_type = typeRef('WeakValidatorAddr');
-			yn_return = typeRef('ValidatorAddr');
+			yn_return = typeRef('CwValidatorAddr');
 		}
 		// account address
 		else if(/(_addr(ess)?|(^|_)receiver)$/.test(si_field) || A_SEMANTIC_ACCOUNT_ADDR_STR.includes(si_field)) {
@@ -362,20 +370,23 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		// locate source
 		const sr_path = k_impl.pathOfFieldType(g_field);
 
-		// extract type reference ident
-		const si_ref = g_field.typeName!.split('.').at(-1)!;
+		const yn_json = k_impl.importType(sr_path, k_impl.exportedId(k_impl.resolveType(g_field.typeName!)));
 
 		// construct ts field
 		return {
 			calls: {
 				name: `g_${si_name}`,
-				type: k_impl.importType(sr_path, k_impl.exportedId(k_impl.resolveType(g_field.typeName!))),
+				type: yn_json,
 			},
 
+			json: {
+				type: yn_json,
+			},
+			
 			nests: {
 				name: `a_${si_name}`,
 				hints: literal(0),
-				parse: yn_data => call(ident('decode_protobuf'), [yn_data]),
+				parse: yn_data => callExpr(ident('decode_protobuf'), [yn_data]),
 			},
 
 			...H_OVERRIDE_MIXINS[g_field.typeName!]?.(g_field, k_impl) || {
@@ -402,10 +413,12 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 				calls: {
 					name: `sa_${si_name}`,
 					type: typeRef('WeakAccountAddr'),
-					to_proto: yn_expr => call('bech32_decode', [yn_expr]),
-					from_json: yn_expr => call('bech32_encode', [call('safe_base64_to_buffer', [yn_expr])]),
+					to_proto: yn_expr => callExpr('bech32_decode', [yn_expr]),
+					from_json: yn_expr => callExpr('bech32_encode', [callExpr('safe_base64_to_buffer', [yn_expr])]),
 					return_type: typeRef('CwAccountAddr'),
 				},
+
+				actual_tye: typeRef('CwBase64'),
 
 				proto: {
 					writer: 'b',
@@ -424,9 +437,11 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			calls: {
 				name: si_self,
 				type: yn_type,
-				from_json: yn_expr => call('safe_base64_to_buffer', [yn_expr]),
+				from_json: yn_expr => callExpr('safe_base64_to_buffer', [yn_expr]),
 				return_type: typeRef('CwBase64'),
 			},
+
+			actual_tye: typeRef('CwBase64'),
 
 			// json: {
 			// 	type: typeRef('CwBase64'),

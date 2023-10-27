@@ -3,7 +3,7 @@ import type {AugmentedEnum, AugmentedMessage} from './env';
 
 import type {Dict} from '@blake.regalia/belt';
 
-import {ode, odv} from '@blake.regalia/belt';
+import {ode, odv, deduplicate} from '@blake.regalia/belt';
 
 import {NeutrinoImpl} from './impl-neutrino';
 import {plugin} from './plugin';
@@ -40,6 +40,7 @@ const A_GLOBAL_PREAMBLE = [
 			'CwUint64',
 			'CwBase64',
 			'CwAccountAddr',
+			'CwValidatorAddr',
 		], true),
 		importModule('#/bech32', [
 			'bech32_decode',
@@ -71,6 +72,7 @@ const A_GLOBAL_PREAMBLE = [
 		]),
 		importModule('#/types', [
 			'Encoded',
+			'JsonAny',
 		], true),
 	].map(yn => print(yn)),
 ];
@@ -121,6 +123,9 @@ export const main = () => {
 		 * add closures from given message type
 		 */
 		function mark_fields(g_msg: AugmentedMessage, g_coders: ClosureStruct) {
+			// ensure message is covered
+			g_coders.messages[g_msg.path] = g_msg;
+
 			// ensure every field's type has an encoder
 			for(const g_field of g_msg.fieldList) {
 				// ref type path
@@ -133,7 +138,7 @@ export const main = () => {
 
 					// message
 					if('message' === g_resolved.form) {
-						g_coders.messages[si_type] = g_resolved;
+						// g_coders.messages[si_type] = g_resolved;
 
 						// recurse on message
 						mark_fields(g_resolved, g_coders);
@@ -144,12 +149,10 @@ export const main = () => {
 
 						// TODO: what should happen here between encoders and decoders?
 
-						if(g_msg.source.name!.startsWith('akash/escrow/v1beta1/types')) {
-							debugger;
-						}
+						// if('ProposalStatus' === g_msg.source.name) debugger;
 
 						// add to draft
-						(h_drafts[g_msg.source.name!] ||= {
+						(h_drafts[g_resolved.source.name!] ||= {
 							enums: new Set(),
 						}).enums.add(si_type);
 					}
@@ -278,7 +281,7 @@ export const main = () => {
 						// ensure its fields can be encoded
 						mark_fields(g_input, g_encoders);
 
-						// message has output content
+						// method output has content
 						if(g_output.fieldList.length) {
 							// render decoder
 							const sx_decoder = k_impl.msgDecoder(g_output);
@@ -359,6 +362,7 @@ export const main = () => {
 		for(const [, g_proto] of ode(h_inputs)) {
 			// open
 			k_impl.open(g_proto);
+			const p_output = k_impl.path;
 
 			const {
 				a_gateways,
@@ -488,7 +492,7 @@ export const main = () => {
 
 			// there are contents to write to the file
 			if(a_body.length) {
-				h_outputs[k_impl.path] = [g_parts.head.join('\n'), ...g_parts.body].join('\n\n');
+				h_outputs[p_output] = [[...new Set(g_parts.head)].join('\n'), ...g_parts.body].join('\n\n');
 			}
 		}
 

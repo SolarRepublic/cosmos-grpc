@@ -1,4 +1,5 @@
 import type {JsonObject} from '@blake.regalia/belt';
+import type { CwBase64 } from '@solar-republic/types';
 
 declare const INTERFACES: unique symbol;
 
@@ -22,3 +23,10 @@ export type Any<
 > = {
 	'@type': p_type;
 } & g_msg;
+
+export type JsonAny<
+	p_type extends string=string,
+> = {
+	type_url: p_type;
+	value: CwBase64;
+};

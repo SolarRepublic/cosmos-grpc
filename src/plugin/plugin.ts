@@ -1,5 +1,5 @@
 // import {default as pluginPb} from 
-import type {AugmentedEnum, AugmentedFile, AugmentedFormOf, AugmentedMessage, AugmentedService, ProtoElement} from './env';
+import type {AugmentedEnum, AugmentedField, AugmentedFile, AugmentedFormOf, AugmentedMessage, AugmentedService, ProtoElement} from './env';
 import type {Dict, Promisable} from '@blake.regalia/belt';
 import type {CodeGeneratorRequest as CodeGenReq} from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 import type {DescriptorProto, EnumDescriptorProto, FileDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
@@ -117,9 +117,29 @@ function preprocess_messages(
 
 		// each field
 		g_msg.fieldList.forEach((g_field, i_field) => {
+			// whether the field has the repeated modifier
+			const b_repeated = FieldLabel.LABEL_REPEATED === g_field.label;
+
+			// whether the field is deemed optional (true by default)
+			let b_optional = true;
+
+			// explicitly not nullable
+			if(false === (g_field as AugmentedField).options?.nullable) {
+				// explictly optional
+				if(g_field.proto3Optional) {
+					debugger;
+					throw new Error(`Unsupported proto3Optional on ${g_field.typeName}`);
+				}
+				// not repeated
+				else if(!(g_field as AugmentedField).repeated) {
+					b_optional = true;
+				}
+			}
+
 			// augment it
 			augment(g_field, {
-				repeated: FieldLabel.LABEL_REPEATED === g_field.label,
+				repeated: b_repeated,
+				optional: b_optional,
 				comments: comments_at([...a_local, 2, i_field], g_proto, g_field.name),
 			});
 		});

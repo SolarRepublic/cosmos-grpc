@@ -65,6 +65,7 @@ export interface MessageAugmentations extends AugmentSource {
 
 export interface FieldAugmentations extends AugmentComments {
 	repeated: boolean;
+	optional: boolean;
 	options?: ExtendedFieldOptions;
 }
 

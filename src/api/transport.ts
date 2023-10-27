@@ -68,7 +68,7 @@ export const restful_grpc = <
 	w_parsed,
 >(
 	f_req: RpcRequest<a_args>,
-	f_res: (g_response: any) => w_parsed,
+	// f_res: (g_response: any) => w_parsed,
 	g_init?: 1 | RequestInit
 ) => async(z_req: string | {origin: string} & RequestInit, ...a_args: a_args): Promise<w_parsed> => {
 	let [sr_append, h_args] = f_req(...a_args);
@@ -115,6 +115,8 @@ export const restful_grpc = <
 	// eslint-disable-next-line no-throw-literal
 	if(!d_res.ok || g_res['code']) throw [d_res, sx_res, g_res] as NetworkErrorDetails;
 
-	// process response
-	return f_res(g_res);
+	// // process response
+	// return f_res(g_res);
+
+	return g_res as w_parsed;
 };
