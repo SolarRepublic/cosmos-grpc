@@ -9,7 +9,7 @@ import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex} from '@blake.rega
 
 import {map_proto_path} from './common';
 
-import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory, chain, callChain} from './ts-factory';
+import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory, chain, callChain, union} from './ts-factory';
 
 
 export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
@@ -63,11 +63,19 @@ export abstract class RpcImplementor {
 
 		if(!a_msgs) {
 			console.warn(`WARNING: No messages implement the interface "${si_interface}"`);
-			return keyword('never');
+			return keyword('void');
 		}
 
+		if(a_msgs.length) debugger;
+
 		// return union(a_msgs.map(g_msg => this.importType(this.pathOfType(g_msg.path), [g_msg.name!, this.clashFreeTypeId(g_msg)])));
-		return typeRef('Encoded', [litType(string(si_interface))]);
+		return typeRef('JsonAny', [
+			litType(string(si_interface)),
+			union(a_msgs.map(g_msg => this.importType(
+				this.pathOfType(g_msg.path),
+				g_msg
+			))),
+		]);
 	}
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -93,20 +101,29 @@ export abstract class RpcImplementor {
 		return this.pathOfType(g_field.typeName!);
 	}
 
-	importType(sr_path: string, z_ident: string | [ident: string, rename: string], a_type_args?: TypeNode[]): TypeNode {
+	// importType(sr_path: string, z_ident: string | [ident: string, rename: string], a_type_args?: TypeNode[]): TypeNode {
+
+	importType(sr_path: string, z_ident: string | RefableType, a_type_args?: TypeNode[]): TypeNode {
 		let si_name = z_ident as string;
 		let si_prop: string | undefined;
 
 		if('string' !== typeof z_ident) {
-			[si_prop, si_name] = z_ident;
+			// [si_prop, si_name] = z_ident;
+			[si_prop, si_name] = [this.exportedId(z_ident), this.clashFreeTypeId(z_ident)];
 		}
 
+		// different file
 		if(this._g_opened.name!.replace(/\.proto$/, '') !== sr_path) {
 			this._h_type_imports[si_name] = [`#/proto/${sr_path}`, y_factory.createImportSpecifier(
 				false,  // never directly, handled in import clause
 				si_prop? ident(si_prop): __UNDEFINED,
 				ident(si_name)
 			)];
+		}
+		// same file
+		else {
+			// use exportedId, otherwise the clash-free version will be wrong
+			return typeRef(si_prop || z_ident as string);
 		}
 
 		return typeRef(si_name, a_type_args);

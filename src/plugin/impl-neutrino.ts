@@ -508,7 +508,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		if(!a_interfaces) throw new Error('No interface option');
 
 		// prep unique type
-		const si_singleton = `Actual${g_msg.name}`;
+		const si_singleton = `Any${this.exportedId(g_msg)}`;
 
 		// prep 'typeUrl' property for `Any` protobuf message
 		const p_type = `/${g_msg.source.pb_package}.${g_msg.local}`;
@@ -518,11 +518,11 @@ export class NeutrinoImpl extends RpcImplementor {
 			// Encoded<si_message | ...as_interfaces>
 			typeRef('Encoded', [
 				union([
-					litType(string(p_type)),
+					// litType(string(p_type)),
 					...a_interfaces.map(si_interface => litType(string(si_interface))),
 				]),
 			]),
-		]));
+		]), true);
 
 		// add to preamble
 		this._g_heads.any.push(print(yn_type));

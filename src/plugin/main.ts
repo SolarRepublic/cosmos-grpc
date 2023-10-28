@@ -208,6 +208,12 @@ export const main = () => {
 
 					// ensure its fields can be encoded
 					mark_fields(g_msg, g_encoders);
+
+					// ensure its fields can be described
+					mark_fields(g_msg, g_accessible);
+
+					// ensure response values can be destructured
+					mark_fields(g_msg, g_destructors);
 				}
 
 				// each encoder pattern
@@ -298,7 +304,8 @@ export const main = () => {
 						// ensure its output can be destructured
 						mark_fields(g_output, g_destructors);
 
-						if('/cosmos/tx/v1beta1/simulate' === g_http.post) debugger;
+						// ensure its output can be described
+						mark_fields(g_output, g_accessible);
 
 						// ensure its inputs are typed and enums accessible
 						mark_fields(g_input, g_accessible);

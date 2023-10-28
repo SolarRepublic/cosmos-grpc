@@ -18,19 +18,19 @@ export type Encoded<
 
 export type PropagateUndefined<z_any> = z_any extends undefined? undefined: never;
 
-export type Any<
-	g_msg extends JsonObject,
-	p_type extends string,
+export type JsonAny<
+	p_type extends string=string,
+	g_msg extends JsonObject=JsonObject,
 > = {
 	'@type': p_type;
 } & g_msg;
 
-export type JsonAny<
-	p_type extends string=string,
-> = {
-	type_url: p_type;
-	value: CwBase64;
-};
+// export type JsonAny<
+// 	p_type extends string=string,
+// > = {
+// 	type_url: p_type;
+// 	value: CwBase64;
+// };
 
 // export type Opt<
 // 	z_type,

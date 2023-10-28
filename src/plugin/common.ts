@@ -201,7 +201,7 @@ const H_OVERRIDE_MIXINS: Dict<
 	// Any
 	'.google.protobuf.Any'(g_field, k_impl) {
 		let yn_proto_type: TypeNode = typeRef('Uint8Array');
-		let yn_json_type: TypeNode = keyword('string');
+		let yn_json_type: TypeNode = typeRef('JsonAny');
 
 		let b_prefers_call = 0;
 
@@ -220,12 +220,11 @@ const H_OVERRIDE_MIXINS: Dict<
 		return {
 			calls: {
 				name: `atu8_${g_field.name!}`,
-				// type: yn_json_type,
 				type: yn_proto_type,
 			},
 
 			json: {
-				type: typeRef('JsonAny'),
+				type: yn_json_type,
 			},
 
 			proto: {
@@ -399,7 +398,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		// locate source
 		const sr_path = k_impl.pathOfFieldType(g_field);
 
-		const yn_json = k_impl.importType(sr_path, k_impl.exportedId(k_impl.resolveType(g_field.typeName!)));
+		const yn_json = k_impl.importType(sr_path, k_impl.resolveType(g_field.typeName!));
 
 		// construct ts field
 		return {
