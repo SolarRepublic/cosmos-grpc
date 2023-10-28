@@ -511,7 +511,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const si_singleton = `Actual${g_msg.name}`;
 
 		// prep 'typeUrl' property for `Any` protobuf message
-		const p_type = `/${g_msg.source.pb_package}.${g_msg.name}`;
+		const p_type = `/${g_msg.source.pb_package}.${g_msg.local}`;
 
 		// declare unique type
 		const yn_type = declareAlias(si_singleton, intersection([
@@ -594,7 +594,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// declare unique type
 		const yn_type = declareAlias(si_singleton, typeRef('Encoded', [
-			litType(string(`/${g_msg.source.pb_package}.${g_msg.name!}`)),
+			litType(string(`/${g_msg.source.pb_package}.${g_msg.local}`)),
 		]), true);
 
 		// add type decl to preamble

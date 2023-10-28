@@ -126,6 +126,9 @@ info "generating module..."
 # prep list of forced encoders
 s_encoders="""
 /^cosmos\.tx\.v1beta1\.(.*)(?<!Request|Response)$/
+cosmos.crypto.ed25519.PubKey
+cosmos.crypto.secp256k1.PubKey
+cosmos.crypto.secp256r1.PubKey
 """
 
 # define options for plugin

@@ -143,20 +143,21 @@ export const main = () => {
 				// ref type path
 				const si_type = g_field.typeName;
 
+				// no typename; skip
+				if(!si_type) continue;
+
+				// resolve type
+				const g_resolved = h_types[si_type];
+
 				// type exists, is not encoded, and is not yet defined in closure/enum
-				if(si_type && !g_coders.messages[si_type] && !g_coders.enums[si_type]) {
-					// resolve type
-					const g_resolved = h_types[si_type];
-
-					// message
+				if(!g_coders.messages[si_type] && !g_coders.enums[si_type]) {
+					// message; recurse
 					if('message' === g_resolved.form) {
-						// g_coders.messages[si_type] = g_resolved;
-
-						// recurse on message
 						mark_fields(g_resolved, g_coders);
 					}
 					// enum
 					else {
+						// save to enums struct
 						g_coders.enums[si_type] = g_resolved;
 
 						// TODO: what should happen here between encoders and decoders?

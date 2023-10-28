@@ -46,7 +46,7 @@ export abstract class RpcImplementor {
 		const g_parts = parse_package_parts(si_thing, '.');
 
 		const sr_reparted = [g_parts.vendor, g_parts.module, g_parts.version]
-			.map(s => s+'.').join('').replace(/[^A-Za-z0-9_.]+/g, '');
+			.map(s => s+'.').join('').replace(/[^A-Za-z0-9_.]+/g, '').replace(/\.{2,}/g, '.');
 
 		const s_name = si_thing.replace(new RegExp(`^${escape_regex(sr_reparted)}`), '');
 

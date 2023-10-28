@@ -95,6 +95,7 @@ export type FieldRouter = Record<
 
 const A_SEMANTIC_ACCOUNT_ADDR_STR = [
 	'sender',
+	'payer',
 	'creator',
 	'delegator',
 	'depositor',

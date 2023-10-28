@@ -55,6 +55,7 @@ export interface MethodAugmentations extends AugmentComments {
 export interface MessageAugmentations extends AugmentSource {
 	form: 'message';
 	path: string;
+	local: string;
 	options?: ExtendedMessageOptions;
 	fieldList: AugmentedField[];
 	nestedTypeList: AugmentedMessage[];
@@ -72,6 +73,7 @@ export interface FieldAugmentations extends AugmentComments {
 export interface EnumAugmentations extends AugmentSource {
 	form: 'enum';
 	path: string;
+	local: string;
 	valueList: AugmentedEnumValue[];
 }
 

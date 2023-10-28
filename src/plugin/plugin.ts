@@ -57,7 +57,8 @@ function preprocess_enums(
 	g_proto: AugmentedFile,
 	sr_package: string,
 	h_types: TypesDict,
-	a_path: number[]=[]
+	a_path: number[]=[],
+	sr_parent=''
 ) {
 	// each enum
 	a_enums.forEach((g_enum, i_enum) => {
@@ -84,6 +85,7 @@ function preprocess_enums(
 		h_types[p_enum] = augment(g_enum, {
 			form: 'enum',
 			path: p_enum,
+			local: (sr_parent? sr_parent+'.': '')+g_enum.name,
 			source: g_proto,
 			comments: comments_at(a_local, g_proto, si_enum),
 		});
@@ -100,7 +102,8 @@ function preprocess_messages(
 	sr_package: string,
 	h_types: TypesDict,
 	h_interfaces: InterfacesDict,
-	a_path: number[]=[]
+	a_path: number[]=[],
+	sr_parent=''
 ) {
 	// each message
 	a_msgs.forEach((g_msg, i_msg) => {
@@ -148,16 +151,19 @@ function preprocess_messages(
 			});
 		});
 
+		const sr_local = (sr_parent? sr_parent+'.': '')+g_msg.name;
+
 		// process nested enums
-		preprocess_enums(g_msg.enumTypeList, g_proto, p_msg, h_types, a_local);
+		preprocess_enums(g_msg.enumTypeList, g_proto, p_msg, h_types, a_local, sr_local);
 
 		// process nested types
-		preprocess_messages(g_msg.nestedTypeList, g_proto, p_msg, h_types, h_interfaces, a_local);
+		preprocess_messages(g_msg.nestedTypeList, g_proto, p_msg, h_types, h_interfaces, a_local, sr_local);
 
 		// augment message type and save to global lookup
 		h_types[p_msg] = augment(g_msg, {
 			form: 'message',
 			path: p_msg,
+			local: sr_local,
 			source: g_proto,
 			comments: comments_at(a_local, g_proto, si_msg),
 		});
