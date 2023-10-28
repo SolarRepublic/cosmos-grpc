@@ -1,5 +1,5 @@
 /* eslint-disable prefer-const */
-import type {Dict, JsonObject, JsonValue} from '@blake.regalia/belt';
+import type {Dict, Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
 
 import {safe_json, ode, buffer_to_base64, __UNDEFINED} from '@blake.regalia/belt';
 import type { SlimCoin } from '@solar-republic/types';
@@ -125,14 +125,14 @@ export const restful_grpc = <
 
 
 
-export const restruct_coin = (a_coin: SlimCoin | undefined) => a_coin? ({
+export const restruct_coin = (a_coin: Nilable<SlimCoin>) => a_coin? ({
 	amount: a_coin[0],
 	denom: a_coin[1],
 }): __UNDEFINED;
 
-export const restruct_temporal = (xt_temporal: number | undefined) => __UNDEFINED === xt_temporal
-	? xt_temporal
-	: ({
+export const restruct_temporal = (xt_temporal: Nilable<number>) => xt_temporal
+	? ({
 		seconds: Math.floor(xt_temporal / 1e3)+'',
 		nanos: (xt_temporal % 1e3) * 1e6,
-	});
+	})
+	: __UNDEFINED;

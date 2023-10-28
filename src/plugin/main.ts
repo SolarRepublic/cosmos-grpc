@@ -42,17 +42,17 @@ const A_GLOBAL_PREAMBLE = [
 			'CwAccountAddr',
 			'CwValidatorAddr',
 		], true),
-		importModule('#/bech32', [
+		importModule('#/api/bech32', [
 			'bech32_encode',
 			'bech32_decode',
 		]),
-		importModule('#/util', [
+		importModule('#/api/util', [
 			'safe_buffer_to_base64',
 			'safe_buffer_to_text',
 			'safe_base64_to_buffer',
 			'safe_base64_to_text',
 		]),
-		importModule('#/protobuf-writer', [
+		importModule('#/api/protobuf-writer', [
 			'Protobuf',
 			'map',
 			'temporal',
@@ -60,29 +60,30 @@ const A_GLOBAL_PREAMBLE = [
 			'coin',
 			'coins',
 		]),
-		importModule('#/protobuf-reader', [
+		importModule('#/api/protobuf-reader', [
 			'decode_protobuf',
 			'decode_protobuf_r0',
 			'decode_protobuf_r0_0',
 			'decode_coin',
 			'reduce_temporal',
 		]),
-		importModule('#/transport', [
+		importModule('#/api/transport', [
 			'F_RPC_REQ_NO_ARGS',
 			'restful_grpc',
 			'restruct_coin',
 			'restruct_temporal',
 		]),
-		importModule('#/types', [
+		importModule('#/api/types', [
 			'Encoded',
 			'JsonAny',
+			'Opt',
 		], true),
 	].map(yn => print(yn)),
 ];
 
 
 export const main = () => {
-	void plugin((a_protos, h_inputs, h_types, h_interfaces) => {
+	void plugin((a_protos, h_inputs, h_types, h_interfaces, h_params) => {
 		// new impl
 		const k_impl = new NeutrinoImpl(h_types, h_interfaces);
 
@@ -135,7 +136,7 @@ export const main = () => {
 				const si_type = g_field.typeName;
 
 				// type exists, is not encoded, and is not yet defined in closure/enum
-				if(si_type && !h_encoders[si_type] && !g_coders.messages[si_type] && !g_coders.enums[si_type]) {
+				if(si_type && !g_coders.messages[si_type] && !g_coders.enums[si_type]) {
 					// resolve type
 					const g_resolved = h_types[si_type];
 
@@ -198,6 +199,24 @@ export const main = () => {
 
 					// ensure its fields can be encoded
 					mark_fields(g_msg, g_encoders);
+				}
+
+				// each encoder pattern
+				for(const r_match of h_params.encoders || []) {
+					// match found
+					if(r_match.test(g_msg.path.slice(1))) {
+						// verbose
+						console.warn(`INFO: Matched to encoders pattern: "${g_msg.path.slice(1)}"`);
+
+						// add input encoder
+						h_encoders[g_msg.path] = {
+							message: g_msg,
+							contents: [k_impl.msgEncoder(g_msg)],
+						};
+
+						// ensure its fields can be encoded
+						mark_fields(g_msg, g_encoders);
+					}
 				}
 			}
 
@@ -270,6 +289,8 @@ export const main = () => {
 						// ensure its output can be destructured
 						mark_fields(g_output, g_destructors);
 
+						if('/cosmos/tx/v1beta1/simulate' === g_http.post) debugger;
+
 						// ensure its inputs are typed and enums accessible
 						mark_fields(g_input, g_accessible);
 					}
@@ -327,7 +348,7 @@ export const main = () => {
 			}
 			else {
 				// debugger;
-				console.warn(`Skipping decoder for ${g_msg.path}`);
+				console.warn(`WARNING: Skipping decoder for ${g_msg.path}`);
 			}
 
 			const a_destructor = k_impl.msgDestructor(g_msg);

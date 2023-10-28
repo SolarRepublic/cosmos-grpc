@@ -5,29 +5,43 @@ s_run_mode="${1:-run}"
 
 
 # root build directory
-srd_build="build"
+srd_build="./build"
 
-# subdir to merged proto files
+# dir to merged proto files
 srd_proto="$srd_build/proto"
 
-# subdir to plugin and support files that will run as protoc plugin
+# dir to plugin and support files that will run as protoc plugin
 srd_gen="$srd_build/gen"
 
-# subdir to generated/copied typescript files prior to compilation
+# dir to generated/copied typescript files prior to compilation
 srd_lib="$srd_build/lib"
 
-# subdir to final output typescript
+# dir to final output typescript
 srd_dist="$srd_build/dist"
 
 
 # dirs to target proto files
 srd_chains=($srd_proto/{secret,akash,gaia,osmosis,cosmos})
 
-# dir to annotations to generate
+# subdir to annotations to generate
 srd_annotations="$srd_gen/annotations"
 
-# typings output
-srd_types="$srd_lib/_types"
+# subdir to plugin
+srd_plugin="$srd_gen/plugin"
+
+# subdir to generated ts proto sources
+srd_lib_cosmos="$srd_lib/proto"
+
+# subdir to copied api ts sources
+srd_lib_api="$srd_lib/api"
+
+
+# method for joining a multiline string list using a delimiter
+join() {
+	s_list=$1; s_delim=$2
+
+	echo -n "${s_list/$'\n'/}" | tr '\n' $s_delim | sed "s/$s_delim$//"
+}
 
 
 # portable method for getting current datetime
@@ -49,9 +63,20 @@ info() {
 }
 
 
+
 # clean outputs
-rm -rf "$srd_annotations" "$srd_lib" "$srd_dist"
-mkdir -p "$srd_annotations" "$srd_lib" "$srd_dist" "$srd_types"
+rm -rf "$srd_dist" "$srd_gen" "$srd_lib"
+mkdir -p "$srd_dist" "$srd_annotations" "$srd_plugin" "$srd_lib_cosmos" "$srd_lib_api"
+
+
+# compile plugin
+tsc -p tsconfig.gen.json
+
+# fix
+yarn tsc-esm-fix --target="$srd_gen"
+
+# chmod
+chmod u+x $srd_plugin/{run,debug}.js
 
 
 # define function for annotation
@@ -95,53 +120,25 @@ done
 SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
 
 
-# # define options for ts_proto
-# s_opts="""
-# env=browser
-# esModuleInterop=true
-# exportCommonSymbols=false
-# forceLong=string
-# useOptionals=all
-# oneof=unions
-# removeEnumPrefix=true
-# snakeToCamel=false
-# enumAsLiterals=true
-# onlyTypes=true
-# useJsonWireFormat=true
-# outputServices=false
-# outputTypeAnnotations=true
-# """
-
-
-# info "generating typings..."
-
-# # generate typings
-# protoc \
-# 	--plugin='protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto' \
-# 	--ts_proto_out="$srd_types" \
-# 	--ts_proto_opt="$(echo -n "${s_opts/$'\n'/}" | tr '\n' ',' | sed 's/,$//')" \
-# 	--proto_path="$srd_proto" \
-# 	$(find "${srd_chains[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
-# 	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
-
-# # replace all interface defs with type literals
-# find "$srd_types" -name "*.ts" \
-# 	-exec sed -i.del -E 's/export interface (\w+) /export type \1 = /g; s>\$type: ">"@type": "/>g' {} + \
-# 	# -exec rm -f {}.del \;
-
-# find "$srd_types" -name "*.del" \
-# 	-exec rm {} \;
-
-
-# info "Done"
-
-
 info "generating module..."
+
+
+# prep list of forced encoders
+s_encoders="""
+/^cosmos\.tx\.v1beta1\.(.*)(?<!Request|Response)$/
+"""
+
+# define options for plugin
+s_opts="""
+encoders=$(join "$s_encoders" ';')
+"""
+
 
 # generate neutrino lib
 protoc \
-	--plugin="protoc-gen-cosmos=$srd_gen/plugin/${s_run_mode}.js" \
-	--cosmos_out="$srd_lib" \
+	--plugin="protoc-gen-cosmos=$srd_plugin/${s_run_mode}.js" \
+	--cosmos_out="$srd_lib_cosmos" \
+	--cosmos_opt="$(join "$s_opts" ',')" \
 	--proto_path="$srd_proto" \
 	$(find "${srd_chains[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
 	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
@@ -153,19 +150,20 @@ fi
 
 info "Done"
 
+
 # copy compiled api to lib
-cp -r src/api/* "$srd_lib"
+cp -r src/api/* "$srd_lib_api"
 
 # for inspection
 inspect_lib() {
-	cp .eslintrc.cjs build/lib/
-	cp tsconfig.dist.json build/lib/tsconfig.json
+	cp .eslintrc.cjs "$srd_lib"
+	cp tsconfig.dist.json "$srd_lib/tsconfig.json"
 }
 
 
 # run through linter with fix-all
 info "running eslint..."
-yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --color --fix build/lib \
+yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --color --fix "$srd_lib" \
 	| grep -v "warning"  # ignore warnings from initial lint cycle
 
 if [[ $? -ne 0 ]]; then
@@ -179,7 +177,7 @@ info "---- end of first lint cycle ----"
 info " "
 
 # run through linter again with fix-all
-yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --fix build/lib
+yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --fix "$srd_lib"
 
 info ""
 info "---- end of repeated lint cycle ----"
@@ -188,6 +186,8 @@ info ""
 
 inspect_lib
 
+
+info "compiling to dist..."
 
 # compile to dist
 tsc -p tsconfig.lib.json

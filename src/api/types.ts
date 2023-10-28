@@ -1,5 +1,6 @@
-import type {JsonObject} from '@blake.regalia/belt';
-import type { CwBase64 } from '@solar-republic/types';
+import type {JsonObject, Nilable} from '@blake.regalia/belt';
+
+import type {CwBase64} from '@solar-republic/types';
 
 declare const INTERFACES: unique symbol;
 
@@ -30,3 +31,16 @@ export type JsonAny<
 	type_url: p_type;
 	value: CwBase64;
 };
+
+// export type Opt<
+// 	z_type,
+// > = Nilable<z_type> | (z_type extends string
+// 	? ''
+// 	: z_type extends Array<infer z_item>
+// 		? Nilable<z_item[]>
+// 		: never);
+
+export type Opt<
+	z_type
+>= z_type | null | undefined | (z_type extends string? '': never);
+

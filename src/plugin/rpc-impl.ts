@@ -98,7 +98,7 @@ export abstract class RpcImplementor {
 		}
 
 		if(this._g_opened.name!.replace(/\.proto$/, '') !== sr_path) {
-			this._h_type_imports[si_name] = [`#/${sr_path}`, y_factory.createImportSpecifier(
+			this._h_type_imports[si_name] = [`#/proto/${sr_path}`, y_factory.createImportSpecifier(
 				false,  // never directly, handled in import clause
 				si_prop? ident(si_prop): __UNDEFINED,
 				ident(si_name)
@@ -113,7 +113,7 @@ export abstract class RpcImplementor {
 
 		if(g_msg.source !== this._g_opened) {
 
-			this._h_type_imports[si_name] = [`#/${map_proto_path(g_msg.source)}`, y_factory.createImportSpecifier(
+			this._h_type_imports[si_name] = [`#/proto/${map_proto_path(g_msg.source)}`, y_factory.createImportSpecifier(
 				false,
 				__UNDEFINED,
 				ident(si_name),

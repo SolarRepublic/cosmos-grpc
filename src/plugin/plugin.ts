@@ -22,6 +22,10 @@ export type TypesDict = Dict<RefableType>;
 
 export type InterfacesDict = Dict<AugmentedMessage[]>;
 
+export type Params = {
+	encoders?: RegExp[];
+};
+
 const {
 	CodeGeneratorRequest,
 	CodeGeneratorResponse,
@@ -236,7 +240,8 @@ export const plugin = async(
 		a_protos: AugmentedFile[],
 		a_includes: Dict<AugmentedFile>,
 		h_types: TypesDict,
-		h_interfaces: InterfacesDict
+		h_interfaces: InterfacesDict,
+		h_params: Params
 	) => Promisable<Dict>
 ): Promise<void> => {
 	// parse stdin
@@ -247,6 +252,29 @@ export const plugin = async(
 
 	// deserialize and convert to object form
 	const g_req: CodeGenReq.AsObject = pluginPb.CodeGeneratorRequest.deserializeBinary(atu8_accumulate).toObject();
+
+	// parse params
+	const h_params: Params = fold((g_req.parameter || '').split(','), (sx_param) => {
+		const m_param = /^([^=]+)=(.*)$/.exec(sx_param);
+		if(!m_param) throw new Error(`Failed to parse param option ${sx_param}`);
+
+		const [, si_opt, s_value] = m_param;
+
+		const a_values = s_value.split(';');
+
+		let z_return: string[] | RegExp[] = a_values;
+
+		if(['encoders'].includes(si_opt)) {
+			z_return = a_values.map(s => /^\/.*\/$/.test(s)
+				? new RegExp(s.slice(1, -1))
+				: new RegExp('^'+escape_regex(s).replace(/\\\*/g, '.*')+'$'));
+		}
+
+		return {
+			[si_opt]: z_return,
+		};
+	});
+
 
 	// prep response
 	const y_res = new pluginPb.CodeGeneratorResponse();
@@ -307,7 +335,7 @@ export const plugin = async(
 	const a_protos = g_req.fileToGenerateList.map(sr_file => h_augmented[sr_file]);
 
 	// call plugin
-	const h_results = await f_plugin(a_protos, h_augmented, h_types, h_interfaces);
+	const h_results = await f_plugin(a_protos, h_augmented, h_types, h_interfaces, h_params);
 
 	// process results
 	try {

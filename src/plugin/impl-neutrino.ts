@@ -111,8 +111,14 @@ export class NeutrinoImpl extends RpcImplementor {
 
 			// create parameter
 			const yn_param = g_thing.proto.prefers_call
-				? param(g_thing.calls.id, g_thing.calls.type, g_thing.optional)
-				: param(g_thing.proto.id, g_thing.proto.type, g_thing.optional);
+				? param(
+					g_thing.calls.id,
+					g_thing.optional? typeRef('Opt', [g_thing.calls.type]): g_thing.calls.type,
+					g_thing.optional)
+				: param(
+					g_thing.proto.id,
+					g_thing.optional? typeRef('Opt', [g_thing.proto.type]): g_thing.proto.type,
+					g_thing.optional);
 
 			// extend
 			(yn_param as any).thing = g_thing;
@@ -439,7 +445,9 @@ export class NeutrinoImpl extends RpcImplementor {
 			tuple(a_args.map(g_arg => [
 				g_arg.calls.id,
 				is_optional(g_arg),
-				g_arg.calls.type,
+				g_arg.optional
+					? typeRef('Opt', [g_arg.calls.type])
+					: g_arg.calls.type,
 			])),
 
 			// 2nd generics param is raw response data
@@ -463,7 +471,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		const a_returns = g_return.things;
 		if(!a_returns.length) {
-			a_comment_lines.push(`@returns an empty object`);
+			a_comment_lines.push(`@returns an empty tuple`);
 		}
 		else {
 			const a_docs_returns = a_returns.map((g_thing) => {
@@ -473,16 +481,16 @@ export class NeutrinoImpl extends RpcImplementor {
 				return `${s_comment || `the '${g_field.name}' response property`}`;
 			});
 
-			if(1 === a_returns.length) {
-				a_comment_lines.push(`@returns ${a_docs_returns[0]}`);
-			}
-			else {
+			// if(1 === a_returns.length) {
+			// 	a_comment_lines.push(`@returns ${a_docs_returns[0]}`);
+			// }
+			// else {
 				a_comment_lines.push(`@returns a tuple where:`);
 
 				a_docs_returns.forEach((s_doc, i_doc) => {
 					a_comment_lines.push(`  - ${i_doc}: ${a_returns[i_doc].field.name} - ${s_doc}`);
 				});
-			}
+			// }
 		}
 
 		return print(yn_statement, a_comment_lines);
@@ -868,7 +876,6 @@ export class NeutrinoImpl extends RpcImplementor {
 			// field number does not immediately follow previous
 			GAPS:
 			if(i_number !== n_field_expected++) {
-				debugger;
 				// still continuous and gap is clearable
 				if(b_continuous && (i_number - (n_field_expected -1)) < N_MAX_PROTO_FIELD_NUMBER_GAP) {
 					// clear the gap

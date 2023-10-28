@@ -1,5 +1,6 @@
 import type {PropagateUndefined} from './types';
 
+import type {Nilable} from '@blake.regalia/belt';
 import {__UNDEFINED} from '@blake.regalia/belt';
 
 import {die} from './util';
@@ -102,8 +103,8 @@ export const bech32_encode = (si_hrp: string, atu8_data: Uint8Array): string => 
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export const bech32_decode = <
-	sa_defined extends string | undefined,
->(sa_bech32: sa_defined): Uint8Array | PropagateUndefined<sa_defined> => {
+	sa_defined extends string,
+>(sa_bech32: Nilable<sa_defined>): Uint8Array | PropagateUndefined<sa_defined> => {
 	if(!sa_bech32) return __UNDEFINED as PropagateUndefined<sa_defined>;
 
 	const [s_prefix, sx_data] = sa_bech32.split('1');

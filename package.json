@@ -3,10 +3,14 @@
   "description": "Generates tree-shakable TypeScript APIs from the .proto files of any blockchain built using Cosmos-SDK.",
   "version": "0.6.3",
   "type": "module",
-  "main": "build/main.js",
+  "main": "build/dist/main.js",
   "files": [
     "build/dist/"
   ],
+  "exports": {
+    ".": "./build/dist/api/main.js",
+    "./*": "./build/dist/proto/*"
+  },
   "bin": {
     "protoc-gen-secret": "./build/protoc/run.js"
   },
@@ -15,12 +19,8 @@
   "scripts": {
     "clean": "rm -rf build",
     "proto:build": "./build.sh",
-    "gen:compile": "tsc -p tsconfig.gen.json",
-    "gen:fix": "yarn tsc-esm-fix --target=build/gen",
-    "gen:chmod": "chmod u+x ./build/gen/plugin/{run,debug}.js",
-    "plugin:build": "yarn gen:compile && yarn gen:fix && yarn gen:chmod",
     "plugin:run": "./run-plugin.sh",
-    "build": "yarn clean && yarn proto:build && yarn plugin:build && yarn plugin:run",
+    "build": "yarn clean && yarn proto:build && yarn plugin:run",
     "debug": "yarn build debug"
   },
   "dependencies": {
@@ -38,6 +38,7 @@
     "@typescript-eslint/parser": "^6.9.0",
     "eslint": "^8.52.0",
     "eslint-plugin-unused-imports": "^3.0.0",
+    "resolve-tspaths": "^0.8.17",
     "ts-morph": "^20.0.0",
     "ts-node": "^10.9.1",
     "ts-proto": "^1.162.2",

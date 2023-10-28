@@ -2,6 +2,7 @@ import type {O} from 'ts-toolbelt';
 
 import type {PropagateUndefined} from './types';
 import type {SlimCoin} from '@solar-republic/types';
+import type {Nilable} from '@blake.regalia/belt';
 
 import {ATU8_NIL, __UNDEFINED, buffer, text_to_buffer} from '@blake.regalia/belt';
 
@@ -23,17 +24,17 @@ type WireType = 0 | 1 | 2 | 5;
 // type Nester = (k_writer: ProtoWriter, ...a_args: any[]) => ProtoWriter;
 
 export interface ProtoWriterScalar {
-	v(xn_value?: boolean | number, i_field?: number): this;
-	g(xg_value?: bigint | `${bigint}`, i_field?: number): this;
-	b(atu8_bytes?: Uint8Array | number[], i_field?: number): this;
-	s(s_data?: string, i_field?: number): this;
+	v(xn_value?: Nilable<boolean | number>, i_field?: number): this;
+	g(xg_value?: Nilable<bigint | `${bigint}` | ''>, i_field?: number): this;
+	b(atu8_bytes?: Nilable<Uint8Array | number[]>, i_field?: number): this;
+	s(s_data?: Nilable<string>, i_field?: number): this;
 }
 
 export interface ProtoWriter extends ProtoWriterScalar {
-	V(a_values?: Array<boolean | number>, i_field?: number): this;
-	G(a_values?: Array<bigint | `${bigint}`>, i_field?: number): this;
-	B(a_buffers?: Array<Uint8Array | number[]>, i_field?: number): this;
-	S(a_data?: string[], i_field?: number): this;
+	V(a_values?: Nilable<Array<Parameters<ProtoWriterScalar['v']>[0]>>, i_field?: number): this;
+	G(a_values?: Nilable<Array<Parameters<ProtoWriterScalar['g']>[0]>>, i_field?: number): this;
+	B(a_buffers?: Nilable<Array<Parameters<ProtoWriterScalar['b']>[0]>>, i_field?: number): this;
+	S(a_data?: Nilable<Array<Parameters<ProtoWriterScalar['s']>[0]>>, i_field?: number): this;
 	// n<f_nester extends Nester>(xn_wire_sub: WireType, i_field: number, f_call: f_nester, ...a_args: L.Tail<Parameters<f_nester>>): ProtoWriter;
 	get o(): Uint8Array;
 }
@@ -116,10 +117,10 @@ export const Protobuf = (): ProtoWriter => {
 
 	const g_self: ProtoWriter = {
 		// eslint-disable-next-line @typescript-eslint/naming-convention
-		v: (xn_value, i_field=i_auto++) => __UNDEFINED === xn_value? g_self: (field(i_field, 0), varint(xn_value as number)),
+		v: (xn_value, i_field=i_auto++) => xn_value && +xn_value? (field(i_field, 0), varint(xn_value as number)): g_self,
 
 		g: (xg_value, i_field=i_auto++) => {
-			if(__UNDEFINED === xg_value) return g_self;
+			if(!xg_value) return g_self;
 
 			// normalize possible string
 			xg_value = BigInt(xg_value);
@@ -132,7 +133,7 @@ export const Protobuf = (): ProtoWriter => {
 				xg_copy >>= 7n;
 			}
 
-			return (field(i_field, 0), push([
+			return 0n === xg_value? g_self: (field(i_field, 0), push([
 				encode_biguint,
 				xg_value,
 				nb_biguint,
@@ -140,7 +141,7 @@ export const Protobuf = (): ProtoWriter => {
 		},
 
 		b: (atu8_bytes, i_field=i_auto++) => {
-			if(__UNDEFINED === atu8_bytes) return g_self;
+			if(!atu8_bytes?.length) return g_self;
 
 			const nb_bytes = atu8_bytes.length;
 
@@ -198,9 +199,9 @@ export const Protobuf = (): ProtoWriter => {
 
 export const map = <
 	w_item,
->(a_items: w_item[] | undefined, f_call: (w_item: w_item) => Uint8Array): Uint8Array[] | undefined => a_items?.map(f_call);
+>(a_items: Nilable<w_item[]>, f_call: (w_item: w_item) => Uint8Array): Uint8Array[] | undefined => a_items?.map(f_call);
 
-export const temporal = (xn_milliseconds: number | undefined): Uint8Array => xn_milliseconds? Protobuf()
+export const temporal = (xn_milliseconds: Nilable<number>): Uint8Array => xn_milliseconds? Protobuf()
 	.v((xn_milliseconds / 1e3) | 0)
 	.v((xn_milliseconds % 1e3) * 1e6)
 	.o: ATU8_NIL;
@@ -211,7 +212,7 @@ export const any = (si_type: string, atu8_value: Uint8Array): Uint8Array => Prot
 	.o;
 
 export const coin = <
-	a_coin extends SlimCoin | undefined,
+	a_coin extends SlimCoin | undefined | null,
 >(a_coin: a_coin): Uint8Array | PropagateUndefined<a_coin> => (
 	a_coin
 		? Protobuf()
@@ -221,4 +222,4 @@ export const coin = <
 		: __UNDEFINED
 ) as Uint8Array | PropagateUndefined<a_coin>;
 
-export const coins = (a_coins: SlimCoin[] | undefined): Uint8Array[] | undefined => map(a_coins, coin);
+export const coins = (a_coins: Nilable<SlimCoin[]>): Uint8Array[] | undefined => map(a_coins, coin);
