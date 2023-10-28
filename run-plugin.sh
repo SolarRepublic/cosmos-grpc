@@ -192,5 +192,18 @@ info "compiling to dist..."
 # compile to dist
 tsc -p tsconfig.lib.json
 
+info "Done"
+
+
+info "fixing import specifiers..."
+
+# copy terminal tsconfig
+cp tsconfig.dist.json "$srd_dist/tsconfig.json"
+
+# resolve tsconfig paths
+yarn resolve-tspaths -s "$srd_dist" -p "$srd_dist/tsconfig.json"
+
+# fix relative paths
+yarn tsc-esm-fix --target="$srd_dist"
 
 info "Done"

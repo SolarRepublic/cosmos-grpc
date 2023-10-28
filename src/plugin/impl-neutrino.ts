@@ -12,8 +12,9 @@ import {ts} from 'ts-morph';
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType} from './ts-factory';
+import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
+import { escape } from 'querystring';
 
 type ReturnThing = {
 	type: TypeNode;
@@ -958,32 +959,103 @@ export class NeutrinoImpl extends RpcImplementor {
 		// open proto source of msg
 		this.open(g_enum.source);
 
-		const h_values_proto: Dict<Expression> = {};
-		const h_values_json: Dict<Expression> = {};
-		const a_types: TypeNode[] = [];
+		// enum path
+		const sr_enum = g_enum.path.slice(1);
 
+		// enum ids
+		const si_enum_proto = this.enumId(g_enum, 'Proto');
+		const si_enum_json = this.enumId(g_enum, 'Json');
+
+		// ident refs to exported values
+		const a_values_proto: string[] = [];
+		const a_values_json: string[] = [];
+
+		// types for enum alias
+		const a_types_proto: TypeNode[] = [];
+		const a_types_json: TypeNode[] = [];
+
+		// output strings
+		const a_outs: string[] = [];
+
+		// each value
 		for(const g_value of g_enum.valueList) {
-			h_values_proto[g_value.name!] = numericLit(g_value.number!);
+			// value name
+			const si_value = g_value.name!;
 
-			const s_value = g_value.options?.enumvalueCustomname || g_value.name!;
-			h_values_json[g_value.name!] = literal(s_value);
-			a_types.push(litType(string(s_value)));
+			// value text
+			const s_value = g_value.options?.enumvalueCustomname || si_value;
+
+			// enum symbol suffix
+			const si_redundant = g_enum.name!.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase();
+			const si_symbol = this.exportedConst(g_enum).replace(new RegExp(`_${si_redundant}$`), '')
+				+'_'+si_value;
+
+
+			// proto value const id
+			const si_proto = `XC_PROTO_${si_symbol}`;
+
+			// add id to values list
+			a_values_proto.push(si_proto);
+
+			// add ref to types list
+			a_types_proto.push(typeOf(ident(si_proto)));
+
+			// declare proto const
+			const yn_proto = declareConst(si_proto, numericLit(g_value.number!), true);
+
+
+			// json value const id
+			const si_json = `SI_JSON_${si_symbol}`;
+
+			// add id to values list
+			a_values_json.push(si_json);
+
+			// add ref to types list
+			a_types_json.push(typeOf(ident(si_json)));
+
+			// declare json const
+			const yn_json = declareConst(si_json, string(s_value), true);
+
+
+			// print values to putput
+			a_outs.push(...[
+				// proto value
+				print(yn_proto, [
+					`Protobuf enum value for \`${sr_enum}\`.`,
+					'',
+					`**${g_enum.name!}** - ${g_value.comments}`,
+					'',
+					`Belongs to enum type {@link ${si_enum_proto}}`,
+				]),
+				// json value
+				print(yn_json, [
+					`JSON enum value for \`${sr_enum}\`.`,
+					'',
+					`**${g_value.name}** - ${g_value.comments}`,
+					'',
+					`Belongs to enum type {@link ${si_enum_json}}`,
+				]),
+			]);
 		}
 
-		const yn_enum_proto = enumDecl(this.enumId(g_enum, 'Proto'), h_values_proto, true, true);
+		// print proto enum type
+		a_outs.push(print(declareAlias(si_enum_proto, union(a_types_proto), true), [
+			`Raw protobuf enum values for \`${sr_enum}\` to be used when passing to an encoder or comparing to a decoded protobuf value.`,
+			'',
+			'Values:',
+			...a_values_proto.map(s => `  - {@link ${s}}`),
+		]));
 
-		const yn_enum_json = enumDecl(this.enumId(g_enum, 'Json'), h_values_json, true, true);
+		// print json enum type
+		a_outs.push(print(declareAlias(si_enum_json, union(a_types_json), true), [
+			`JSON enum values for \`${sr_enum}\` to be used when passing to a gRPC-gateway method or comparing to a response value`,
+			'',
+			'Values:',
+			...a_values_json.map(s => `  - {@link ${s}}`),
+		]));
 
-		return [
-			print(yn_enum_proto, [
-				`Raw protobuf enum values for \`${g_enum.path.slice(1)}\` to be used when passing to an encoder or comparing to a decoded protobuf value.`,
-				g_enum.comments,
-			]),
-			print(yn_enum_json, [
-				`JSON enum values for \`${g_enum.path.slice(1)}\` to be used when passing to a gRPC-gateway method or comparing to a response value`,
-				g_enum.comments,
-			]),
-		];
+		// return string list
+		return a_outs;
 	}
 
 	msgAccessor(g_msg: AugmentedMessage): string[] {

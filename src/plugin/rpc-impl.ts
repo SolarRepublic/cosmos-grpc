@@ -54,6 +54,10 @@ export abstract class RpcImplementor {
 			.split(/[^A-Za-z0-9]+/g).map(proper).join('');
 	}
 
+	exportedConst(g_thing: {name?: string | undefined; path: string; source: AugmentedFile}): string {
+		return this.exportedId(g_thing).replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase();
+	}
+
 	importJsonTypesImplementing(si_interface: string): TypeNode {
 		const a_msgs = this._h_interfaces[si_interface];
 
