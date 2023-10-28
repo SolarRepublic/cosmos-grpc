@@ -52,6 +52,12 @@ const A_GLOBAL_PREAMBLE = [
 			'safe_base64_to_buffer',
 			'safe_base64_to_text',
 		]),
+		importModule('#/api/json', [
+			'parse_duration',
+			'parse_timestamp',
+			'duration_to_json',
+			'timestamp_to_json',
+		]),
 		importModule('#/api/protobuf-writer', [
 			'Protobuf',
 			'map',
@@ -77,6 +83,8 @@ const A_GLOBAL_PREAMBLE = [
 			'Encoded',
 			'JsonAny',
 			'Opt',
+			'WeakTimestampStr',
+			'WeakDurationStr',
 		], true),
 	].map(yn => print(yn)),
 ];

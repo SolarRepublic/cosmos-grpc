@@ -980,15 +980,15 @@ export class NeutrinoImpl extends RpcImplementor {
 		// each value
 		for(const g_value of g_enum.valueList) {
 			// value name
-			const si_value = g_value.name!;
+			const si_name = g_value.name!;
 
 			// value text
-			const s_value = g_value.options?.enumvalueCustomname || si_value;
+			const s_value = g_value.options?.enumvalueCustomname || si_name;
 
 			// enum symbol suffix
 			const si_redundant = g_enum.name!.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase();
 			const si_symbol = this.exportedConst(g_enum).replace(new RegExp(`_${si_redundant}$`), '')
-				+'_'+si_value;
+				+'_'+si_name;
 
 
 			// proto value const id
@@ -1023,7 +1023,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				print(yn_proto, [
 					`Protobuf enum value for \`${sr_enum}\`.`,
 					'',
-					`**${g_enum.name!}** - ${g_value.comments}`,
+					`**${si_name!}** - ${g_value.comments}`,
 					'',
 					`Belongs to enum type {@link ${si_enum_proto}}`,
 				]),
@@ -1031,7 +1031,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				print(yn_json, [
 					`JSON enum value for \`${sr_enum}\`.`,
 					'',
-					`**${g_value.name}** - ${g_value.comments}`,
+					`**${si_name}** - ${g_value.comments}`,
 					'',
 					`Belongs to enum type {@link ${si_enum_json}}`,
 				]),

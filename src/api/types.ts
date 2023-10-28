@@ -44,3 +44,6 @@ export type Opt<
 	z_type
 >= z_type | null | undefined | (z_type extends string? '': never);
 
+export type WeakTimestampStr = `${string}T${string}Z`;
+
+export type WeakDurationStr = `${bigint}.${bigint}s`;

@@ -10,6 +10,8 @@ import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb
 
 import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, typeLit, tuple} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
+import type { Optional } from 'ts-toolbelt/out/Object/Optional';
+import type { Key } from 'ts-toolbelt/out/Any/Key';
 
 // destructure members from protobuf
 const {
@@ -113,14 +115,17 @@ const A_SEMANTIC_ACCOUNT_ADDR_BYTES = [
 
 type ThingDefMixin = Pick<TsThingBare, 'proto'> & Partial<Omit<TsThingBare, 'proto'>>;
 
-const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixin => {
+const temporal = (g_mixin: {calls?: Optional<TsThingBare['calls']>; json?: TsThingBare['json']}) => (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixin => {
 	const s_ident = `xt_${snake(g_field.name!)}`;
 	return {
 		calls: {
 			name: s_ident,
 			type: keyword('number'),
 			to_proto: yn_expr => callExpr('temporal', [yn_expr]),
+			...g_mixin.calls,
 		},
+
+		json: g_mixin.json,
 
 		proto: {
 			writer: 'b',
@@ -134,7 +139,7 @@ const temporal = (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixi
 			hints: literal([ProtoHint.SINGULAR_BIGINT, ProtoHint.SINGULAR]),
 			parse: yn_expr => callExpr(ident('reduce_temporal'), [yn_expr]),
 		},
-	};
+	} as TsThingBare;
 };
 
 // special overrides
@@ -171,10 +176,26 @@ const H_OVERRIDE_MIXINS: Dict<
 	},
 
 	// Timestamp
-	'.google.protobuf.Timestamp': temporal,
+	'.google.protobuf.Timestamp': temporal({
+		calls: {
+			to_json: yn_expr => callExpr('timestamp_to_json', [yn_expr]),
+			from_json: yn_expr => callExpr('parse_timestamp', [yn_expr]),
+		},
+		json: {
+			type: typeRef('WeakTimestampStr'),
+		},
+	}),
 
 	// Duration
-	'.google.protobuf.Duration': temporal,
+	'.google.protobuf.Duration': temporal({
+		calls: {
+			to_json: yn_expr => callExpr('duration_to_json', [yn_expr]),
+			from_json: yn_expr => callExpr('parse_duration', [yn_expr]),
+		},
+		json: {
+			type: typeRef('WeakDurationStr'),
+		},
+	}),
 
 	// Any
 	'.google.protobuf.Any'(g_field, k_impl) {
