@@ -3,7 +3,7 @@ import type {AugmentedEnum, AugmentedMessage} from './env';
 
 import type {Dict} from '@blake.regalia/belt';
 
-import {ode, odv, deduplicate} from '@blake.regalia/belt';
+import {ode, odv} from '@blake.regalia/belt';
 
 import {NeutrinoImpl} from './impl-neutrino';
 import {plugin} from './plugin';
@@ -38,6 +38,7 @@ const A_GLOBAL_PREAMBLE = [
 			'SlimCoin',
 			'CwInt64',
 			'CwUint64',
+			'CwHexLower',
 			'CwBase64',
 			'CwAccountAddr',
 			'CwValidatorAddr',
@@ -223,7 +224,7 @@ export const main = () => {
 						// verbose
 						console.warn(`INFO: Matched to encoders pattern: "${g_msg.path.slice(1)}"`);
 
-						// add input encoder
+						// add encoder
 						h_encoders[g_msg.path] = {
 							message: g_msg,
 							contents: [k_impl.msgEncoder(g_msg)],
@@ -231,6 +232,63 @@ export const main = () => {
 
 						// ensure its fields can be encoded
 						mark_fields(g_msg, g_encoders);
+					}
+				}
+
+				// each decoder pattern
+				for(const r_match of h_params.decoders || []) {
+					// match found
+					if(r_match.test(g_msg.path.slice(1))) {
+						// verbose
+						console.warn(`INFO: Matched to decoders pattern: "${g_msg.path.slice(1)}"`);
+
+						const sx_decoder = k_impl.msgDecoder(g_msg);
+						if(sx_decoder) {
+							// add decoder
+							h_decoders[g_msg.path] = {
+								message: g_msg,
+								contents: [sx_decoder],
+							};
+						}
+
+						// ensure its fields can be decoded
+						mark_fields(g_msg, g_decoders);
+					}
+				}
+
+				// each destructor pattern
+				for(const r_match of h_params.destructors || []) {
+					// match found
+					if(r_match.test(g_msg.path.slice(1))) {
+						// verbose
+						console.warn(`INFO: Matched to destructors pattern: "${g_msg.path.slice(1)}"`);
+
+						// add encoder
+						h_destructors[g_msg.path] = {
+							message: g_msg,
+							contents: k_impl.msgDestructor(g_msg),
+						};
+
+						// ensure its fields can be destructed
+						mark_fields(g_msg, g_destructors);
+					}
+				}
+				
+				// each accessor pattern
+				for(const r_match of h_params.accessors || []) {
+					// match found
+					if(r_match.test(g_msg.path.slice(1))) {
+						// verbose
+						console.warn(`INFO: Matched to accessors pattern: "${g_msg.path.slice(1)}"`);
+
+						// add accessor
+						h_accessors[g_msg.path] = {
+							message: g_msg,
+							contents: k_impl.msgAccessor(g_msg),
+						};
+
+						// ensure its fields can be accessed
+						mark_fields(g_msg, g_accessible);
 					}
 				}
 			}

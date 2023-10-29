@@ -331,6 +331,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 
 		// create default type
 		let yn_type: TypeNode = keyword('string');
+		let yn_json!: TypeNode | undefined;
 		let yn_return!: TypeNode;
 
 		// validator address
@@ -351,6 +352,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		else if(/code_hash$/.test(si_field)) {
 			si_name = `sb16_${si_field}`;
 			yn_type = typeRef('NaiveHexLower');
+			yn_return = typeRef('CwHexLower');
 		}
 
 		// construct ts field

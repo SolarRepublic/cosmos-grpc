@@ -21,7 +21,7 @@ srd_dist="$srd_build/dist"
 
 
 # dirs to target proto files
-srd_chains=($srd_proto/{secret,akash,gaia,osmosis,cosmos})
+srd_chains=($srd_proto/{tendermint,cosmos,secret,akash,gaia,osmosis})
 
 # subdir to annotations to generate
 srd_annotations="$srd_gen/annotations"
@@ -131,9 +131,18 @@ cosmos.crypto.secp256k1.PubKey
 cosmos.crypto.secp256r1.PubKey
 """
 
+# prep list of forced destructors
+s_destructors="""
+cosmos.base.abci.*
+cosmos.base.kv.*
+/^cosmos\.base\.tendermint\.(Block|Header)$/
+/^tendermint\.abci\..*(Response|Result)/
+"""
+
 # define options for plugin
 s_opts="""
 encoders=$(join "$s_encoders" ';')
+destructors=$(join "$s_destructors" ';')
 """
 
 

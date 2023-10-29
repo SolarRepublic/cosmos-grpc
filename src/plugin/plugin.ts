@@ -24,6 +24,9 @@ export type InterfacesDict = Dict<AugmentedMessage[]>;
 
 export type Params = {
 	encoders?: RegExp[];
+	decoders?: RegExp[];
+	destructors?: RegExp[];
+	accessors?: RegExp[];
 };
 
 const {
@@ -270,7 +273,7 @@ export const plugin = async(
 
 		let z_return: string[] | RegExp[] = a_values;
 
-		if(['encoders'].includes(si_opt)) {
+		if(['encoders', 'decoders', 'destructors', 'accessors'].includes(si_opt)) {
 			z_return = a_values.map(s => /^\/.*\/$/.test(s)
 				? new RegExp(s.slice(1, -1))
 				: new RegExp('^'+escape_regex(s).replace(/\\\*/g, '.*')+'$'));

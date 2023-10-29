@@ -19,10 +19,10 @@
   resolved "https://registry.yarnpkg.com/@blake.regalia/belt/-/belt-0.15.0.tgz#e0110f4bf518a45250b9b4a266216bdaa3b46285"
   integrity sha512-uPGkC1zupjjbCYOelCcci4QshRr15ItWZk9eIxgPwzqIb5AJyVghazrWosK1MzWXDMBtwkVCU6jYcoLQBxEIrg==
 
-"@blake.regalia/belt@^0.20.0":
-  version "0.20.0"
-  resolved "https://registry.yarnpkg.com/@blake.regalia/belt/-/belt-0.20.0.tgz#9ec47b8bbec1d639702d89c9518ae45bbf93fa93"
-  integrity sha512-+d96/xGihYbCUN7rGNBPBA5fDgx8M4eTKxv8dutugagJPe4Tv8INIyvfJBNle654NZr7bH4qifBADA2AvrApOQ==
+"@blake.regalia/belt@^0.20.4":
+  version "0.20.4"
+  resolved "https://registry.yarnpkg.com/@blake.regalia/belt/-/belt-0.20.4.tgz#27fd09fe68c600ca666307b0b4cd8b7bb9429f34"
+  integrity sha512-L2Uc+xh7UnuNVzBdIf2qpfyELJNmzGlO2CfoHc9qUu3Sw3j33FTFSghvuRMwHoNpy/tYZ2LMz4UhKkt2CvVJwg==
 
 "@blake.regalia/eslint-config-elite@^0.3.3":
   version "0.3.3"
@@ -414,10 +414,10 @@
   dependencies:
     "@blake.regalia/belt" "^0.15.0"
 
-"@solar-republic/types@^0.1.2":
-  version "0.1.2"
-  resolved "https://registry.yarnpkg.com/@solar-republic/types/-/types-0.1.2.tgz#729cb962842601087c2d60bc772ff2ba3c563f33"
-  integrity sha512-tpaKRWXs9wDlPfhnfGSXqR/07jgP0tR/IBFJqza6gci6mPNqy+ODNKD/LLdOSnWjHk5WMawMR8tt+8u9KscYTA==
+"@solar-republic/types@^0.1.3":
+  version "0.1.3"
+  resolved "https://registry.yarnpkg.com/@solar-republic/types/-/types-0.1.3.tgz#1e863a6eca54666b9486cb7e5a7896caec0a581a"
+  integrity sha512-nnyTB1JddWEAwkJfe/y33x/jB6qx2pKQhGLGH6w5EF7ArgoLn6TZ7tlf/j5HaGA7te+kvofNsKr0EUPXnodSEw==
 
 "@sveltejs/vite-plugin-svelte-inspector@^1.0.4":
   version "1.0.4"

@@ -4,17 +4,20 @@ import type {Dict, Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
 import {safe_json, ode, buffer_to_base64, __UNDEFINED} from '@blake.regalia/belt';
 import type { SlimCoin } from '@solar-republic/types';
 
+type Voidable = void | undefined;
 
 export type RpcRequest<
 	a_args extends any[]=[],
-> = (...a_args: a_args) => [string] | [string, JsonObject<Uint8Array | undefined>];
+> = (...a_args: a_args) => [string] | [string, JsonObject<Voidable | Uint8Array>];
 
 export const F_RPC_REQ_NO_ARGS: RpcRequest = () => [''];
 
-export type NetworkErrorDetails = [
+export type NetworkJsonResponse<
+	w_type extends JsonValue<Voidable>=JsonValue | undefined,
+> = [
 	d_res: Response,
 	sx_res: string,
-	g_res?: JsonObject,
+	g_res: w_type,
 ];
 
 // export const query_error = (a_details: NetworkErrorDetails) => {
@@ -23,7 +26,7 @@ export type NetworkErrorDetails = [
 // 	});
 // };
 
-const json_to_flatdot = (w_value: JsonValue<Uint8Array>, h_root: Dict, sr_path: string): void => {
+const json_to_flatdot = (w_value: JsonValue<Voidable | Uint8Array>, h_root: Dict, sr_path: string): void => {
 	if(Array.isArray(w_value)) {
 		// eslint-disable-next-line array-callback-return
 		w_value.map((w_item, i_item) => {
@@ -41,7 +44,27 @@ const json_to_flatdot = (w_value: JsonValue<Uint8Array>, h_root: Dict, sr_path: 
 	}
 };
 
-const json_object_to_flatdot = (h_object: JsonObject<Uint8Array | undefined>, h_root: Dict={}, sr_path=''): Dict => {
+/**
+ * Converts a JSON object to a 'flatdot' notation dict for use in URL query params.
+ * 
+ * For example,
+ * ```
+ * {
+ *   "foo": {
+ *     "bar": [25, 42]
+ *   }
+ * }
+ * ```
+ * 
+ * becomes:
+ * ```
+ * {
+ *   "foo.bar[0]": "25",
+ *   "foo.bar[1]": "42"
+ * }
+ * ```
+ */
+const json_object_to_flatdot = (h_object: JsonObject<Voidable | Uint8Array>, h_root: Dict={}, sr_path=''): Dict => {
 	for(const [si_key, w_value] of ode(h_object)) {
 		// anything falsy is default, skip it
 		if(!w_value) continue;
@@ -67,12 +90,14 @@ const json_object_to_flatdot = (h_object: JsonObject<Uint8Array | undefined>, h_
 */
 export const restful_grpc = <
 	a_args extends any[],
-	w_parsed,
+	w_parsed extends JsonValue<Voidable>,
 >(
 	f_req: RpcRequest<a_args>,
-	// f_res: (g_response: any) => w_parsed,
 	g_init?: 1 | RequestInit
-) => async(z_req: string | {origin: string} & RequestInit, ...a_args: a_args): Promise<w_parsed> => {
+) => async(
+	z_req: string | {origin: string} & RequestInit,
+	...a_args: a_args
+): Promise<NetworkJsonResponse<w_parsed>> => {
 	let [sr_append, h_args] = f_req(...a_args);
 
 	// indicated submit action
@@ -107,22 +132,18 @@ export const restful_grpc = <
 	const sx_res = await d_res.text();
 
 	// parse json
-	const g_res = safe_json<JsonObject>(sx_res);
+	const g_res = safe_json<w_parsed>(sx_res);
 
-	// not json
+	// response tuple
+	const a_tuple: NetworkJsonResponse<w_parsed> = [d_res, sx_res, g_res!];
+
+	// not json or response/network error
 	// eslint-disable-next-line no-throw-literal
-	if(!g_res) throw [d_res, sx_res] as NetworkErrorDetails;
+	if(!g_res || !d_res.ok) throw a_tuple;
 
-	// response error or network error
-	// eslint-disable-next-line no-throw-literal
-	if(!d_res.ok || g_res['code']) throw [d_res, sx_res, g_res] as NetworkErrorDetails;
-
-	// // process response
-	// return f_res(g_res);
-
-	return g_res as w_parsed;
+	// return truple
+	return a_tuple;
 };
-
 
 
 export const restruct_coin = (a_coin: Nilable<SlimCoin>) => a_coin? ({
