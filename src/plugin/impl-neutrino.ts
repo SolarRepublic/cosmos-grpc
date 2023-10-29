@@ -846,10 +846,6 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		const si_name = this.exportedId(g_msg);
 
-		// const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, g_field => ({
-		// 	[g_field.name!]: [this.route(g_field).actual_type, g_field.optional],
-		// }))), true);
-
 		// continuous sequence
 		const a_sequence: Expression[] = [];
 		const h_assigns: Record<number, Expression> = {};

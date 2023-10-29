@@ -65,7 +65,6 @@ export type TsThingBare = {
 export type TsThing = {
 	field: AugmentedField;
 	optional: boolean;
-	// actual_type: TypeNode;
 
 	calls: Required<TsThingBare['calls']> & {
 		id: Identifier;
@@ -450,8 +449,6 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 					return_type: typeRef('CwAccountAddr'),
 				},
 
-				actual_tye: typeRef('CwBase64'),
-
 				proto: {
 					writer: 'b',
 					prefers_call: 1,
@@ -470,17 +467,19 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 				name: si_self,
 				type: yn_type,
 				from_json: yn_expr => callExpr('safe_base64_to_buffer', [yn_expr]),
-				return_type: typeRef('CwBase64'),
+				// return_type: typeRef('CwBase64'),
+
+				// type: typeRef('CwBase64'),
+				return_type: yn_type,
 			},
 
-			actual_tye: typeRef('CwBase64'),
-
-			// json: {
-			// 	type: typeRef('CwBase64'),
-			// },
+			json: {
+				type: typeRef('CwBase64'),
+			},
 
 			proto: {
 				writer: 'b',
+				type: typeRef('Uint8Array'),
 			},
 		};
 	},
