@@ -12,9 +12,8 @@ import {ts} from 'ts-morph';
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayAccess, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, enumDecl, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf} from './ts-factory';
+import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
-import { escape } from 'querystring';
 
 type ReturnThing = {
 	type: TypeNode;
@@ -486,11 +485,11 @@ export class NeutrinoImpl extends RpcImplementor {
 			// 	a_comment_lines.push(`@returns ${a_docs_returns[0]}`);
 			// }
 			// else {
-				a_comment_lines.push(`@returns a tuple where:`);
+			a_comment_lines.push(`@returns a tuple where:`);
 
-				a_docs_returns.forEach((s_doc, i_doc) => {
-					a_comment_lines.push(`  - ${i_doc}: ${a_returns[i_doc].field.name} - ${s_doc}`);
-				});
+			a_docs_returns.forEach((s_doc, i_doc) => {
+				a_comment_lines.push(`  - ${i_doc}: ${a_returns[i_doc].field.name} - ${s_doc}`);
+			});
 			// }
 		}
 
@@ -857,7 +856,6 @@ export class NeutrinoImpl extends RpcImplementor {
 		let b_continuous = true;
 
 		// each field
-		FIELDS:
 		for(const g_field of g_msg.fieldList) {
 			const g_thing = this.route(g_field);
 
@@ -901,7 +899,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				h_indicies[i_number] = [g_thing.destruct_type, g_thing.optional];
 
 				// next
-				continue FIELDS;
+				continue;
 			}
 
 			// add to sequence
@@ -1019,7 +1017,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				print(yn_proto, [
 					`Protobuf enum value for \`${sr_enum}\`.`,
 					'',
-					`**${si_name!}** - ${g_value.comments}`,
+					`**${si_name}** - ${g_value.comments}`,
 					'',
 					`Belongs to enum type {@link ${si_enum_proto}}`,
 				]),

@@ -1,6 +1,6 @@
 import type {FieldRouter, TsThing} from './common';
 import type {AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod} from './env';
-import {parse_package_parts, type InterfacesDict, type RefableType, type TypesDict} from './plugin';
+
 import type {Dict} from '@blake.regalia/belt';
 
 import type {TypeNode, ImportSpecifier} from 'typescript';
@@ -8,6 +8,7 @@ import type {TypeNode, ImportSpecifier} from 'typescript';
 import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
+import {parse_package_parts, type InterfacesDict, type RefableType, type TypesDict} from './plugin';
 
 import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory, chain, callChain, union} from './ts-factory';
 
@@ -133,12 +134,11 @@ export abstract class RpcImplementor {
 		const si_name = this.exportedId(g_msg);
 
 		if(g_msg.source !== this._g_opened) {
-
 			this._h_type_imports[si_name] = [`#/proto/${map_proto_path(g_msg.source)}`, y_factory.createImportSpecifier(
 				false,
 				__UNDEFINED,
-				ident(si_name),
-			)]
+				ident(si_name)
+			)];
 		}
 
 		return typeRef(si_name);
@@ -255,8 +255,8 @@ export abstract class RpcImplementor {
 					[
 						arrow([
 							param('atu8'),
-						], f_parse(ident('atu8')))
-					],
+						], f_parse(ident('atu8'))),
+					]
 				);
 			}
 		}

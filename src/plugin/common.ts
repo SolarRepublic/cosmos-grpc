@@ -1,3 +1,5 @@
+import type {Optional} from 'ts-toolbelt/out/Object/Optional';
+
 import type {AugmentedEnum, AugmentedField, AugmentedFile} from './env';
 import type {NeutrinoImpl} from './impl-neutrino';
 import type {RpcImplementor} from './rpc-impl';
@@ -8,10 +10,8 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 import {snake, type Dict, F_IDENTITY} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, typeLit, tuple} from './ts-factory';
+import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, tuple} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
-import type { Optional } from 'ts-toolbelt/out/Object/Optional';
-import type { Key } from 'ts-toolbelt/out/Any/Key';
 
 // destructure members from protobuf
 const {
@@ -411,7 +411,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			json: {
 				type: yn_json,
 			},
-			
+
 			nests: {
 				name: `a_${si_name}`,
 				type: typeRef('Uint8Array'),
