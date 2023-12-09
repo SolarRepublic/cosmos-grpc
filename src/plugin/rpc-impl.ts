@@ -67,7 +67,8 @@ export abstract class RpcImplementor {
 			return keyword('void');
 		}
 
-		if(a_msgs.length) debugger;
+		// TODO: why was this line important
+		// if(a_msgs.length) debugger;
 
 		// return union(a_msgs.map(g_msg => this.importType(this.pathOfType(g_msg.path), [g_msg.name!, this.clashFreeTypeId(g_msg)])));
 		return typeRef('JsonAny', [

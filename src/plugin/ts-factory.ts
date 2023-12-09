@@ -19,6 +19,8 @@ import type {
 import {__UNDEFINED, fodemtv, oderac} from '@blake.regalia/belt';
 import {ts, NodeFlags} from 'ts-morph';
 
+export type TupleEntryDescriptor = [z_ident: string | Identifier, b_opt: boolean, yn_type: TypeNode];
+
 // alias ts.factory
 export const y_factory = ts.factory;
 
@@ -129,7 +131,7 @@ export const declareConst = (
 	], NodeFlags.Const)
 );
 
-export const tuple = (a_members: Array<TypeNode | [z_ident: string | Identifier, b_opt: boolean, yn_type: TypeNode]>) => y_factory
+export const tuple = (a_members: Array<TypeNode | TupleEntryDescriptor>) => y_factory
 	.createTupleTypeNode(
 		a_members.map(z_member => Array.isArray(z_member)
 			? y_factory
@@ -204,7 +206,7 @@ export const access = (
 
 export const chain = (
 	yn_prime: Expression,
-	yn_access: string | Identifier,
+	yn_access: string | Identifier
 ) => y_factory.createPropertyAccessChain(
 	yn_prime,
 	y_factory.createToken(SyntaxKind.QuestionDotToken),

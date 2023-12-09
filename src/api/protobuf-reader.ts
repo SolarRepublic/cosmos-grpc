@@ -78,32 +78,47 @@ export const enum ProtoHint {
  *   uint32 foo = 1;
  *   repeated string bar = 2;
  *   uint64 baz = 5;
+ *   string high = 1025;
  * }
  * ```
  *  becomes:
  * ```
- * [foo, bar, ..empty x 2, baz]
+ * [empty, foo, bar, ..empty x 2, baz]
  * ```
  * where `foo`, `bar` and `baz` are all Arrays,
  *  e.g., `foo[0]` contains the single item for the `foo` field.
  * 
  * Decoding an instance of the `Info` message example above with hints might look like this:
  * ```
- * // notice the two empty elements denoted by `,,`
- * const [foo, bar, ,, baz] = decode_protobuf<
- * 	[number, string[], ,, string]
+ * // notice the two empty elements in the middle denoted by `,,`
+ * const [, foo, bar, ,, baz] = decode_protobuf<
+ * 	[never, number, string[], ,, string]
  * >(atu8_msg, [ProtoHint.SINGULAR, ProtoHing.STRING, ,, ProtoHint.SINGULAR_BIGINT])
+ * ```
+ * 
+ * Notice the use of `never` for position 0. This is required to maintain consistency with the 1-based index
+ * used by protobuf fields, ensuring that arbitrarily high indexes can be accessed using their matching id.
+ * 
+ * ```
+ * const a_arbitrary = decode_protobuf(atu8_msg);
+ * 
+ * a_arbitrary[1025];  // <-- [string]
  * ```
  */
 export const decode_protobuf = <
-	w_return extends DecodedProtobufMessage<void>=DecodedProtobufMessage,
+	w_intent extends DecodedProtobufMessage<void>=DecodedProtobufMessage,
+	w_return extends DecodedProtobufMessage<void>=w_intent extends any[]
+		? w_intent extends [never, ...any[]]? w_intent: never
+		: w_intent,
 >(atu8_data: Uint8Array, a_hints?: NestedArrayable<ProtoHint>[]): w_return => {
+	// decode a varint from the next position in the input
 	let varint = <
 		w_format extends string | number=number,
 	>(xc_hint?: ProtoHint): w_format => {
 		let xn_out = 0;
 		let xi_shift = -7;
 
+		// until terminal byte is encountered (or exceed the bounds of the buffer and throw)
 		for(;;) {
 			// read the byte
 			let xb_read = atu8_data[ib_read++];
@@ -116,25 +131,29 @@ export const decode_protobuf = <
 		}
 	};
 
+	// read position in bytes
 	let ib_read = 0;
 
-	let i_field = 0;
+	// 1-based protobuf field index
+	let i_field = 1;
+
+	// outputs of decoded fields
 	let a_out: DecodedProtobufField[] = [];
 
+	// while bytes remain in input buffer
 	for(; ib_read<atu8_data.length;) {
+		// decode field & type
 		let xn_field_and_type = varint();
-		let xn_field = (xn_field_and_type >> 3) - 1;
+		let xn_field = xn_field_and_type >> 3;
 		let xn_type = xn_field_and_type & 0x07;
 
-		// not the expected field index or expected type
-		if(xn_field < i_field || xn_field > i_field + 1 || xn_type > 2) {
+		// invalid field index (precedes previous or lowest) or not the expected field type
+		if(xn_field < i_field || xn_type > 2) {
 			return atu8_data as unknown as w_return;
 		}
 
-		// original
-		// (a_out[i_field = xn_field] || (a_out[i_field] = [])).push([
-
-		let xc_hint_local = a_hints?.[i_field] as ProtoHint;
+		// ref provided hint, if any
+		let xc_hint_local = a_hints?.[i_field-1] as ProtoHint;
 
 		// length-delimited
 		let w_value = [
@@ -149,24 +168,33 @@ export const decode_protobuf = <
 			// len (string, bytes, embedded, etc.)
 			// eslint-disable-next-line @typescript-eslint/no-loop-func
 			(w_hint?: ProtoHint) => {
+				// decode len prefix
 				let nb_read = varint();
+
+				// init start position
 				let ib_start = ib_read;
+
+				// advance read pointer byte len bytes to end position
 				ib_read += nb_read;
 
+				// decode that portion of the buffer
 				const w_read = decode_protobuf(
 					atu8_data.subarray(ib_start, ib_read),
 					((w_hint as number) > 0? []: w_hint) as ProtoHint[]
 				);
 
+				// apply hint, expecting non-protobuf messages to be returned as raw bytes
 				return ProtoHint.STRING & (w_hint as number)? buffer_to_text(w_read as unknown as Uint8Array): w_read;
 			},
 		][xn_type](xc_hint_local);
 
+		// hint is that field is not repeated; set directly instead of pushing to result slot array
 		if(xc_hint_local & ProtoHint.SINGULAR) {
 			a_out[i_field=xn_field] = w_value;
 		}
+		// field can possibly repeat; add to slot array
 		else {
-			((a_out[i_field=xn_field] || (a_out[i_field] = [])) as DecodedProtobufField[]).push(w_value as DecodedProtobufField);
+			((a_out[i_field=xn_field] ??= []) as DecodedProtobufField[]).push(w_value as DecodedProtobufField);
 		}
 	}
 
@@ -194,8 +222,8 @@ export const decode_coin = <
 	s_denom extends string=string,
 >(
 	atu8_payload: Uint8Array,
-	[s_denom, s_amount]=decode_protobuf<
-		[string, string]
+	[, s_denom, s_amount]=decode_protobuf<
+		[never, string, string]
 	>(atu8_payload, [ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING])
 ): SlimCoin<s_denom> => [s_amount, s_denom as s_denom] as SlimCoin<s_denom>;
 
@@ -205,5 +233,5 @@ export const decode_coin = <
  */
 export const reduce_temporal = (
 	[sg_seconds, xn_nanos]: [string, number]
-): number => (+(sg_seconds) * 1e3) + ((xn_nanos / 1e6) | 0);
+): number => (+sg_seconds * 1e3) + ((xn_nanos / 1e6) | 0);
 

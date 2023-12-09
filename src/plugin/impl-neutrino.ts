@@ -3,9 +3,10 @@ import type {AugmentedEnum, AugmentedFile, AugmentedMessage, AugmentedMethod, Ex
 
 import type {InterfacesDict, TypesDict} from './plugin';
 import type {FileCategory} from './rpc-impl';
+import type {TupleEntryDescriptor} from './ts-factory';
 import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
 
-import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex, F_IDENTITY} from '@blake.regalia/belt';
+import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex, F_IDENTITY, fodemtv} from '@blake.regalia/belt';
 
 import {ts} from 'ts-morph';
 
@@ -629,12 +630,24 @@ export class NeutrinoImpl extends RpcImplementor {
 		let b_processed = false;
 
 		const a_types: TsThing[] = [];
-		const a_generics: TypeNode[] = [];
-		const a_returns: Expression[] = [];
 		const a_hints: Expression[] = [];
+		const a_returns: Expression[] = [];
 
-		// prep bindings
+		// prep generic args and destructure bindings, omitting 0th item
+		const a_generics: TypeNode[] = [];
 		const a_bindings: Array<OmittedExpression | BindingElement> = [];
+
+		// // prep generic args and destructure bindings, omitting 0th item
+		// const a_generics: TypeNode[] = [keyword('never')];
+		// const a_bindings: Array<OmittedExpression | BindingElement> = [y_factory.createOmittedExpression()];
+
+		const h_arbitrary_fields: Record<number, {
+			type: TsThing;
+			generic: TypeNode;
+			return: Expression;
+			hint: Expression;
+			binding: OmittedExpression | BindingElement;
+		}> = {};
 
 		// whether or not to include hints
 		const b_worthy = false;
@@ -665,9 +678,14 @@ export class NeutrinoImpl extends RpcImplementor {
 				}
 				// gap is not skippable; flag as not monotonic
 				else {
-					return b_monotonic = false;
+					b_monotonic = false;
 				}
 			}
+
+			// prep components
+			let yn_hint: Expression;
+			let yn_generic: TypeNode;
+			let yn_return: Expression;
 
 			// convert to thing
 			const g_thing = this.route(g_field);
@@ -678,20 +696,21 @@ export class NeutrinoImpl extends RpcImplementor {
 			// message is nested inside of field
 			const g_nests = g_thing.nests;
 			if(g_nests) {
+				debugger;
 				// mark as not flat
 				b_flat = false;
 
 				// set hint
-				a_hints.push(g_nests.hints);
+				yn_hint = g_nests.hints;
 
 				// overwrite identifier
 				yn_ident = ident(g_nests.name);
 
 				// defer
-				a_generics.push(g_thing.field.repeated? arrayType(g_nests.type): g_nests.type);
+				yn_generic = g_thing.field.repeated? arrayType(g_nests.type): g_nests.type;
 
 				// add expression to return list
-				a_returns.push(g_nests.parse(yn_ident));
+				yn_return = g_nests.parse(yn_ident);
 
 				// mark as processed if processing occurs
 				if(F_IDENTITY !== g_nests.parse) {
@@ -700,12 +719,12 @@ export class NeutrinoImpl extends RpcImplementor {
 			}
 			else {
 				// infer hint from write type
-				a_hints.push(literal((g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR) | ({
+				yn_hint = literal((g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR) | ({
 					v: 's' === g_thing.calls.name[0]? ProtoHint.BIGINT: ProtoHint.NONE,
 					g: ProtoHint.BIGINT,
 					s: ProtoHint.STRING,
 					b: ProtoHint.NONE,
-				}[g_thing.proto.writer.toLowerCase()] || 0)));
+				}[g_thing.proto.writer.toLowerCase()] || 0));
 
 				// apply same logic to generic parameter
 				const yn_primitive = {
@@ -716,16 +735,35 @@ export class NeutrinoImpl extends RpcImplementor {
 				}[g_thing.proto.writer.toLowerCase()] || keyword('unknown');
 
 				// add to generic type arg
-				a_generics.push(g_field.repeated? arrayType(yn_primitive): yn_primitive);
+				yn_generic = g_field.repeated? arrayType(yn_primitive): yn_primitive;
 
 				// add expression to return list
-				a_returns.push(yn_ident);
+				yn_return = yn_ident;
 			}
 
-			// set return type
-			a_types.push(g_thing);
+			const yn_binding = binding(yn_ident);
 
-			a_bindings.push(binding(yn_ident));
+			// fields up to this point are monotonic (or gaps have been tolerated)
+			if(b_monotonic) {
+				a_hints.push(yn_hint);
+				a_generics.push(yn_generic);
+				a_returns.push(yn_return);
+
+				// set return type
+				a_types.push(g_thing);
+
+				a_bindings.push(yn_binding);
+			}
+			// not monotic
+			else {
+				h_arbitrary_fields[i_number] = {
+					hint: yn_hint,
+					generic: yn_generic,
+					return: yn_return,
+					type: g_thing,
+					binding: yn_binding,
+				};
+			}
 
 			// // repeated type; bind items
 			// if(g_field.repeated) {
@@ -740,18 +778,31 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// message fields are not monotonic
 		if(!b_monotonic) {
+			debugger;
 			console.warn(`WARNING: Message ${g_msg.name} in ${g_msg.source.name} has too wide of a gap between non-monotonic fields`);
-			return;
+			// return;
 		}
+
+		// prep generics args
+		const yn_generics_args = b_processed
+			? [
+				// arbitrary fields are set
+				Object.keys(h_arbitrary_fields).length
+					// intersect with each arbitrary field index
+					? intersection([
+						tuple(a_generics),
+						typeLit(fodemtv(h_arbitrary_fields, g => g.generic)),
+					])
+					: tuple(a_generics),
+			]
+			: __UNDEFINED;
 
 		// call expression to decode payload
 		const yn_decode = callExpr('decode_protobuf', [
 			ident('atu8_payload'),
 			// ...b_worthy? [arrayLit(a_hints)]: [],
 			arrayLit(a_hints),
-		], b_processed
-			? [tuple(a_generics)]
-			: __UNDEFINED);
+		], yn_generics_args);
 
 		let yn_init!: Expression;
 		let yn_body!: ConciseBody;
@@ -767,7 +818,14 @@ export class NeutrinoImpl extends RpcImplementor {
 		// 		: a_types[0].calls.return_type
 		// 	: tuple(a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type]));
 
-		const yn_return = tuple(a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type]));
+		// create the return types
+		const yn_return = tuple([
+			// // skip the protobuf 0 field index
+			// ['SKIP_THIS', true, keyword('never')],
+
+			// transform the TsThing items to tuple entry descriptors
+			...a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type] as TupleEntryDescriptor),
+		]);
 
 		let g_param_destructure!: ParameterDeclaration;
 

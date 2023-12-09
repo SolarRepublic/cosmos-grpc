@@ -273,7 +273,7 @@ export const main = () => {
 						mark_fields(g_msg, g_destructors);
 					}
 				}
-				
+
 				// each accessor pattern
 				for(const r_match of h_params.accessors || []) {
 					// match found
