@@ -1,19 +1,21 @@
 import type {TsThing} from './common';
 import type {AugmentedEnum, AugmentedFile, AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
 
-import type {InterfacesDict, TypesDict} from './plugin';
+import type {InterfacesDict, Params, TypesDict} from './plugin';
 import type {FileCategory} from './rpc-impl';
-import type {TupleEntryDescriptor} from './ts-factory';
-import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement} from 'typescript';
+import type {Dict} from '@blake.regalia/belt';
+import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement, Identifier} from 'typescript';
 
-import {__UNDEFINED, fold, oderac, proper, snake, type Dict, escape_regex, F_IDENTITY, fodemtv} from '@blake.regalia/belt';
+import {readFileSync} from 'node:fs';
+
+import {__UNDEFINED, fold, oderac, proper, snake, escape_regex, fodemtv, odem} from '@blake.regalia/belt';
 
 import {ts} from 'ts-morph';
 
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf} from './ts-factory';
+import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 type ReturnThing = {
@@ -27,6 +29,7 @@ const {
 } = ts;
 
 type Draft = {
+	typeImports: Dict<[string, ImportSpecifier]>;
 	imports: Dict<[string, ImportSpecifier]>;
 	heads: Record<FileCategory, string[]>;
 	consts: Record<FileCategory, Dict<Statement>>;
@@ -56,8 +59,8 @@ export class NeutrinoImpl extends RpcImplementor {
 
 	protected _p_output = '';
 
-	constructor(h_types: TypesDict, h_interfaces: InterfacesDict) {
-		super(h_types, h_interfaces);
+	constructor(h_types: TypesDict, h_interfaces: InterfacesDict, h_params: Params) {
+		super(h_types, h_interfaces, h_params);
 
 		this._h_router = field_router(this);
 	}
@@ -252,12 +255,15 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// open draft
 		const g_draft = this._h_drafts[p_output] ||= {
-			imports: this._h_type_imports,
+			typeImports: this._h_type_imports,
+			imports: this._h_imports,
 			heads: reset_heads(),
 			consts: reset_consts(),
 		};
 
-		this._h_type_imports = g_draft.imports;
+		// restore imports
+		this._h_type_imports = g_draft.typeImports;
+		this._h_imports = g_draft.imports;
 
 		// destructure parts
 		const {
@@ -271,12 +277,21 @@ export class NeutrinoImpl extends RpcImplementor {
 	}
 
 	override head(si_category: FileCategory): string[] {
+		// inject augmentations once, right below the imports
+		let s_augmentations = '';
+		const sr_augment = this._h_params.augmentations?.[this.path.replace(/\.ts$/, '')];
+		if(sr_augment) {
+			s_augmentations = readFileSync(sr_augment, 'utf-8');
+		}
+
 		return [
 			...this._g_heads[si_category],
+			s_augmentations,
 		];
 	}
 
 	override body(si_category: FileCategory): string[] {
+		// all statements
 		return [
 			...oderac(this._g_consts[si_category], (si_const, yn_const) => print(yn_const)),
 		];
@@ -617,19 +632,19 @@ export class NeutrinoImpl extends RpcImplementor {
 	}
 
 	// 
-	msgDecoder(g_msg: AugmentedMessage): string | undefined {
+	msgDecoder(g_msg: AugmentedMessage): string[] | undefined {
 		// open proto source of msg
 		this.open(g_msg.source);
 
-		let b_monotonic = true;
-
-		let b_flat = true;
+		// whether or not the fields are continuous and don't need arbitrary indexes
+		let b_continuous = true;
 
 		// determine whether the decoded values are processed before being returned
 		// eslint-disable-next-line prefer-const
 		let b_processed = false;
 
-		const a_types: TsThing[] = [];
+		const a_types: [string, boolean, TypeNode][] = [];
+		const a_things: TsThing[] = [];
 		const a_hints: Expression[] = [];
 		const a_returns: Expression[] = [];
 
@@ -637,26 +652,23 @@ export class NeutrinoImpl extends RpcImplementor {
 		const a_generics: TypeNode[] = [];
 		const a_bindings: Array<OmittedExpression | BindingElement> = [];
 
-		// // prep generic args and destructure bindings, omitting 0th item
-		// const a_generics: TypeNode[] = [keyword('never')];
-		// const a_bindings: Array<OmittedExpression | BindingElement> = [y_factory.createOmittedExpression()];
+		const a_decoders: Expression[] = [];
 
+		// arbitrary-index fields
 		const h_arbitrary_fields: Record<number, {
-			type: TsThing;
+			thing: TsThing;
+			type: TypeNode;
 			generic: TypeNode;
 			return: Expression;
 			hint: Expression;
-			binding: OmittedExpression | BindingElement;
+			binding: BindingElement;
 		}> = {};
 
-		// whether or not to include hints
-		const b_worthy = false;
-
-		// each field
-		g_msg.fieldList.forEach((g_field, i_field) => {
+		// each field in sorted order
+		g_msg.fieldList.sort((g_a, g_b) => g_a.number! - g_b.number!).forEach((g_field, i_field) => {
 			const i_number = g_field.number!;
 
-			// found a gap, fields are not monotonic
+			// found a gap, fields are not continuous
 			if(i_number !== i_field + 1) {
 				// mark as processed
 				b_processed = true;
@@ -676,9 +688,9 @@ export class NeutrinoImpl extends RpcImplementor {
 						a_hints.push(literal(ProtoHint.NONE));
 					}
 				}
-				// gap is not skippable; flag as not monotonic
+				// gap is not skippable; flag as not continuous
 				else {
-					b_monotonic = false;
+					b_continuous = false;
 				}
 			}
 
@@ -693,29 +705,36 @@ export class NeutrinoImpl extends RpcImplementor {
 			// prep identifier
 			let yn_ident = g_thing.calls.id;
 
+			let yn_type: TypeNode;
+			let s_type_label: string;
+
 			// message is nested inside of field
 			const g_nests = g_thing.nests;
 			if(g_nests) {
-				debugger;
-				// mark as not flat
-				b_flat = false;
-
 				// set hint
 				yn_hint = g_nests.hints;
 
+				s_type_label = g_nests.name;
+
 				// overwrite identifier
-				yn_ident = ident(g_nests.name);
+				yn_ident = ident(s_type_label);
+
+				yn_type = g_nests.type;
 
 				// defer
-				yn_generic = g_thing.field.repeated? arrayType(g_nests.type): g_nests.type;
+				yn_generic = g_thing.field.repeated? arrayType(yn_type): yn_type;
 
-				// add expression to return list
-				yn_return = g_nests.parse(yn_ident);
+				yn_return = yn_ident;
 
-				// mark as processed if processing occurs
-				if(F_IDENTITY !== g_nests.parse) {
-					b_processed = true;
-				}
+				if(g_nests.parser) a_decoders[i_field] = g_nests.parser;
+
+				// // add expression to return list
+				// yn_return = g_nests.parse(yn_ident);
+
+				// // mark as processed if processing occurs
+				// if(F_IDENTITY !== g_nests.parse) {
+				// 	b_processed = true;
+				// }
 			}
 			else {
 				// infer hint from write type
@@ -739,28 +758,33 @@ export class NeutrinoImpl extends RpcImplementor {
 
 				// add expression to return list
 				yn_return = yn_ident;
+
+				s_type_label = g_thing.calls.name;
+				yn_type = g_thing.calls.return_type;
 			}
 
 			const yn_binding = binding(yn_ident);
 
-			// fields up to this point are monotonic (or gaps have been tolerated)
-			if(b_monotonic) {
+			// fields up to this point are continuous (or gaps have been tolerated)
+			if(b_continuous) {
 				a_hints.push(yn_hint);
 				a_generics.push(yn_generic);
 				a_returns.push(yn_return);
+				a_things.push(g_thing);
 
-				// set return type
-				a_types.push(g_thing);
+				// add return type to tuple
+				a_types.push([s_type_label, g_thing.optional, yn_type]);
 
 				a_bindings.push(yn_binding);
 			}
-			// not monotic
+			// not continuous
 			else {
-				h_arbitrary_fields[i_number] = {
+				h_arbitrary_fields[i_number-1] = {
+					thing: g_thing,
 					hint: yn_hint,
 					generic: yn_generic,
 					return: yn_return,
-					type: g_thing,
+					type: yn_type,
 					binding: yn_binding,
 				};
 			}
@@ -774,14 +798,6 @@ export class NeutrinoImpl extends RpcImplementor {
 			// 	return arrayBinding([binding(yn_ident)]);
 			// }
 		});
-
-
-		// message fields are not monotonic
-		if(!b_monotonic) {
-			debugger;
-			console.warn(`WARNING: Message ${g_msg.name} in ${g_msg.source.name} has too wide of a gap between non-monotonic fields`);
-			// return;
-		}
 
 		// prep generics args
 		const yn_generics_args = b_processed
@@ -797,12 +813,31 @@ export class NeutrinoImpl extends RpcImplementor {
 			]
 			: __UNDEFINED;
 
-		// call expression to decode payload
-		const yn_decode = callExpr('decode_protobuf', [
+		// build args
+		const a_args: Expression[] = [
+			// payload argument
 			ident('atu8_payload'),
-			// ...b_worthy? [arrayLit(a_hints)]: [],
-			arrayLit(a_hints),
-		], yn_generics_args);
+		];
+
+		// 2nd arg is needed; add hints if there are any
+		if(a_hints.length || a_decoders.length) {
+			a_args.push(a_hints.length? arrayLit(a_hints): ident('__UNDEFINED'));
+		}
+
+		// nested decoders are present
+		if(a_decoders.length) {
+			// prep full-width array literal, using `0` to omit slots where one is not used
+			const a_fill: Expression[] = Array(a_decoders.length).fill(numericLit(0));
+
+			// set decoder in each position where one is defined
+			a_decoders.forEach((yn, i) => a_fill[i] = yn);
+
+			// add call arg
+			a_args.push(arrayLit(a_fill));
+		}
+
+		// call expression to decode payload
+		const yn_decode = callExpr('decode_protobuf', a_args, yn_generics_args);
 
 		let yn_init!: Expression;
 		let yn_body!: ConciseBody;
@@ -812,60 +847,88 @@ export class NeutrinoImpl extends RpcImplementor {
 			param(ident('atu8_payload'), typeRef('Uint8Array')),
 		];
 
-		// const yn_return = 1 === a_types.length
-		// 	? a_types[0].calls.id
-		// 		? union([a_types[0].calls.return_type, keyword('undefined')])
-		// 		: a_types[0].calls.return_type
-		// 	: tuple(a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type]));
+		// create the return types by transforming each TsThing item to a tuple entry descriptor
+		let yn_return: TypeNode = tuple(a_types);
 
-		// create the return types
-		const yn_return = tuple([
-			// // skip the protobuf 0 field index
-			// ['SKIP_THIS', true, keyword('never')],
 
-			// transform the TsThing items to tuple entry descriptors
-			...a_types.map(g_thing => [g_thing.calls.name, g_thing.optional, g_thing.calls.return_type] as TupleEntryDescriptor),
-		]);
+		let g_param_destructure: ParameterDeclaration | undefined;
+		let a_params_arbitrary: ParameterDeclaration[] | undefined;
 
-		let g_param_destructure!: ParameterDeclaration;
-
+		// in-parameter processing required
 		if(b_processed) {
-			// add init param
-			g_param_destructure = param(arrayBinding(a_bindings), __UNDEFINED, false, yn_decode);
-
-			// const yn_destructure = declareConst(
-			// 	arrayBinding(a_bindings),
-			// 	yn_decode
-			// );
-
-			// yn_body = block([
-			// 	yn_destructure,
-			// 	doReturn(arrayLit([])),
-			// ]);
-
+			// set arrow function's body, which is also the return value
 			yn_body = arrayLit(a_returns);
+
+			// destructuring array bindings will be used
+			const yn_destruct_array_bindings = arrayBinding(a_bindings);
+
+			// add init param
+			g_param_destructure = param(b_continuous? yn_destruct_array_bindings: 'a_decoded', __UNDEFINED, false, yn_decode);
+
+			// not continuous
+			if(!b_continuous) {
+				// need to destructure arbitrary indexes
+				a_params_arbitrary = [
+					// e.g., `{1023: field_1024} = a_decoded`
+					param(objectBinding(odem(h_arbitrary_fields, ([si_field, g]) => {
+						const yn_ident = ident((g.binding.name as Identifier).text);
+						return binding(yn_ident, numericLit(+si_field));
+					})), __UNDEFINED, false, ident('a_decoded')),
+				];
+
+				// there are also indexed fields to destructure with aray binding
+				if(a_bindings.length) {
+					a_params_arbitrary.push(
+						// e.g., `[field_1, field_2] = a_decoded`
+						param(yn_destruct_array_bindings, __UNDEFINED, false, ident('a_decoded'))
+					);
+				}
+
+				// wrap return value, e.g., `oda([field_1], {1023: field:1024})`
+				yn_body = callExpr('oda', [
+					yn_body,
+					objectLit(fodemtv(h_arbitrary_fields, g_arb => g_arb.binding.name as Identifier)),
+				]);
+
+				// extend return type with intersection
+				yn_return = intersection([
+					yn_return,
+
+					// add arbitrary-index fields to type lit, each one with question token (i.e., optional)
+					typeLit(fodemtv(h_arbitrary_fields, g => [g.type, g.thing.optional])),
+				]);
+			}
 		}
-		// // single field; use simplified response
-		// else if(1 === a_bindings.length) {
-		// 	// flat type
-		// 	if(b_flat) {
-		// 		yn_init = castAs(ident('decode_protobuf_r0'), funcType(a_params, yn_return));
-		// 	}
-		// 	// not flat
-		// 	else {
-		// 		yn_body = arrayAccess(yn_decode, numericLit(0));
-		// 	}
-		// }
+		// simple decoder; all logic happens in body
 		else {
 			yn_body = yn_decode;
 		}
 
+		// override the type
+		const si_override = this._h_params.decoder_types?.[g_msg.path.slice(1)];
+		if(si_override) yn_return = typeRef(si_override);
+
+		// declare type def
+		const si_decoded_type = `Decoded${this.exportedId(g_msg)}`;
+		const yn_type_decl = declareAlias(si_decoded_type, yn_return, true);
+
+		// change return to type ref
+		yn_return = typeRef(si_decoded_type);
+
+		// function has a body
 		if(yn_body) {
+			// in-parameter destructuring
 			const yn_destructure = arrow([
 				...a_params,
-				...g_param_destructure? [g_param_destructure]: [],
-			], yn_body);  // , g_param_destructure? __UNDEFINED: yn_return);
+				...g_param_destructure
+					? [
+						g_param_destructure,
+						...a_params_arbitrary || [],
+					]
+					: [],
+			], yn_body);
 
+			// set statement initializer
 			yn_init ||= g_param_destructure
 				? castAs(
 					castAs(
@@ -880,21 +943,31 @@ export class NeutrinoImpl extends RpcImplementor {
 				: castAs(yn_destructure, yn_return);
 		}
 
+		// create decoder statement
 		const yn_statement = declareConst(`decode${this.exportedId(g_msg)}`, yn_init, true);
 
-		return print(yn_statement, [
-			`Decodes a protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} response message`,
-			'@param atu8_payload - raw bytes to decode',
-			...g_param_destructure
-				? ['@param RESERVED - a second argument is explicitly forbidden. make sure not to pass this function by reference to some callback argument']
-				: [],
-			...1 === a_types.length
-				? [`@returns ${a_types[0].field.name} - ${a_types[0].field.comments}`]
-				: [
-					'@returns a tuple where:',
-					...a_types.map((g_type, i_type) => `  - ${i_type}: ${g_type.field.name} - ${g_type.field.comments}`),
-				],
-		]);
+		// print statement with docs
+		return [
+			print(yn_type_decl, [
+				`A decoded protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} message`,
+				'',
+				...1 === a_things.length
+					? [`Alias for: ${a_things[0].field.name} - ${a_things[0].field.comments}`]
+					: [
+						'Tuple where:',
+						...a_things.map((g_type, i_type) => `  - ${i_type}: ${g_type.field.name} - ${g_type.field.comments}`),
+						...odem(h_arbitrary_fields, ([si_index, g_arb]) => ` - ${si_index}: ${g_arb.thing.field.name} - ${g_arb.thing.field.comments}`),
+					],
+			]),
+			print(yn_statement, [
+				`Decodes a protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} message`,
+				'@param atu8_payload - raw bytes to decode',
+				...g_param_destructure
+					? ['@param RESERVED - a second argument is explicitly forbidden. make sure not to pass this function by reference to some callback argument']
+					: [],
+				`@returns a {@link Decoded${this.exportedId(g_msg)}}`,
+			]),
+		];
 	}
 
 	msgDestructor(g_msg: AugmentedMessage): string[] {
@@ -947,7 +1020,7 @@ export class NeutrinoImpl extends RpcImplementor {
 					break GAPS;
 				}
 
-				// set monotonicity break
+				// set continuity break
 				b_continuous = false;
 
 				// add to assign

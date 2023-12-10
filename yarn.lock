@@ -219,6 +219,11 @@
   resolved "https://registry.yarnpkg.com/@tsconfig/node16/-/node16-1.0.4.tgz#0b92dcc0cc1c81f6f306a381f28e31b1a56536e9"
   integrity sha512-vxhUy4J8lyeyinH7Azl1pdd43GJhZH/tP2weN8TntQblOY+A0XbT8DJk1/oCPuOOyg/Ja757rG0CgHcWC8OfMA==
 
+"@types/diff@^5.0.8":
+  version "5.0.8"
+  resolved "https://registry.yarnpkg.com/@types/diff/-/diff-5.0.8.tgz#28dc501cc3e7c62d4c5d096afe20755170acf276"
+  integrity sha512-kR0gRf0wMwpxQq6ME5s+tWk9zVCfJUl98eRkD05HWWRbhPB/eu4V1IbyZAsvzC1Gn4znBJ0HN01M4DGXdBEV8Q==
+
 "@types/google-protobuf@^3.15.9":
   version "3.15.9"
   resolved "https://registry.yarnpkg.com/@types/google-protobuf/-/google-protobuf-3.15.9.tgz#a983fc4bc35acb2b84a824d2ec8107d084e8603f"
@@ -557,6 +562,11 @@ diff@^4.0.1:
   version "4.0.2"
   resolved "https://registry.yarnpkg.com/diff/-/diff-4.0.2.tgz#60f3aecb89d5fae520c11aa19efc2bb982aade7d"
   integrity sha512-58lmxKSA4BNyLz+HHMUzlOEpg09FV+ev6ZMe3vJihgdxzgcwZ8VoEEPmALCZG9LmqfVoNMMKpttIYTVG6uDY7A==
+
+diff@^5.1.0:
+  version "5.1.0"
+  resolved "https://registry.yarnpkg.com/diff/-/diff-5.1.0.tgz#bc52d298c5ea8df9194800224445ed43ffc87e40"
+  integrity sha512-D+mk+qE8VC/PAUrlAU34N+VfXev0ghe5ywmpqrawphmVZc1bEfn56uo9qpyGp1p4xpzOHkSW4ztBd6L7Xx4ACw==
 
 dir-glob@^3.0.1:
   version "3.0.1"
@@ -1224,6 +1234,11 @@ prelude-ls@^1.2.1:
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/prelude-ls/-/prelude-ls-1.2.1.tgz#debc6489d7a6e6b0e7611888cec880337d316396"
   integrity sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==
+
+proto-parser@^0.0.9:
+  version "0.0.9"
+  resolved "https://registry.yarnpkg.com/proto-parser/-/proto-parser-0.0.9.tgz#f7f94f8da798859e81fc4f2f8bd7a881b369e0dc"
+  integrity sha512-1rFsUdeZ1bKOGfhy1Pw2RWNiAPj7luwBIFeVSJQXZA2G3sh4a24sHtNgnYfisdi4YvAe7TsDNq1xREos+Iwfww==
 
 protobufjs@^7.2.4, protobufjs@^7.2.5:
   version "7.2.5"

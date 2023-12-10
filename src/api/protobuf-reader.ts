@@ -63,6 +63,8 @@ export const enum ProtoHint {
 
 // type test = HintsApplied<[0, 1, 2, 3, 4, 5]>;
 
+export type ProtobufNestedDecoder = (atu8_payload: Uint8Array) => any;
+
 /**
  * Decodes a protobuf buffer without requiring a schema. By default, every field is assumed to be repeatable,
  * and thus is returned as an array of values (without a schema, the decoder has no way of knowing if there
@@ -83,7 +85,7 @@ export const enum ProtoHint {
  * ```
  *  becomes:
  * ```
- * [empty, foo, bar, ..empty x 2, baz]
+ * [foo, bar, ..empty x 2, baz]
  * ```
  * where `foo`, `bar` and `baz` are all Arrays,
  *  e.g., `foo[0]` contains the single item for the `foo` field.
@@ -92,25 +94,26 @@ export const enum ProtoHint {
  * ```
  * // notice the two empty elements in the middle denoted by `,,`
  * const [, foo, bar, ,, baz] = decode_protobuf<
- * 	[never, number, string[], ,, string]
+ * 	[number, string[], ,, string]
  * >(atu8_msg, [ProtoHint.SINGULAR, ProtoHing.STRING, ,, ProtoHint.SINGULAR_BIGINT])
  * ```
  * 
- * Notice the use of `never` for position 0. This is required to maintain consistency with the 1-based index
- * used by protobuf fields, ensuring that arbitrarily high indexes can be accessed using their matching id.
+ * Notice that the field index is offset by one for the return value compared to its original 1-based index
+ * used in the protobuf field definition. Arbitrarily high indexes can be accessed using their id - 1.
  * 
  * ```
  * const a_arbitrary = decode_protobuf(atu8_msg);
  * 
- * a_arbitrary[1025];  // <-- [string]
+ * a_arbitrary[1025-1];  // <-- [string]
  * ```
  */
 export const decode_protobuf = <
-	w_intent extends DecodedProtobufMessage<void>=DecodedProtobufMessage,
-	w_return extends DecodedProtobufMessage<void>=w_intent extends any[]
-		? w_intent extends [never, ...any[]]? w_intent: never
-		: w_intent,
->(atu8_data: Uint8Array, a_hints?: NestedArrayable<ProtoHint>[]): w_return => {
+	w_return extends DecodedProtobufMessage<void>=DecodedProtobufMessage,
+>(
+	atu8_data: Uint8Array,
+	a_hints?: NestedArrayable<ProtoHint>[],
+	a_decoders?: Array<ProtobufNestedDecoder | 0 | undefined>
+): w_return => {
 	// decode a varint from the next position in the input
 	let varint = <
 		w_format extends string | number=number,
@@ -134,8 +137,8 @@ export const decode_protobuf = <
 	// read position in bytes
 	let ib_read = 0;
 
-	// 1-based protobuf field index
-	let i_field = 1;
+	// 0-based protobuf field index
+	let i_field = 0;
 
 	// outputs of decoded fields
 	let a_out: DecodedProtobufField[] = [];
@@ -144,7 +147,7 @@ export const decode_protobuf = <
 	for(; ib_read<atu8_data.length;) {
 		// decode field & type
 		let xn_field_and_type = varint();
-		let xn_field = xn_field_and_type >> 3;
+		let xn_field = (xn_field_and_type >> 3) - 1;
 		let xn_type = xn_field_and_type & 0x07;
 
 		// invalid field index (precedes previous or lowest) or not the expected field type
@@ -152,8 +155,11 @@ export const decode_protobuf = <
 			return atu8_data as unknown as w_return;
 		}
 
+		// update field index
+		i_field = xn_field;
+
 		// ref provided hint, if any
-		let xc_hint_local = a_hints?.[i_field-1] as ProtoHint;
+		let xc_hint_local = a_hints?.[i_field] as ProtoHint;
 
 		// length-delimited
 		let w_value = [
@@ -177,9 +183,15 @@ export const decode_protobuf = <
 				// advance read pointer byte len bytes to end position
 				ib_read += nb_read;
 
-				// decode that portion of the buffer
+				// extract section
+				const atu8_section = atu8_data.subarray(ib_start, ib_read);
+
+				// decoder supplied; apply it
+				if(a_decoders?.[i_field]) return (a_decoders[i_field] as ProtobufNestedDecoder)(atu8_section);
+
+				// decode that section of the buffer
 				const w_read = decode_protobuf(
-					atu8_data.subarray(ib_start, ib_read),
+					atu8_section,
 					((w_hint as number) > 0? []: w_hint) as ProtoHint[]
 				);
 
@@ -190,11 +202,11 @@ export const decode_protobuf = <
 
 		// hint is that field is not repeated; set directly instead of pushing to result slot array
 		if(xc_hint_local & ProtoHint.SINGULAR) {
-			a_out[i_field=xn_field] = w_value;
+			a_out[i_field] = w_value;
 		}
 		// field can possibly repeat; add to slot array
 		else {
-			((a_out[i_field=xn_field] ??= []) as DecodedProtobufField[]).push(w_value as DecodedProtobufField);
+			((a_out[i_field] ??= []) as DecodedProtobufField[]).push(w_value as DecodedProtobufField);
 		}
 	}
 
@@ -222,8 +234,8 @@ export const decode_coin = <
 	s_denom extends string=string,
 >(
 	atu8_payload: Uint8Array,
-	[, s_denom, s_amount]=decode_protobuf<
-		[never, string, string]
+	[s_denom, s_amount]=decode_protobuf<
+		[string, string]
 	>(atu8_payload, [ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING])
 ): SlimCoin<s_denom> => [s_amount, s_denom as s_denom] as SlimCoin<s_denom>;
 
@@ -235,3 +247,11 @@ export const reduce_temporal = (
 	[sg_seconds, xn_nanos]: [string, number]
 ): number => (+sg_seconds * 1e3) + ((xn_nanos / 1e6) | 0);
 
+/**
+ * Reduces a parsed google.protobuf.Timestamp into whole milliseconds
+ */
+export const decode_temporal = (
+	atu8_payload: Uint8Array
+): number => reduce_temporal(decode_protobuf<
+	[string, number]
+>(atu8_payload, [ProtoHint.SINGULAR_BIGINT, ProtoHint.SINGULAR]));

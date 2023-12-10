@@ -73,6 +73,7 @@ const A_GLOBAL_PREAMBLE = [
 			'decode_protobuf_r0_0',
 			'decode_coin',
 			'reduce_temporal',
+			'decode_temporal',
 		]),
 		importModule('#/api/transport', [
 			'F_RPC_REQ_NO_ARGS',
@@ -94,7 +95,7 @@ const A_GLOBAL_PREAMBLE = [
 export const main = () => {
 	void plugin((a_protos, h_inputs, h_types, h_interfaces, h_params) => {
 		// new impl
-		const k_impl = new NeutrinoImpl(h_types, h_interfaces);
+		const k_impl = new NeutrinoImpl(h_types, h_interfaces, h_params);
 
 		const h_drafts: Dict<{
 			enums: Set<string>;
@@ -242,12 +243,12 @@ export const main = () => {
 						// verbose
 						console.warn(`INFO: Matched to decoders pattern: "${g_msg.path.slice(1)}"`);
 
-						const sx_decoder = k_impl.msgDecoder(g_msg);
-						if(sx_decoder) {
+						const a_decoder = k_impl.msgDecoder(g_msg);
+						if(a_decoder) {
 							// add decoder
 							h_decoders[g_msg.path] = {
 								message: g_msg,
-								contents: [sx_decoder],
+								contents: a_decoder,
 							};
 						}
 
@@ -382,12 +383,12 @@ export const main = () => {
 						// method output has content
 						if(g_output.fieldList.length) {
 							// render decoder
-							const sx_decoder = k_impl.msgDecoder(g_output);
+							const a_decoder = k_impl.msgDecoder(g_output);
 
 							// decoder is OK
-							if(sx_decoder) {
+							if(a_decoder) {
 								// add decoder
-								a_decoders.push(sx_decoder);
+								a_decoders.push(...a_decoder);
 
 								// ensure its fields can be decoded
 								mark_fields(g_output, g_decoders);
@@ -411,13 +412,13 @@ export const main = () => {
 		debugger;
 		// each message in need of a decoder
 		for(const [, g_msg] of ode(g_decoders.messages)) {
-			const sx_decoder = k_impl.msgDecoder(g_msg);
+			const a_decoder = k_impl.msgDecoder(g_msg);
 
-			if(sx_decoder) {
+			if(a_decoder) {
 				// add decoder
 				h_decoders[g_msg.path] = {
 					message: g_msg,
-					contents: [sx_decoder],
+					contents: a_decoder,
 				};
 			}
 			else {
@@ -456,6 +457,7 @@ export const main = () => {
 			}
 		}
 
+		debugger;
 		// every file
 		for(const [, g_proto] of ode(h_inputs)) {
 			// open

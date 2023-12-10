@@ -23,10 +23,19 @@ copy cosmos-sdk/proto
 copy wasmd/proto
 
 # TODO: perform additive merging of protobufs from different projects
+# copy secret/third_party/proto/cosmos cosmos
+merge() {
+	find submodules/$1 -type f -name "*.proto" | while read -r file; do
+		mv "$file" "${file%.js}.cjs"
+	done
+}
+
+merge secret/third_party/proto/cosmos cosmos
+
+
 copy gaia/proto/gaia gaia
 copy akash/proto/node/akash akash
 copy osmosis/proto/osmosis osmosis
-copy secret/third_party/proto/cosmos cosmos
 copy secret/proto
 
 copy gogoproto

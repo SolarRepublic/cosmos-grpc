@@ -40,7 +40,7 @@ srd_lib_api="$srd_lib/api"
 join() {
 	s_list=$1; s_delim=$2
 
-	echo -n "${s_list/$'\n'/}" | tr '\n' $s_delim | sed "s/$s_delim$//"
+	echo -n "${s_list/$'\n'/}" | tr '\n' "$s_delim" | sed "s/$s_delim$//"
 }
 
 
@@ -131,6 +131,11 @@ cosmos.crypto.secp256k1.PubKey
 cosmos.crypto.secp256r1.PubKey
 """
 
+# prep list of forced decoders
+s_decoders="""
+cosmos.tx.v1beta1.*
+"""
+
 # prep list of forced destructors
 s_destructors="""
 cosmos.base.abci.*
@@ -139,10 +144,23 @@ cosmos.base.kv.*
 /^tendermint\.abci\..*(Response|Result)/
 """
 
+# override types of specific decoders. format is MSG_ID:TYPE_REF
+# for example: cosmos.tx.v1beta1.ModeInfo:DecodedModeInfo
+s_decoder_types="""
+"""
+
+# file-specific augmentations. format is PROTO_PATH:AUGMENTATION_FILE
+# for example: cosmos/tx/v1beta1/tx:scripts/augmentations/cosmos-tx-v1beta1-tx.ts.txt
+s_augmentations="""
+"""
+
 # define options for plugin
 s_opts="""
 encoders=$(join "$s_encoders" ';')
+decoders=$(join "$s_decoders" ';')
 destructors=$(join "$s_destructors" ';')
+decoder_types=$(join "$s_decoder_types" ';')
+augmentations=$(join "$s_augmentations" ';')
 """
 
 

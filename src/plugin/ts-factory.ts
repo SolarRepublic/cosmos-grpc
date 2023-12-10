@@ -11,9 +11,11 @@ import type {
 	ConciseBody,
 	ParameterDeclaration,
 	Node,
+	BindingElement,
 	ArrayBindingElement,
 	MemberName,
 	ImportSpecifier,
+	PropertyName,
 } from 'typescript';
 
 import {__UNDEFINED, fodemtv, oderac} from '@blake.regalia/belt';
@@ -176,6 +178,8 @@ export const numericLit = (xn_value: number) => y_factory.createNumericLiteral(x
 
 export const arrayLit = (a_elements: Expression[]) => y_factory.createArrayLiteralExpression(a_elements, false);
 
+
+
 export const literal = (z_value: Arrayable<boolean | number | bigint | string | undefined>): Expression => {
 	switch(typeof z_value) {
 		case 'boolean': return y_factory.createToken(z_value? SyntaxKind.TrueKeyword: SyntaxKind.FalseKeyword) as Expression;
@@ -220,14 +224,16 @@ export const arrayAccess = (
 	(yn_prev, z_part) => y_factory.createElementAccessExpression(yn_prev as Expression, z_part),
 	'string' === typeof z_prime? ident(z_prime) as Expression: z_prime) as Expression;
 
-export const binding = (yn_inner: BindingName) => y_factory.createBindingElement(
+export const binding = (yn_inner: BindingName, z_prop?: string | PropertyName | undefined) => y_factory.createBindingElement(
 	__UNDEFINED,
-	__UNDEFINED,
+	z_prop,
 	yn_inner,
 	__UNDEFINED
 );
 
 export const arrayBinding = (a_bidings: ArrayBindingElement[]) => y_factory.createArrayBindingPattern(a_bidings);
+
+export const objectBinding = (a_bindings: BindingElement[]) => y_factory.createObjectBindingPattern(a_bindings);
 
 export const importModule = (sx_specifier: string, a_imports: Array<string | ImportSpecifier>, b_type_only=false) => y_factory.createImportDeclaration(
 	__UNDEFINED,

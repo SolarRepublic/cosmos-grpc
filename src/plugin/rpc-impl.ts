@@ -3,12 +3,12 @@ import type {AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod} f
 
 import type {Dict} from '@blake.regalia/belt';
 
-import type {TypeNode, ImportSpecifier} from 'typescript';
+import type {TypeNode, ImportSpecifier, Identifier} from 'typescript';
 
 import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
-import {parse_package_parts, type InterfacesDict, type RefableType, type TypesDict} from './plugin';
+import {parse_package_parts, type InterfacesDict, type RefableType, type TypesDict, type Params} from './plugin';
 
 import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory, chain, callChain, union} from './ts-factory';
 
@@ -19,10 +19,11 @@ export abstract class RpcImplementor {
 	protected _h_router!: FieldRouter;
 
 	protected _h_type_imports: Dict<[string, ImportSpecifier]> = {};
+	protected _h_imports: Dict<[string, ImportSpecifier]> = {};
 
 	protected _g_opened!: AugmentedFile;
 
-	constructor(protected _h_types: TypesDict, protected _h_interfaces: InterfacesDict) {}
+	constructor(protected _h_types: TypesDict, protected _h_interfaces: InterfacesDict, protected _h_params: Params) {}
 
 	abstract gateway(
 		sr_path_prefix: string,
@@ -85,6 +86,7 @@ export abstract class RpcImplementor {
 		this._g_opened = g_proto;
 
 		this._h_type_imports = {};
+		this._h_imports = {};
 	}
 
 	resolveType(si_type: string): RefableType {
@@ -134,6 +136,7 @@ export abstract class RpcImplementor {
 	importMessage(g_msg: AugmentedMessage): TypeNode {
 		const si_name = this.exportedId(g_msg);
 
+		// external
 		if(g_msg.source !== this._g_opened) {
 			this._h_type_imports[si_name] = [`#/proto/${map_proto_path(g_msg.source)}`, y_factory.createImportSpecifier(
 				false,
@@ -145,8 +148,29 @@ export abstract class RpcImplementor {
 		return typeRef(si_name);
 	}
 
+	importDecoder(g_ref: RefableType): Identifier {
+		const si_decoder = `decode${this.exportedId(g_ref)}`;
+
+		// external
+		if(g_ref.source !== this._g_opened) {
+			this._h_imports[si_decoder] = [`#/proto/${map_proto_path(g_ref.source)}`, y_factory.createImportSpecifier(
+				false,
+				__UNDEFINED,
+				ident(si_decoder)
+			)];
+		}
+
+		return ident(si_decoder);
+	}
+
 	imports(): string[] {
-		return oderac(this._h_type_imports, (si_ident, [sr_path, yn_import]) => importModule(sr_path, [yn_import], true)).map(yn => print(yn));
+		return [
+			// type imports
+			...oderac(this._h_type_imports, (si_ident, [sr_path, yn_import]) => importModule(sr_path, [yn_import], true)).map(yn => print(yn)),
+
+			// dependencies on other generated proto files
+			...oderac(this._h_imports, (si_ident, [sr_path, yn_import]) => importModule(sr_path, [yn_import])).map(yn => print(yn)),
+		];
 	}
 
 	route(g_field: AugmentedField): TsThing {
@@ -248,18 +272,19 @@ export abstract class RpcImplementor {
 				}
 			}
 
-			if(g_nests?.parse && F_IDENTITY !== g_nests.parse) {
-				const f_parse = g_nests.parse;
+			// TODO: revise
+			// if(g_nests?.parse && F_IDENTITY !== g_nests.parse) {
+			// 	const f_parse = g_nests.parse;
 
-				g_nests.parse = yn_data => callExpr(
-					access(yn_data, 'map'),
-					[
-						arrow([
-							param('atu8'),
-						], f_parse(ident('atu8'))),
-					]
-				);
-			}
+			// 	g_nests.parse = yn_data => callExpr(
+			// 		access(yn_data, 'map'),
+			// 		[
+			// 			arrow([
+			// 				param('atu8'),
+			// 			], f_parse(ident('atu8'))),
+			// 		]
+			// 	);
+			// }
 		}
 
 		// auto-fill calls

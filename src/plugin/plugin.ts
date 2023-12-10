@@ -4,7 +4,7 @@ import type {Dict, Promisable} from '@blake.regalia/belt';
 import type {CodeGeneratorRequest as CodeGenReq} from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 import type {DescriptorProto, EnumDescriptorProto, FileDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {fold, concat2, escape_regex, fodemtv, ode} from '@blake.regalia/belt';
+import {fold, concat2, escape_regex, fodemtv, ode, ofe} from '@blake.regalia/belt';
 
 import pluginPb from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 
@@ -27,6 +27,8 @@ export type Params = {
 	decoders?: RegExp[];
 	destructors?: RegExp[];
 	accessors?: RegExp[];
+	decoder_types?: Dict;
+	augmentations?: Dict;
 };
 
 const {
@@ -271,12 +273,18 @@ export const plugin = async(
 
 		const a_values = s_value.split(';');
 
-		let z_return: string[] | RegExp[] = a_values;
+		let z_return: string[] | RegExp[] | Dict = a_values;
 
 		if(['encoders', 'decoders', 'destructors', 'accessors'].includes(si_opt)) {
 			z_return = a_values.map(s => /^\/.*\/$/.test(s)
 				? new RegExp(s.slice(1, -1))
 				: new RegExp('^'+escape_regex(s).replace(/\\\*/g, '.*')+'$'));
+		}
+		else if(['decoder_types', 'augmentations'].includes(si_opt)) {
+			z_return = ofe(a_values.map(s_config => s_config.split(':', 2) as [string, string]));
+		}
+		else {
+			throw Error(`Unrecognized option "${si_opt}"`);
 		}
 
 		return {
