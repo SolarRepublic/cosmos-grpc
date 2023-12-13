@@ -1,8 +1,8 @@
 import type {O} from 'ts-toolbelt';
 
 import type {PropagateUndefined} from './types';
-import type {SlimCoin} from '@solar-republic/types';
 import type {Nilable} from '@blake.regalia/belt';
+import type {SlimCoin} from '@solar-republic/types';
 
 import {ATU8_NIL, __UNDEFINED, buffer, text_to_buffer} from '@blake.regalia/belt';
 
@@ -199,7 +199,13 @@ export const Protobuf = (): ProtoWriter => {
 
 export const map = <
 	w_item,
->(a_items: Nilable<w_item[]>, f_call: (w_item: w_item) => Uint8Array): Uint8Array[] | undefined => a_items?.map(f_call);
+	w_out,
+>(a_items: Nilable<w_item[]>, f_call: (w_item: w_item) => w_out): w_out[] | undefined => a_items?.map(f_call);
+
+export const apply_opt = <
+	w_item,
+	w_out,
+>(w_item: w_item | undefined, f_call: (w_item: w_item) => w_out): w_out | undefined => w_item? f_call(w_item): __UNDEFINED;
 
 export const temporal = (xn_milliseconds: Nilable<number>): Uint8Array => xn_milliseconds? Protobuf()
 	.v((xn_milliseconds / 1e3) | 0)
@@ -223,3 +229,7 @@ export const coin = <
 ) as Uint8Array | PropagateUndefined<a_coin>;
 
 export const coins = (a_coins: Nilable<SlimCoin[]>): Uint8Array[] | undefined => map(a_coins, coin);
+
+export const slimify_coin = (g_coin: {denom?: string; amount?: string}) => [g_coin.amount!, g_coin.denom!] as SlimCoin;
+
+// export const 

@@ -1,14 +1,15 @@
 import type {FieldRouter, TsThing} from './common';
 import type {AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod} from './env';
 
+import type {InterfacesDict, RefableType, TypesDict, Params} from './plugin';
 import type {Dict} from '@blake.regalia/belt';
 
-import type {TypeNode, ImportSpecifier, Identifier} from 'typescript';
+import type {TypeNode, ImportSpecifier, Identifier, CallExpression} from 'typescript';
 
 import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
-import {parse_package_parts, type InterfacesDict, type RefableType, type TypesDict, type Params} from './plugin';
+import {parse_package_parts} from './plugin';
 
 import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory, chain, callChain, union} from './ts-factory';
 
@@ -105,8 +106,6 @@ export abstract class RpcImplementor {
 		return this.pathOfType(g_field.typeName!);
 	}
 
-	// importType(sr_path: string, z_ident: string | [ident: string, rename: string], a_type_args?: TypeNode[]): TypeNode {
-
 	importType(sr_path: string, z_ident: string | RefableType, a_type_args?: TypeNode[]): TypeNode {
 		let si_name = z_ident as string;
 		let si_prop: string | undefined;
@@ -148,19 +147,19 @@ export abstract class RpcImplementor {
 		return typeRef(si_name);
 	}
 
-	importDecoder(g_ref: RefableType): Identifier {
-		const si_decoder = `decode${this.exportedId(g_ref)}`;
+	importConstant(g_ref: RefableType, s_prefix: string): Identifier {
+		const si_const = `${s_prefix}${this.exportedId(g_ref)}`;
 
 		// external
 		if(g_ref.source !== this._g_opened) {
-			this._h_imports[si_decoder] = [`#/proto/${map_proto_path(g_ref.source)}`, y_factory.createImportSpecifier(
+			this._h_imports[si_const] = [`#/proto/${map_proto_path(g_ref.source)}`, y_factory.createImportSpecifier(
 				false,
 				__UNDEFINED,
-				ident(si_decoder)
+				ident(si_const)
 			)];
 		}
 
-		return ident(si_decoder);
+		return ident(si_const);
 	}
 
 	imports(): string[] {
@@ -191,6 +190,7 @@ export abstract class RpcImplementor {
 		const g_calls = g_bare.calls as TsThing['calls'];
 		const g_proto = g_bare.proto as TsThing['proto'];
 		const g_nests = g_bare.nests as TsThing['nests'] || null;
+		const g_json = g_bare.json as TsThing['json'];
 
 		// auto-fill proto
 		{
@@ -241,18 +241,30 @@ export abstract class RpcImplementor {
 			// wrap to_json
 			const f_json = g_calls.to_json;
 			if(f_json) {
-				g_calls.to_json = yn_expr => callChain(
-					chain(yn_expr, 'map'),
-					[arrow([param(s_name_singular)], f_json(ident(s_name_singular)))]
-				);
+				// cache singular form
+				const yn_json = f_json(ident(s_name_singular)) as CallExpression;
+
+				// shorten to using `map` import if single argument
+				g_calls.to_json = 1 === yn_json.arguments.length
+					? yn_expr => callExpr('map', [yn_expr, yn_json.expression])
+					: yn_expr => callChain(
+						chain(yn_expr, 'map'),
+						[arrow([param(s_name_singular)], yn_json)]
+					);
 			}
 
 			// wrap from_json
 			const f_from_json = g_calls.from_json;
 			if(f_from_json) {
-				g_calls.from_json = yn_expr => callChain(chain(yn_expr, 'map'), [
-					arrow([param(s_name_singular)], f_from_json(ident(s_name_singular))),
-				]);
+				// cache singular form
+				const yn_json = f_from_json(ident(s_name_singular)) as CallExpression;
+
+				// shorten to using `map` import if single argument
+				g_calls.from_json = 1 === yn_json.arguments.length
+					? yn_expr => callExpr('map', [yn_expr, yn_json.expression])
+					: yn_expr => callChain(chain(yn_expr, 'map'), [
+						arrow([param(s_name_singular)], f_from_json(ident(s_name_singular))),
+					]);
 			}
 
 			// wrap to_proto
@@ -265,11 +277,36 @@ export abstract class RpcImplementor {
 				else {
 					const f_original = g_calls.to_proto;
 
-					g_calls.to_proto = yn_expr => callExpr(
-						access(g_calls.name, 'map'),
-						[arrow([param(s_name_singular)], f_original(yn_expr))]
-					);
+					// cache singular form
+					const yn_singular = f_original(ident(s_name_singular)) as CallExpression;
+
+					// shorten to using `map` import if single argument
+					g_calls.to_proto = 1 === yn_singular.arguments.length
+						? yn_expr => callExpr('map', [yn_expr, yn_singular.expression])
+						: yn_expr => callExpr(
+							// access(g_calls.name, 'map'),
+							access(yn_expr, 'map'),
+							[arrow([param(s_name_singular)], yn_singular)]
+						);
 				}
+			}
+
+			// convert
+			const f_convert = g_calls.convert;
+			if(f_convert) {
+				// cache singular form
+				const yn_singular = f_convert(ident(s_name_singular)) as CallExpression;
+
+				// shorten to using `map` import if single argument
+				g_calls.convert = 1 === yn_singular.arguments.length
+					? yn_expr => callExpr('map', [yn_expr, yn_singular.expression])
+					: yn_expr => callChain(chain(yn_expr, 'map'), [
+						arrow([param(s_name_singular)], f_from_json(ident(s_name_singular))),
+					]);
+			}
+
+			if(g_json?.type) {
+				g_json.type = arrayType(g_json.type);
 			}
 
 			// TODO: revise
@@ -299,10 +336,12 @@ export abstract class RpcImplementor {
 		g_calls.to_proto ||= F_IDENTITY;  // ident(g_proto.prefers_call? g_calls.name: g_proto.name);
 		g_calls.return_type ||= g_calls.type;
 
-		let yn_json = g_bare.json?.type || g_calls.return_type;
-		if(g_field.repeated) {
-			yn_json = arrayType(yn_json);
-		}
+		g_calls.convert ||= g_calls.from_json;
+
+		const yn_json = g_json?.type || g_calls.return_type;
+		// if(g_field.repeated) {
+		// 	yn_json = arrayType(yn_json);
+		// }
 
 		// create and return thing
 		return {

@@ -3,11 +3,12 @@ import type {AugmentedEnum, AugmentedMessage} from './env';
 
 import type {Dict} from '@blake.regalia/belt';
 
-import {ode, odv} from '@blake.regalia/belt';
+import {ode, oderac, oderom, odv} from '@blake.regalia/belt';
 
+import {map_proto_path} from './common';
 import {NeutrinoImpl} from './impl-neutrino';
 import {plugin} from './plugin';
-import {importModule, print} from './ts-factory';
+import {declareConst, funcType, ident, importModule, objectLit, param, print, typeRef, y_factory} from './ts-factory';
 
 // inject into preamble of any file, allow linter to delete unused imports
 const A_GLOBAL_PREAMBLE = [
@@ -62,10 +63,12 @@ const A_GLOBAL_PREAMBLE = [
 		importModule('#/api/protobuf-writer', [
 			'Protobuf',
 			'map',
+			'apply_opt',
 			'temporal',
 			'any',
 			'coin',
 			'coins',
+			'slimify_coin',
 		]),
 		importModule('#/api/protobuf-reader', [
 			'decode_protobuf',
@@ -88,6 +91,9 @@ const A_GLOBAL_PREAMBLE = [
 			'WeakTimestampStr',
 			'WeakDurationStr',
 		], true),
+		importModule('#/proto/_any_condense', [
+			'condenseJsonAny',
+		]),
 	].map(yn => print(yn)),
 ];
 
@@ -228,7 +234,7 @@ export const main = () => {
 						// add encoder
 						h_encoders[g_msg.path] = {
 							message: g_msg,
-							contents: [k_impl.msgEncoder(g_msg)],
+							contents: k_impl.msgEncoder(g_msg),
 						};
 
 						// ensure its fields can be encoded
@@ -243,14 +249,11 @@ export const main = () => {
 						// verbose
 						console.warn(`INFO: Matched to decoders pattern: "${g_msg.path.slice(1)}"`);
 
-						const a_decoder = k_impl.msgDecoder(g_msg);
-						if(a_decoder) {
-							// add decoder
-							h_decoders[g_msg.path] = {
-								message: g_msg,
-								contents: a_decoder,
-							};
-						}
+						// add decoder
+						h_decoders[g_msg.path] = {
+							message: g_msg,
+							contents: k_impl.msgDecoder(g_msg),
+						};
 
 						// ensure its fields can be decoded
 						mark_fields(g_msg, g_decoders);
@@ -374,25 +377,22 @@ export const main = () => {
 						// add input encoder
 						h_encoders[g_input.path] = {
 							message: g_input,
-							contents: [k_impl.msgEncoder(g_input)],
+							contents: k_impl.msgEncoder(g_input),
 						};
 
 						// ensure its fields can be encoded
 						mark_fields(g_input, g_encoders);
 
+						// ensure its inputs are typed and enums accessible
+						mark_fields(g_input, g_accessible);
+
 						// method output has content
 						if(g_output.fieldList.length) {
-							// render decoder
-							const a_decoder = k_impl.msgDecoder(g_output);
+							// add decoder
+							a_decoders.push(...k_impl.msgDecoder(g_output));
 
-							// decoder is OK
-							if(a_decoder) {
-								// add decoder
-								a_decoders.push(...a_decoder);
-
-								// ensure its fields can be decoded
-								mark_fields(g_output, g_decoders);
-							}
+							// ensure its fields can be decoded
+							mark_fields(g_output, g_decoders);
 						}
 					}
 				}
@@ -405,26 +405,18 @@ export const main = () => {
 			// add encoder
 			h_encoders[g_msg.path] = {
 				message: g_msg,
-				contents: [k_impl.msgEncoder(g_msg)],
+				contents: k_impl.msgEncoder(g_msg),
 			};
 		}
 
 		debugger;
 		// each message in need of a decoder
 		for(const [, g_msg] of ode(g_decoders.messages)) {
-			const a_decoder = k_impl.msgDecoder(g_msg);
-
-			if(a_decoder) {
-				// add decoder
-				h_decoders[g_msg.path] = {
-					message: g_msg,
-					contents: a_decoder,
-				};
-			}
-			else {
-				// debugger;
-				console.warn(`WARNING: Skipping decoder for ${g_msg.path}`);
-			}
+			// add decoder
+			h_decoders[g_msg.path] = {
+				message: g_msg,
+				contents: k_impl.msgDecoder(g_msg),
+			};
 
 			const a_destructor = k_impl.msgDestructor(g_msg);
 			if(a_destructor) {
@@ -596,7 +588,48 @@ export const main = () => {
 			}
 		}
 
-		debugger;
+		// global registries
+		{
+			function create_any_registry(s_prefix: 'encode' | 'condense') {
+				h_outputs[`_any_${s_prefix}.ts`] = [
+					`import type {JsonAny} from '#/api/types.ts';`,
+					`import type {Dict, JsonObject} from '@blake.regalia/belt';`,
+					`import {__UNDEFINED} from '@blake.regalia/belt';`,
+					`import {encodeGoogleProtobufAny} from '#/proto/google/protobuf/any';`,
+
+					...[
+						...oderac(h_encoders, (si, g_encoder) => {
+							const g_msg = g_encoder.message;
+
+							const sr_import = `#/proto/${map_proto_path(g_msg.source)}`;
+
+							const yn_import = y_factory.createImportSpecifier(
+								false,
+								ident(`${s_prefix}${k_impl.exportedId(g_msg)}`),
+								ident(`${s_prefix}${k_impl.clashFreeTypeId(g_msg)}`)
+							);
+
+							return importModule(sr_import, [yn_import]);
+						}),
+
+						declareConst(`H_REGISTRY_ANY_${s_prefix.toUpperCase()}`, objectLit(oderom(h_encoders, (si, g_encoder) => {
+							const g_msg = g_encoder.message;
+
+							return {
+								[g_msg.path.replace(/^\./, '/')]: ident(`${s_prefix}${k_impl.clashFreeTypeId(g_msg)}`),
+							};
+						})), false, typeRef('Dict', [funcType([param('g_msg', typeRef('JsonObject'))], typeRef('Uint8Array'))])),
+					].map(yn => print(yn)),
+
+					`
+						export const ${s_prefix}JsonAny = (g_any: JsonAny | undefined, p_type: string|undefined=g_any?.['@type']): Uint8Array | undefined => g_any? encodeGoogleProtobufAny(p_type!, H_REGISTRY_ANY_${s_prefix.toUpperCase()}[p_type!](g_any)): __UNDEFINED;
+					`,
+				].join('\n\n').replace(/\n+\nimport/g, '\nimport');
+			}
+
+			// create_any_registry('encode');
+			create_any_registry('condense');
+		}
 
 		return h_outputs;
 	});

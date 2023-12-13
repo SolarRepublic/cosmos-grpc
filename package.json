@@ -9,7 +9,7 @@
   ],
   "exports": {
     ".": "./build/dist/api/main.js",
-    "./*": "./build/dist/proto/*"
+    "./*": "./build/dist/proto/*.js"
   },
   "bin": {
     "protoc-gen-secret": "./build/protoc/run.js"

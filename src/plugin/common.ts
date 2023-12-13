@@ -37,6 +37,9 @@ export type TsThingBare = {
 
 		// how to convert a response value in JSON back to `type`
 		from_json?: (yn_expr: Expression) => Expression;
+
+		// how to convert a JSON-encoded value into its protobuf equivalent
+		convert?: (yn_expr: Expression) => Expression;
 	};
 
 	// when using the type to submit gateway request or parse a response
@@ -161,6 +164,7 @@ const H_OVERRIDE_MIXINS: Dict<
 				type: typeRef('SlimCoin'),
 				to_proto: yn_expr => callExpr('coin', [yn_expr]),
 				to_json: yn_expr => callExpr('restruct_coin', [yn_expr]),
+				convert: yn_expr => callExpr('slimify_coin', [yn_expr]),
 			},
 
 			proto: {
@@ -177,6 +181,8 @@ const H_OVERRIDE_MIXINS: Dict<
 				// parse: F_IDENTITY,
 				parser: null,
 			},
+
+
 		};
 	},
 
@@ -225,6 +231,7 @@ const H_OVERRIDE_MIXINS: Dict<
 			calls: {
 				name: `atu8_${g_field.name!}`,
 				type: yn_proto_type,
+				convert: yn_expr => callExpr('condenseJsonAny', [yn_expr]),
 			},
 
 			json: {
@@ -269,7 +276,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	[H_FIELD_TYPES.TYPE_BOOL]: si_field => ({
 		calls: {
 			name: `b_${si_field}`,
-			type: keyword('boolean'),
+			type: union([keyword('boolean'), ...[0, 1].map(x => litType(numericLit(x)))]),
 			return_type: union([0, 1].map(x => litType(numericLit(x)))),
 		},
 
@@ -410,7 +417,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		const yn_json = k_impl.importType(sr_path, g_refable);
 
 		// import nested decoder
-		const yn_decoder = k_impl.importDecoder(g_refable);
+		const yn_decoder = k_impl.importConstant(g_refable, 'decode');
 
 		// construct ts field
 		return {
@@ -483,6 +490,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 				type: yn_type,
 				from_json: yn_expr => callExpr('safe_base64_to_buffer', [yn_expr]),
 				// return_type: typeRef('CwBase64'),
+				// to_proto: yn_expr => callExpr(),
 
 				// type: typeRef('CwBase64'),
 				return_type: yn_type,

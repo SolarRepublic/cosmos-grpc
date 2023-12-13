@@ -171,8 +171,10 @@ export const arrow = (a_params: ParameterDeclaration[], yn_body: ConciseBody, yn
 	yn_body
 );
 
-export const objectLit = (h_props: Dict<Expression>) => y_factory.createObjectLiteralExpression(
-	oderac(h_props, (si_key, yn_expr) => y_factory.createPropertyAssignment(ident(si_key), yn_expr)), true);
+export const objectLit = (h_props: Dict<Expression | [Expression, Expression]>) => y_factory.createObjectLiteralExpression(
+	oderac(h_props, (si_key, z_value) => Array.isArray(z_value)
+		? y_factory.createPropertyAssignment(y_factory.createComputedPropertyName(z_value[0]), z_value[1])
+		: y_factory.createPropertyAssignment(string(si_key), z_value)), true);
 
 export const numericLit = (xn_value: number) => y_factory.createNumericLiteral(xn_value);
 
@@ -298,3 +300,5 @@ export const typeOf = (z_ref: string | Identifier) => y_factory.createTypeQueryN
 export const keyOf = (yn_type: TypeNode) => y_factory.createTypeOperatorNode(SyntaxKind.KeyOfKeyword, yn_type);
 
 export const accessIndexed = (yn_obj: TypeNode, yn_index: TypeNode) => y_factory.createIndexedAccessTypeNode(yn_obj, yn_index);
+
+export const exclaim = (yn_expr: Expression) => y_factory.createNonNullExpression(yn_expr);

@@ -1,5 +1,6 @@
-import type { Nilable } from '@blake.regalia/belt';
-import { __UNDEFINED } from '@blake.regalia/belt';
+import type {Nilable} from '@blake.regalia/belt';
+
+import {__UNDEFINED} from '@blake.regalia/belt';
 
 export const parse_duration = (s_duration: Nilable<string>): number | undefined => s_duration
 	? +/^([\d.]+)s$/.exec(s_duration)![0] * 1e3

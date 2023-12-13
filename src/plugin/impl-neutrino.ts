@@ -8,14 +8,14 @@ import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclarat
 
 import {readFileSync} from 'node:fs';
 
-import {__UNDEFINED, fold, oderac, proper, snake, escape_regex, fodemtv, odem} from '@blake.regalia/belt';
+import {__UNDEFINED, fold, oderac, proper, snake, escape_regex, fodemtv, odem, F_IDENTITY} from '@blake.regalia/belt';
 
 import {ts} from 'ts-morph';
 
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding} from './ts-factory';
+import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding, arrayAccess, exclaim} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 type ReturnThing = {
@@ -600,7 +600,7 @@ export class NeutrinoImpl extends RpcImplementor {
 	// 	]);
 	// }
 
-	msgEncoder(g_msg: AugmentedMessage): string {
+	msgEncoder(g_msg: AugmentedMessage): string[] {
 		// open proto source of msg
 		this.open(g_msg.source);
 
@@ -624,15 +624,83 @@ export class NeutrinoImpl extends RpcImplementor {
 		// create statement
 		const yn_const = declareConst(`encode${this.exportedId(g_msg)}`, yn_writer, true);
 
-		return print(yn_const, [
-			`Encodes a \`${g_msg.name}\` protobuf message: ${g_msg.comments}`,
-			...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
-			`@returns a strongly subtyped Uint8Array protobuf message`,
+		return [
+			print(yn_const, [
+				`Encodes a \`${g_msg.name}\` protobuf message: ${g_msg.comments}`,
+				...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
+				`@returns a strongly subtyped Uint8Array protobuf message`,
+			]),
+			this.condenser(g_msg),
+		];
+	}
+
+	condenser(g_msg: AugmentedMessage): string {
+		const si_exported = this.exportedId(g_msg);
+
+		const yn_enstructor = arrow(
+			[
+				param('g_msg', typeRef(si_exported)),
+				// this.importType(this.pathOfType(g_msg.path), si_exported)
+			],
+			callExpr(`encode${si_exported}`, g_msg.fieldList.map((g_field) => {
+				// convert field to thing
+				const g_thing = this.route(g_field);
+
+				// base accessor expression
+				const yn_access = access('g_msg', g_field.name!);
+
+				const f_dejson = g_thing.calls.convert;
+
+				// 
+				if(F_IDENTITY !== f_dejson) {
+					return f_dejson(yn_access);
+				}
+				// message
+				else if(g_field.typeName) {
+					// resolve field type
+					const g_resolved = this.resolveType(g_field.typeName);
+
+					// enum
+					if('enum' === g_resolved.form) {
+						// import enum map
+						const yn_enum = this.importConstant(g_resolved, 'JsonToProtoEnum');
+
+						// encode lookup
+						return arrayAccess(yn_enum, exclaim(yn_access));
+					}
+					// message
+					else {
+						// import field condensor
+						const yn_condensor = this.importConstant(g_resolved, 'condense');
+
+						// encode expr
+						const f_encode = (yn: Expression) => callExpr(yn_condensor, [yn]);
+
+						const yn_each = g_field.repeated
+							? callExpr('map', [yn_access, yn_condensor])
+							: g_thing.optional
+								? callExpr('apply_opt', [yn_access, yn_condensor])
+								: f_encode(yn_access);
+
+						return yn_each;
+					}
+				}
+
+				return yn_access;
+			})),
+			typeRef(`Encoded${si_exported}`)
+		);
+
+		const yn_condense = declareConst(`condense${this.exportedId(g_msg)}`, yn_enstructor, true);
+
+		return print(yn_condense, [
+			`Takes the JSON representation of a message and converts it to its protobuf form`,
+			`@returns {@link Encoded${si_exported}}`,
 		]);
 	}
 
 	// 
-	msgDecoder(g_msg: AugmentedMessage): string[] | undefined {
+	msgDecoder(g_msg: AugmentedMessage): string[] {
 		// open proto source of msg
 		this.open(g_msg.source);
 
@@ -1068,15 +1136,11 @@ export class NeutrinoImpl extends RpcImplementor {
 				`@returns a tuple where:`,
 				...g_msg.fieldList.map(g_field => `  - ${g_field.number! - 1}: ${g_field.name!} - ${g_field.comments}`),
 			]),
-			// print(yn_alias, [
-			// 	`JSON serialization of \`${g_msg.path.slice(1)}\` - ${g_msg.comments}`,
-			// 	// ...g_msg.fieldList.map(g_field => `@param ${g_field.name} - ${g_field.comments}`),
-			// ]),
 			...this.msgAccessor(g_msg),
 		];
 	}
 
-	enumId(g_enum: AugmentedEnum, si_mode: 'Proto' | 'Json') {
+	enumId(g_enum: AugmentedEnum, si_mode: 'Proto' | 'Json' | 'ProtoToJson' | 'JsonToProto') {
 		return `${si_mode}Enum${this.exportedId(g_enum)}`;
 	}
 
@@ -1098,6 +1162,10 @@ export class NeutrinoImpl extends RpcImplementor {
 		// types for enum alias
 		const a_types_proto: TypeNode[] = [];
 		const a_types_json: TypeNode[] = [];
+
+		// mapping entries between modes
+		const h_map_proto_json: Dict<[Expression, Expression]> = {};
+		const h_map_json_proto: Dict<[Expression, Expression]> = {};
 
 		// output strings
 		const a_outs: string[] = [];
@@ -1161,6 +1229,10 @@ export class NeutrinoImpl extends RpcImplementor {
 					`Belongs to enum type {@link ${si_enum_json}}`,
 				]),
 			]);
+
+			// add mappings
+			h_map_proto_json[si_proto] = [ident(si_proto), ident(si_json)];
+			h_map_json_proto[si_json] = [ident(si_json), ident(si_proto)];
 		}
 
 		// print proto enum type
@@ -1177,6 +1249,24 @@ export class NeutrinoImpl extends RpcImplementor {
 			'',
 			'Values:',
 			...a_values_json.map(s => `  - {@link ${s}}`),
+		]));
+
+		// print maps
+		a_outs.push(print(declareConst(
+			this.enumId(g_enum, `ProtoToJson`),
+			objectLit(h_map_proto_json),
+			true,
+			typeRef('Record', [typeRef(si_enum_proto), typeRef(si_enum_json)])
+		), [
+			`Maps a protobuf enum int value for \`${sr_enum}\` to is JSON equivalent enum string value`,
+		]));
+		a_outs.push(print(declareConst(
+			this.enumId(g_enum, `JsonToProto`),
+			objectLit(h_map_json_proto),
+			true,
+			typeRef('Record', [typeRef(si_enum_json), typeRef(si_enum_proto)])
+		), [
+			`Maps a JSON enum string value for \`${sr_enum}\` to is protobuf equivalent enum int value`,
 		]));
 
 		// return string list

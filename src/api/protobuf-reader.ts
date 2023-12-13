@@ -255,3 +255,4 @@ export const decode_temporal = (
 ): number => reduce_temporal(decode_protobuf<
 	[string, number]
 >(atu8_payload, [ProtoHint.SINGULAR_BIGINT, ProtoHint.SINGULAR]));
+

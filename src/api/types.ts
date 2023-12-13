@@ -1,6 +1,5 @@
-import type {JsonObject, Nilable} from '@blake.regalia/belt';
+import type {JsonObject} from '@blake.regalia/belt';
 
-import type {CwBase64} from '@solar-republic/types';
 
 declare const INTERFACES: unique symbol;
 
@@ -41,7 +40,7 @@ export type JsonAny<
 // 		: never);
 
 export type Opt<
-	z_type
+	z_type,
 >= z_type | null | undefined | (z_type extends string? '': never);
 
 export type WeakTimestampStr = `${string}T${string}Z`;
