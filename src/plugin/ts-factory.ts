@@ -180,8 +180,6 @@ export const numericLit = (xn_value: number) => y_factory.createNumericLiteral(x
 
 export const arrayLit = (a_elements: Expression[]) => y_factory.createArrayLiteralExpression(a_elements, false);
 
-
-
 export const literal = (z_value: Arrayable<boolean | number | bigint | string | undefined>): Expression => {
 	switch(typeof z_value) {
 		case 'boolean': return y_factory.createToken(z_value? SyntaxKind.TrueKeyword: SyntaxKind.FalseKeyword) as Expression;

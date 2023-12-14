@@ -630,11 +630,11 @@ export class NeutrinoImpl extends RpcImplementor {
 				...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
 				`@returns a strongly subtyped Uint8Array protobuf message`,
 			]),
-			this.condenser(g_msg),
+			this.msgCondensor(g_msg),
 		];
 	}
 
-	condenser(g_msg: AugmentedMessage): string {
+	msgCondensor(g_msg: AugmentedMessage): string {
 		const si_exported = this.exportedId(g_msg);
 
 		const yn_enstructor = arrow(
@@ -651,15 +651,22 @@ export class NeutrinoImpl extends RpcImplementor {
 
 				const f_dejson = g_thing.calls.convert;
 
+				// resolve field type
+				const g_resolved = g_field.typeName? this.resolveType(g_field.typeName): __UNDEFINED;
+
 				// 
 				if(F_IDENTITY !== f_dejson) {
-					return f_dejson(yn_access);
+					const yn_applied = f_dejson(yn_access);
+
+					if(g_resolved && '.google.protobuf.Any' === g_field.typeName && g_field.options?.acceptsInterface) {
+						const yn_encoded = typeRef('Encoded', [litType(string(g_field.options.acceptsInterface))]);
+						return castAs(yn_applied, g_field.repeated? arrayType(yn_encoded): yn_encoded);
+					}
+
+					return yn_applied;
 				}
 				// message
-				else if(g_field.typeName) {
-					// resolve field type
-					const g_resolved = this.resolveType(g_field.typeName);
-
+				else if(g_resolved) {
 					// enum
 					if('enum' === g_resolved.form) {
 						// import enum map

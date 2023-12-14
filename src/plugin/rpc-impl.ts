@@ -11,7 +11,7 @@ import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex} from '@blake.rega
 import {map_proto_path} from './common';
 import {parse_package_parts} from './plugin';
 
-import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, keyword, typeRef, y_factory, chain, callChain, union} from './ts-factory';
+import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, typeRef, y_factory, chain, callChain, union} from './ts-factory';
 
 
 export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
@@ -64,21 +64,21 @@ export abstract class RpcImplementor {
 	importJsonTypesImplementing(si_interface: string): TypeNode {
 		const a_msgs = this._h_interfaces[si_interface];
 
+		// no mesages implement the interface
 		if(!a_msgs) {
 			console.warn(`WARNING: No messages implement the interface "${si_interface}"`);
-			return keyword('void');
+			// return keyword('void');
 		}
 
-		// TODO: why was this line important
-		// if(a_msgs.length) debugger;
-
-		// return union(a_msgs.map(g_msg => this.importType(this.pathOfType(g_msg.path), [g_msg.name!, this.clashFreeTypeId(g_msg)])));
+		// create type reference to JSON form of Any with appropriate generics
 		return typeRef('JsonAny', [
 			litType(string(si_interface)),
-			union(a_msgs.map(g_msg => this.importType(
-				this.pathOfType(g_msg.path),
-				g_msg
-			))),
+			...a_msgs
+				? [union(a_msgs.map(g_msg => this.importType(
+					this.pathOfType(g_msg.path),
+					g_msg
+				)))]
+				: [],  // keyword('never'),
 		]);
 	}
 
@@ -187,10 +187,10 @@ export abstract class RpcImplementor {
 		const g_bare = f_transformer(g_field.name, g_field);
 
 		// ref parts
-		const g_calls = g_bare.calls as TsThing['calls'];
-		const g_proto = g_bare.proto as TsThing['proto'];
-		const g_nests = g_bare.nests as TsThing['nests'] || null;
-		const g_json = g_bare.json as TsThing['json'];
+		const g_calls = {...g_bare.calls} as TsThing['calls'];
+		const g_proto = {...g_bare.proto} as TsThing['proto'];
+		const g_nests = g_bare.nests? {...g_bare.nests}: __UNDEFINED as TsThing['nests'] || null;
+		const g_json = {...g_bare.json} as TsThing['json'];
 
 		// auto-fill proto
 		{
@@ -309,25 +309,14 @@ export abstract class RpcImplementor {
 				g_json.type = arrayType(g_json.type);
 			}
 
-			// TODO: revise
-			// if(g_nests?.parse && F_IDENTITY !== g_nests.parse) {
-			// 	const f_parse = g_nests.parse;
-
-			// 	g_nests.parse = yn_data => callExpr(
-			// 		access(yn_data, 'map'),
-			// 		[
-			// 			arrow([
-			// 				param('atu8'),
-			// 			], f_parse(ident('atu8'))),
-			// 		]
-			// 	);
-			// }
+			if(g_calls.return_type) {
+				g_calls.return_type = arrayType(g_calls.return_type);
+			}
 		}
 
 		// auto-fill calls
 		if(si_snake.startsWith('atu8_')) {
 			g_calls.to_json ||= yn_expr => callExpr('safe_buffer_to_base64', [yn_expr]);
-			// g_calls.from_json ||= yn_data => call('safe_base64_to_buffer', [yn_data]);
 		}
 
 		g_calls.to_json ||= F_IDENTITY;
@@ -339,9 +328,6 @@ export abstract class RpcImplementor {
 		g_calls.convert ||= g_calls.from_json;
 
 		const yn_json = g_json?.type || g_calls.return_type;
-		// if(g_field.repeated) {
-		// 	yn_json = arrayType(yn_json);
-		// }
 
 		// create and return thing
 		return {

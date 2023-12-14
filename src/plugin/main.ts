@@ -3,7 +3,9 @@ import type {AugmentedEnum, AugmentedMessage} from './env';
 
 import type {Dict} from '@blake.regalia/belt';
 
-import {ode, oderac, oderom, odv} from '@blake.regalia/belt';
+import type {ImportSpecifier} from 'typescript';
+
+import {ode, oderom, odv} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
 import {NeutrinoImpl} from './impl-neutrino';
@@ -239,6 +241,9 @@ export const main = () => {
 
 						// ensure its fields can be encoded
 						mark_fields(g_msg, g_encoders);
+
+						// ensure its fields can be accessed for condensor
+						mark_fields(g_msg, g_accessible);
 					}
 				}
 
@@ -591,6 +596,19 @@ export const main = () => {
 		// global registries
 		{
 			function create_any_registry(s_prefix: 'encode' | 'condense') {
+				const h_imports: Record<string, ImportSpecifier[]> = {};
+
+				for(const [, g_encoder] of ode(h_encoders)) {
+					const g_msg = g_encoder.message;
+					const sr_import = `#/proto/${map_proto_path(g_msg.source)}`;
+
+					(h_imports[sr_import] ??= []).push(y_factory.createImportSpecifier(
+						false,
+						ident(`${s_prefix}${k_impl.exportedId(g_msg)}`),
+						ident(`${s_prefix}${k_impl.clashFreeTypeId(g_msg)}`)
+					));
+				}
+
 				h_outputs[`_any_${s_prefix}.ts`] = [
 					`import type {JsonAny} from '#/api/types.ts';`,
 					`import type {Dict, JsonObject} from '@blake.regalia/belt';`,
@@ -598,19 +616,8 @@ export const main = () => {
 					`import {encodeGoogleProtobufAny} from '#/proto/google/protobuf/any';`,
 
 					...[
-						...oderac(h_encoders, (si, g_encoder) => {
-							const g_msg = g_encoder.message;
-
-							const sr_import = `#/proto/${map_proto_path(g_msg.source)}`;
-
-							const yn_import = y_factory.createImportSpecifier(
-								false,
-								ident(`${s_prefix}${k_impl.exportedId(g_msg)}`),
-								ident(`${s_prefix}${k_impl.clashFreeTypeId(g_msg)}`)
-							);
-
-							return importModule(sr_import, [yn_import]);
-						}),
+						...ode(h_imports).sort(([sr_a], [sr_b]) => sr_a === sr_b? 0: sr_a < sr_b? -1: 1)
+							.map(([sr_import, a_imports]) => importModule(sr_import, a_imports)),
 
 						declareConst(`H_REGISTRY_ANY_${s_prefix.toUpperCase()}`, objectLit(oderom(h_encoders, (si, g_encoder) => {
 							const g_msg = g_encoder.message;

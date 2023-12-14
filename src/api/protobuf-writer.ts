@@ -200,7 +200,7 @@ export const Protobuf = (): ProtoWriter => {
 export const map = <
 	w_item,
 	w_out,
->(a_items: Nilable<w_item[]>, f_call: (w_item: w_item) => w_out): w_out[] | undefined => a_items?.map(f_call);
+>(a_items: Nilable<w_item[]>, f_call: (w_item: w_item) => w_out) => a_items?.map(f_call) as NonNullable<w_out>[] | undefined;
 
 export const apply_opt = <
 	w_item,
@@ -230,6 +230,6 @@ export const coin = <
 
 export const coins = (a_coins: Nilable<SlimCoin[]>): Uint8Array[] | undefined => map(a_coins, coin);
 
-export const slimify_coin = (g_coin: {denom?: string; amount?: string}) => [g_coin.amount!, g_coin.denom!] as SlimCoin;
+export const slimify_coin = (g_coin?: {denom?: string; amount?: string}) => g_coin? [g_coin.amount!, g_coin.denom!] as SlimCoin: __UNDEFINED;
 
 // export const 

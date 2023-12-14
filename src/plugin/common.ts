@@ -7,7 +7,7 @@ import type {ProtoWriterMethod} from '../api/protobuf-writer';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
 
-import {snake, type Dict} from '@blake.regalia/belt';
+import {snake, type Dict, F_IDENTITY} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
 import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, tuple} from './ts-factory';
@@ -468,6 +468,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 					to_proto: yn_expr => callExpr('bech32_decode', [yn_expr]),
 					from_json: yn_expr => callExpr('bech32_encode', [string('DYNAMIC_HRP_NOT_IMPLEMENTED'), callExpr('safe_base64_to_buffer', [yn_expr])]),
 					to_json: yn_expr => callExpr('safe_buffer_to_base64', [callExpr('bech32_decode', [yn_expr])]),
+					convert: F_IDENTITY,
 					return_type: typeRef('CwAccountAddr'),
 				},
 
