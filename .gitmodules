@@ -17,6 +17,7 @@
 [submodule "submodules/secret"]
 	path = submodules/secret
 	url = https://github.com/scrtlabs/SecretNetwork
+	ignore = all
 [submodule "submodules/gogoproto"]
 	path = submodules/gogoproto
 	url = https://github.com/cosmos/gogoproto

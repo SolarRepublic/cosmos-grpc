@@ -28,8 +28,8 @@
     "protobufjs": "^7.2.5"
   },
   "devDependencies": {
-    "@blake.regalia/belt": "^0.27.1",
-    "@blake.regalia/eslint-config-elite": "^0.3.3",
+    "@blake.regalia/belt": "^0.27.2",
+    "@blake.regalia/eslint-config-elite": "^0.4.0",
     "@blake.regalia/tsconfig": "^0.2.0",
     "@solar-republic/types": "^0.1.8",
     "@types/diff": "^5.0.9",

@@ -207,7 +207,7 @@ export const Protobuf = (): ProtoWriter => {
 export const map = <
 	w_item,
 	w_out,
->(a_items: Nilable<w_item[]>, f_call: (w_item: w_item) => w_out) => a_items?.map(f_call) as NonNullable<w_out>[] | undefined;
+>(a_items: Nilable<w_item[]>, f_call: (w_item: w_item) => w_out) => a_items?.map(w => f_call(w)) as NonNullable<w_out>[] | undefined;
 
 export const apply_opt = <
 	w_item,
