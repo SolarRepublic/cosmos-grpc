@@ -3,14 +3,12 @@ import type {AugmentedEnum, AugmentedMessage} from './env';
 
 import type {Dict} from '@blake.regalia/belt';
 
-import type {ImportSpecifier} from 'typescript';
 
-import {ode, oderom, odv} from '@blake.regalia/belt';
+import {ode, oderac, oderom, odv} from '@blake.regalia/belt';
 
-import {map_proto_path} from './common';
 import {NeutrinoImpl} from './impl-neutrino';
 import {plugin} from './plugin';
-import {declareConst, funcType, ident, importModule, objectLit, param, print, typeRef, y_factory} from './ts-factory';
+import {declareConst, funcType, ident, importModule, keyword, objectLit, param, print, typeRef} from './ts-factory';
 
 // inject into preamble of any file, allow linter to delete unused imports
 const A_GLOBAL_PREAMBLE = [
@@ -93,9 +91,6 @@ const A_GLOBAL_PREAMBLE = [
 			'WeakTimestampStr',
 			'WeakDurationStr',
 		], true),
-		importModule('#/proto/_any_condense', [
-			'condenseJsonAny',
-		]),
 	].map(yn => print(yn)),
 ];
 
@@ -118,6 +113,7 @@ export const main = () => {
 
 		// [typePath: string]: serialized message
 		const h_encoders: SerializedMessages = {};
+		const h_condensors: SerializedMessages = {};
 		const h_decoders: SerializedMessages = {};
 		const h_destructors: SerializedMessages = {};
 		const h_accessors: SerializedMessages = {};
@@ -412,6 +408,12 @@ export const main = () => {
 				message: g_msg,
 				contents: k_impl.msgEncoder(g_msg),
 			};
+
+			// add condensor
+			h_condensors[g_msg.path] = {
+				message: g_msg,
+				contents: k_impl.msgCondensor(g_msg),
+			};
 		}
 
 		debugger;
@@ -452,6 +454,47 @@ export const main = () => {
 					contents: a_accessors,
 				};
 			}
+		}
+
+		// condensors
+		{
+			// open file
+			k_impl.open(NeutrinoImpl.condensorFile(), true);
+			const p_output = k_impl.path;
+
+			// prep file parts
+			const g_parts = {
+				head: [
+					...A_GLOBAL_PREAMBLE,
+					`import type {JsonObject} from '@blake.regalia/belt';`,
+					...k_impl.imports(),
+				],
+				body: oderac(h_condensors, (sr, g_condensor) => g_condensor.contents),
+			};
+
+			// save output
+			h_outputs[p_output] = [
+				[...new Set(g_parts.head)].join('\n'),
+				...g_parts.body,
+
+				...[
+					declareConst(`H_REGISTRY_ANY_CONDENSOR`, objectLit(oderom(h_encoders, (si, g_encoder) => {
+						const g_msg = g_encoder.message;
+
+						return {
+							[g_msg.path.replace(/^\./, '/')]: ident(`condense${k_impl.clashFreeTypeId(g_msg)}`),
+						};
+					})), false, typeRef('Record', [
+						keyword('string'),
+						funcType([param('g_msg', typeRef('JsonObject'))], typeRef('Uint8Array')),
+					])),
+				].map(yn => print(yn)),
+
+				`
+					export const condenseJsonAny = (g_any: JsonAny | undefined, p_type: string|undefined=g_any?.['@type']): Uint8Array | undefined => g_any? encodeGoogleProtobufAny(p_type!, H_REGISTRY_ANY_CONDENSOR[p_type!](g_any)): __UNDEFINED;
+				`,
+
+			].join('\n\n');
 		}
 
 		debugger;
@@ -593,50 +636,80 @@ export const main = () => {
 			}
 		}
 
-		// global registries
-		{
-			function create_any_registry(s_prefix: 'encode' | 'condense') {
-				const h_imports: Record<string, ImportSpecifier[]> = {};
+		// // global registries
+		// {
+		// 	function create_any_registry() {
+		// 		k_impl.open({
+		// 			name: '._any_condense',
+		// 		});
 
-				for(const [, g_encoder] of ode(h_encoders)) {
-					const g_msg = g_encoder.message;
-					const sr_import = `#/proto/${map_proto_path(g_msg.source)}`;
+		// 		const s_prefix = 'condense';
+		// 		const s_dep = 'encode';
 
-					(h_imports[sr_import] ??= []).push(y_factory.createImportSpecifier(
-						false,
-						ident(`${s_prefix}${k_impl.exportedId(g_msg)}`),
-						ident(`${s_prefix}${k_impl.clashFreeTypeId(g_msg)}`)
-					));
-				}
+		// 		const h_imports: Record<string, ImportSpecifier[]> = {};
+		// 		const h_import_types: Record<string, ImportSpecifier[]> = {};
+		// 		const a_condensors: string[] = [];
 
-				h_outputs[`_any_${s_prefix}.ts`] = [
-					`import type {JsonAny} from '#/api/types.ts';`,
-					`import type {Dict, JsonObject} from '@blake.regalia/belt';`,
-					`import {__UNDEFINED} from '@blake.regalia/belt';`,
-					`import {encodeGoogleProtobufAny} from '#/proto/google/protobuf/any';`,
+		// 		for(const [, g_encoder] of ode(h_encoders)) {
+		// 			const g_msg = g_encoder.message;
+		// 			const sr_import = `#/proto/${map_proto_path(g_msg.source)}`;
 
-					...[
-						...ode(h_imports).sort(([sr_a], [sr_b]) => sr_a === sr_b? 0: sr_a < sr_b? -1: 1)
-							.map(([sr_import, a_imports]) => importModule(sr_import, a_imports)),
+		// 			(h_imports[sr_import] ??= []).push(...[
+		// 				'encode',
+		// 			].map(s_pre => y_factory.createImportSpecifier(
+		// 				false,
+		// 				ident(`${s_pre}${k_impl.exportedId(g_msg)}`),
+		// 				ident(`${s_pre}${k_impl.clashFreeTypeId(g_msg)}`)
+		// 			)));
 
-						declareConst(`H_REGISTRY_ANY_${s_prefix.toUpperCase()}`, objectLit(oderom(h_encoders, (si, g_encoder) => {
-							const g_msg = g_encoder.message;
+		// 			(h_import_types[sr_import] ??= []).push(...[
+		// 				'',
+		// 				'Encoded',
+		// 			].map(s_pre => y_factory.createImportSpecifier(
+		// 				false,
+		// 				ident(`${s_pre}${k_impl.exportedId(g_msg)}`),
+		// 				ident(`${s_pre}${k_impl.clashFreeTypeId(g_msg)}`)
+		// 			)));
 
-							return {
-								[g_msg.path.replace(/^\./, '/')]: ident(`${s_prefix}${k_impl.clashFreeTypeId(g_msg)}`),
-							};
-						})), false, typeRef('Dict', [funcType([param('g_msg', typeRef('JsonObject'))], typeRef('Uint8Array'))])),
-					].map(yn => print(yn)),
+		// 			a_condensors.push(k_impl.msgCondensor(g_msg));
+		// 		}
 
-					`
-						export const ${s_prefix}JsonAny = (g_any: JsonAny | undefined, p_type: string|undefined=g_any?.['@type']): Uint8Array | undefined => g_any? encodeGoogleProtobufAny(p_type!, H_REGISTRY_ANY_${s_prefix.toUpperCase()}[p_type!](g_any)): __UNDEFINED;
-					`,
-				].join('\n\n').replace(/\n+\nimport/g, '\nimport');
-			}
+		// 		h_outputs[`_any_${s_prefix}.ts`] = [
+		// 			...A_GLOBAL_PREAMBLE,
 
-			// create_any_registry('encode');
-			create_any_registry('condense');
-		}
+		// 			...[
+		// 				...ode(h_import_types).sort(([sr_a], [sr_b]) => sr_a === sr_b? 0: sr_a < sr_b? -1: 1)
+		// 					.map(([sr_import, a_imports]) => importModule(sr_import, a_imports, true)),
+
+		// 				...ode(h_imports).sort(([sr_a], [sr_b]) => sr_a === sr_b? 0: sr_a < sr_b? -1: 1)
+		// 					.map(([sr_import, a_imports]) => importModule(sr_import, a_imports)),
+		// 			].map(yn => print(yn)),
+
+		// 			...a_condensors,
+
+		// 			...[
+		// 				declareConst(`H_REGISTRY_ANY_${s_prefix.toUpperCase()}`, objectLit(oderom(h_encoders, (si, g_encoder) => {
+		// 					const g_msg = g_encoder.message;
+
+		// 					return {
+		// 						[g_msg.path.replace(/^\./, '/')]: ident(`${s_prefix}${k_impl.clashFreeTypeId(g_msg)}`),
+		// 					};
+		// 				})), false, typeRef('Record', [
+		// 					// typeRef('MessageType'),
+		// 					keyword('string'),
+		// 					funcType([param('g_msg', typeRef('JsonObject'))], typeRef('Uint8Array')),
+		// 				])),
+		// 			].map(yn => print(yn)),
+
+		// 			`
+		// 				export const ${s_prefix}JsonAny = (g_any: JsonAny | undefined, p_type: string|undefined=g_any?.['@type']): Uint8Array | undefined => g_any? encodeGoogleProtobufAny(p_type!, H_REGISTRY_ANY_${s_prefix.toUpperCase()}[p_type!](g_any)): __UNDEFINED;
+		// 			`,
+		// 		].join('\n\n').replace(/\n+\nimport/g, '\nimport');
+		// 	}
+
+		// 	// create_any_registry('encode');
+		// 	create_any_registry();
+		// }
 
 		return h_outputs;
 	});

@@ -122,19 +122,33 @@ SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
 
 info "generating module..."
 
+s_core="""
+cosmos.*
+cosmwasm.*
+akash.*
+gaia.*
+secret.*
+osmosis.*
+"""
 
 # prep list of forced encoders
 s_encoders="""
-/^cosmos\.tx\.v1beta1\.(.*)(?<!Request|Response)$/
-cosmos.crypto.ed25519.PubKey
-cosmos.crypto.secp256k1.PubKey
-cosmos.crypto.secp256r1.PubKey
+$s_core
 """
+
+# /^cosmos\.tx\.v1beta1\.(.*)(?<!Request|Response)$/
+# cosmos.tx.*
+# cosmos.base.*
+# cosmos.crypto.ed25519.PubKey
+# cosmos.crypto.secp256k1.PubKey
+# cosmos.crypto.secp256r1.PubKey
 
 # prep list of forced decoders
 s_decoders="""
-cosmos.tx.v1beta1.*
+$s_core
 """
+
+# cosmos.tx.v1beta1.*
 
 # prep list of forced destructors
 s_destructors="""

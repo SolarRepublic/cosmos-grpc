@@ -6,7 +6,7 @@ import type {Dict} from '@blake.regalia/belt';
 
 import type {TypeNode, ImportSpecifier, Identifier, CallExpression} from 'typescript';
 
-import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex} from '@blake.regalia/belt';
+import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex, odv} from '@blake.regalia/belt';
 
 import {map_proto_path} from './common';
 import {parse_package_parts} from './plugin';
@@ -16,13 +16,17 @@ import {access, arrayType, arrow, callExpr, ident, importModule, litType, param,
 
 export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
 
+
+const F_SORT_PATH = ([sr_a]: [string, any], [sr_b]: [string, any]) => sr_a === sr_b? 0: sr_a < sr_b? -1: 1;
+
 export abstract class RpcImplementor {
 	protected _h_router!: FieldRouter;
 
 	protected _h_type_imports: Dict<[string, ImportSpecifier]> = {};
 	protected _h_imports: Dict<[string, ImportSpecifier]> = {};
 
-	protected _g_opened!: AugmentedFile;
+	protected _g_opened!: Pick<AugmentedFile, 'name'>;
+	protected _b_clash_free = false;
 
 	constructor(protected _h_types: TypesDict, protected _h_interfaces: InterfacesDict, protected _h_params: Params) {}
 
@@ -74,17 +78,15 @@ export abstract class RpcImplementor {
 		return typeRef('JsonAny', [
 			litType(string(si_interface)),
 			...a_msgs
-				? [union(a_msgs.map(g_msg => this.importType(
-					this.pathOfType(g_msg.path),
-					g_msg
-				)))]
+				? [union(a_msgs.map(g_msg => this.importType(g_msg)))]
 				: [],  // keyword('never'),
 		]);
 	}
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	open(g_proto: AugmentedFile): void {
+	open(g_proto: Pick<AugmentedFile, 'name'>, b_clash_free=false): void {
 		this._g_opened = g_proto;
+		this._b_clash_free = b_clash_free;
 
 		this._h_type_imports = {};
 		this._h_imports = {};
@@ -106,69 +108,54 @@ export abstract class RpcImplementor {
 		return this.pathOfType(g_field.typeName!);
 	}
 
-	importType(sr_path: string, z_ident: string | RefableType, a_type_args?: TypeNode[]): TypeNode {
-		let si_name = z_ident as string;
-		let si_prop: string | undefined;
+	_import(h_imports: Dict<[string, ImportSpecifier]>, g_ref: RefableType, s_prefix: string, b_ignore=false): string {
+		const si_export = s_prefix+this.exportedId(g_ref);
+		const si_distinct = s_prefix+this.clashFreeTypeId(g_ref);
 
-		if('string' !== typeof z_ident) {
-			// [si_prop, si_name] = z_ident;
-			[si_prop, si_name] = [this.exportedId(z_ident), this.clashFreeTypeId(z_ident)];
-		}
-
-		// different file
-		if(this._g_opened.name!.replace(/\.proto$/, '') !== sr_path) {
-			this._h_type_imports[si_name] = [`#/proto/${sr_path}`, y_factory.createImportSpecifier(
-				false,  // never directly, handled in import clause
-				si_prop? ident(si_prop): __UNDEFINED,
-				ident(si_name)
+		// external and not explicitly ignored
+		if(g_ref.source !== this._g_opened && !b_ignore) {
+			h_imports[si_distinct] = [`#/proto/${map_proto_path(g_ref.source)}`, y_factory.createImportSpecifier(
+				false,
+				...(this._b_clash_free && si_distinct !== si_export
+					? [ident(si_export), ident(si_distinct)]
+					: [__UNDEFINED, ident(si_export)]) as [Identifier | undefined, Identifier]
 			)];
 		}
-		// same file
-		else {
-			// use exportedId, otherwise the clash-free version will be wrong
-			return typeRef(si_prop || z_ident as string);
-		}
 
-		return typeRef(si_name, a_type_args);
+		return this._b_clash_free? si_distinct: si_export;
 	}
 
-	importMessage(g_msg: AugmentedMessage): TypeNode {
-		const si_name = this.exportedId(g_msg);
+	importType(g_ref: RefableType, s_prefix=''): TypeNode {
+		const b_ignore = this._b_clash_free && !['', 'Encoded'].includes(s_prefix);
 
-		// external
-		if(g_msg.source !== this._g_opened) {
-			this._h_type_imports[si_name] = [`#/proto/${map_proto_path(g_msg.source)}`, y_factory.createImportSpecifier(
-				false,
-				__UNDEFINED,
-				ident(si_name)
-			)];
-		}
-
-		return typeRef(si_name);
+		return typeRef(this._import(this._h_type_imports, g_ref, s_prefix, b_ignore));
 	}
 
-	importConstant(g_ref: RefableType, s_prefix: string): Identifier {
-		const si_const = `${s_prefix}${this.exportedId(g_ref)}`;
+	importConstant(g_ref: RefableType, s_prefix=''): Identifier {
+		const b_ignore = this._b_clash_free && !['', 'encode', 'JsonToProtoEnum'].includes(s_prefix);
 
-		// external
-		if(g_ref.source !== this._g_opened) {
-			this._h_imports[si_const] = [`#/proto/${map_proto_path(g_ref.source)}`, y_factory.createImportSpecifier(
-				false,
-				__UNDEFINED,
-				ident(si_const)
-			)];
-		}
-
-		return ident(si_const);
+		return ident(this._import(this._h_imports, g_ref, s_prefix, b_ignore));
 	}
 
 	imports(): string[] {
-		return [
-			// type imports
-			...oderac(this._h_type_imports, (si_ident, [sr_path, yn_import]) => importModule(sr_path, [yn_import], true)).map(yn => print(yn)),
+		// reduce type imports by path
+		const h_types: Dict<ImportSpecifier[]> = {};
+		for(const [sr_path, yn_import] of odv(this._h_type_imports).sort(F_SORT_PATH)) {
+			(h_types[sr_path] ??= []).push(yn_import);
+		}
 
-			// dependencies on other generated proto files
-			...oderac(this._h_imports, (si_ident, [sr_path, yn_import]) => importModule(sr_path, [yn_import])).map(yn => print(yn)),
+		// reduce module imports by path
+		const h_modules: Dict<ImportSpecifier[]> = {};
+		for(const [sr_path, yn_import] of odv(this._h_imports).sort(F_SORT_PATH)) {
+			(h_modules[sr_path] ??= []).push(yn_import);
+		}
+
+		return [
+			// // type imports
+			...oderac(h_types, (sr_path, a_imports) => importModule(sr_path, a_imports, true)).map(yn => print(yn)),
+
+			// // dependencies on other generated proto files
+			...oderac(h_modules, (sr_path, a_imports) => importModule(sr_path, a_imports)).map(yn => print(yn)),
 		];
 	}
 

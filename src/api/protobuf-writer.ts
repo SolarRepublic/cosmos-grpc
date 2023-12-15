@@ -4,7 +4,7 @@ import type {PropagateUndefined} from './types';
 import type {Nilable} from '@blake.regalia/belt';
 import type {SlimCoin} from '@solar-republic/types';
 
-import {ATU8_NIL, __UNDEFINED, buffer, text_to_buffer} from '@blake.regalia/belt';
+import {ATU8_NIL, __UNDEFINED, buffer, dataview, text_to_buffer} from '@blake.regalia/belt';
 
 type NodeValue = number | bigint | number[] | Uint8Array;
 
@@ -26,6 +26,7 @@ type WireType = 0 | 1 | 2 | 5;
 export interface ProtoWriterScalar {
 	v(xn_value?: Nilable<boolean | number>, i_field?: number): this;
 	g(xg_value?: Nilable<bigint | `${bigint}` | ''>, i_field?: number): this;
+	i(x_value?: Nilable<number>, i_field?: number): this;
 	b(atu8_bytes?: Nilable<Uint8Array | number[]>, i_field?: number): this;
 	s(s_data?: Nilable<string>, i_field?: number): this;
 }
@@ -33,6 +34,7 @@ export interface ProtoWriterScalar {
 export interface ProtoWriter extends ProtoWriterScalar {
 	V(a_values?: Nilable<Array<Parameters<ProtoWriterScalar['v']>[0]>>, i_field?: number): this;
 	G(a_values?: Nilable<Array<Parameters<ProtoWriterScalar['g']>[0]>>, i_field?: number): this;
+	I(a_values?: Nilable<Array<Parameters<ProtoWriterScalar['i']>[0]>>, i_field?: number): this;
 	B(a_buffers?: Nilable<Array<Parameters<ProtoWriterScalar['b']>[0]>>, i_field?: number): this;
 	S(a_data?: Nilable<Array<Parameters<ProtoWriterScalar['s']>[0]>>, i_field?: number): this;
 	// n<f_nester extends Nester>(xn_wire_sub: WireType, i_field: number, f_call: f_nester, ...a_args: L.Tail<Parameters<f_nester>>): ProtoWriter;
@@ -140,6 +142,10 @@ export const Protobuf = (): ProtoWriter => {
 			]));
 		},
 
+		i: (x_value, i_field=i_auto++, atu8_data=buffer(8), dv_view=dataview(atu8_data.buffer)) => x_value
+			? (field(i_field, 5), dv_view.setFloat64(0, x_value), push([encode_bytes, atu8_data, 8]))
+			: g_self,
+
 		b: (atu8_bytes, i_field=i_auto++) => {
 			if(!atu8_bytes?.length) return g_self;
 
@@ -160,6 +166,7 @@ export const Protobuf = (): ProtoWriter => {
 
 		V: map_self('v'),
 		G: map_self('g'),
+		I: map_self('i'),
 		B: map_self('b'),
 		S: map_self('s'),
 

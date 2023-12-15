@@ -15,7 +15,7 @@ import {ts} from 'ts-morph';
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding, arrayAccess, exclaim} from './ts-factory';
+import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding, arrayAccess, exclaim, callChain, chain} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 type ReturnThing = {
@@ -50,6 +50,12 @@ const reset_consts = (): Draft['consts'] => ({
 });
 
 export class NeutrinoImpl extends RpcImplementor {
+	static condensorFile(): Pick<AugmentedFile, 'name'> {
+		return {
+			name: '_any_condense.proto',
+		};
+	}
+
 	protected _si_const = '';
 	protected _s_path_prefix = '';
 
@@ -247,8 +253,8 @@ export class NeutrinoImpl extends RpcImplementor {
 		};
 	}
 
-	override open(g_proto: AugmentedFile): void {
-		super.open(g_proto);
+	override open(g_proto: Pick<AugmentedFile, 'name'>, b_clash_free=false): void {
+		super.open(g_proto, b_clash_free);
 
 		// would-be output file nam
 		const p_output = this._p_output = map_proto_path(g_proto)+'.ts';
@@ -467,7 +473,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			])),
 
 			// 2nd generics param is raw response data
-			this.importMessage(g_output),
+			this.importType(g_output),
 		]);
 
 		// const si_action_prefix = si_service
@@ -564,42 +570,6 @@ export class NeutrinoImpl extends RpcImplementor {
 		]);
 	}
 
-	// methodEncoder(
-	// 	g_method: AugmentedMethod,
-	// 	g_input: AugmentedMessage
-	// ): string {
-	// 	// open proto source of method
-	// 	this.open(g_method.service.source);
-
-	// 	const g_parts = g_method.service.source.parts;
-
-	// 	// prep unique type
-	// 	const si_singleton = `Encoded${proper(g_parts.vendor)}${g_method.name}`;
-
-	// 	// declare unique type
-	// 	const yn_type = declareAlias(si_singleton, typeRef('Encoded', [
-	// 		litType(string(`/${g_method.service.source.pb_package}.${g_method.name!}`)),
-	// 	]));
-
-	// 	// add type decl to preamble
-	// 	this._g_heads.encoder.push(print(yn_type));
-
-	// 	// encode params and build chain
-	// 	const [a_params, yn_chain] = this.encode_params(g_input);
-
-	// 	// construct call chain
-	// 	const yn_writer = arrow(a_params, castAs(yn_chain, typeRef(si_singleton)), typeRef(si_singleton));
-
-	// 	// create statement
-	// 	const yn_const = declareConst(`encodeAny${proper(g_parts.vendor)}${g_method.name!}`, yn_writer, true);
-
-	// 	return print(yn_const, [
-	// 		`Encodes a \`${g_method.name}\` protobuf message: ${g_method.comments}`,
-	// 		...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
-	// 		`@returns a strongly subtyped Uint8Array protobuf message`,
-	// 	]);
-	// }
-
 	msgEncoder(g_msg: AugmentedMessage): string[] {
 		// open proto source of msg
 		this.open(g_msg.source);
@@ -630,19 +600,18 @@ export class NeutrinoImpl extends RpcImplementor {
 				...(a_params as unknown as {thing: TsThing}[]).map(({thing:g_thing}) => `@param ${g_thing.calls.name} - \`${g_thing.field.name}\`: ${g_thing.field.comments}`),
 				`@returns a strongly subtyped Uint8Array protobuf message`,
 			]),
-			this.msgCondensor(g_msg),
 		];
 	}
 
-	msgCondensor(g_msg: AugmentedMessage): string {
-		const si_exported = this.exportedId(g_msg);
+	msgCondensor(g_msg: AugmentedMessage): string[] {
+		// open condensor output
+		this.open(NeutrinoImpl.condensorFile(), true);
 
 		const yn_enstructor = arrow(
 			[
-				param('g_msg', typeRef(si_exported)),
-				// this.importType(this.pathOfType(g_msg.path), si_exported)
+				param('g_msg', this.importType(g_msg)),
 			],
-			callExpr(`encode${si_exported}`, g_msg.fieldList.map((g_field) => {
+			callExpr(this.importConstant(g_msg, 'encode'), g_msg.fieldList.map((g_field) => {
 				// convert field to thing
 				const g_thing = this.route(g_field);
 
@@ -672,13 +641,22 @@ export class NeutrinoImpl extends RpcImplementor {
 						// import enum map
 						const yn_enum = this.importConstant(g_resolved, 'JsonToProtoEnum');
 
-						// encode lookup
-						return arrayAccess(yn_enum, exclaim(yn_access));
+						// repeated
+						return g_field.repeated
+							? callChain(
+								chain(yn_access, 'map'),
+								[arrow([param('w')], arrayAccess(yn_enum, exclaim(ident('w'))))]
+							)
+							// encode lookup
+							: arrayAccess(yn_enum, exclaim(yn_access));
 					}
 					// message
 					else {
-						// import field condensor
-						const yn_condensor = this.importConstant(g_resolved, 'condense');
+						// // import field condensor
+						// const yn_condensor = this.importConstant(g_resolved, 'condense');
+
+						// ref field condensor
+						const yn_condensor = ident(`condense${this.clashFreeTypeId(g_resolved)}`);
 
 						// encode expr
 						const f_encode = (yn: Expression) => callExpr(yn_condensor, [yn]);
@@ -695,15 +673,18 @@ export class NeutrinoImpl extends RpcImplementor {
 
 				return yn_access;
 			})),
-			typeRef(`Encoded${si_exported}`)
+			// typeRef(`Encoded${si_exported}`)
+			this.importType(g_msg, 'Encoded')
 		);
 
-		const yn_condense = declareConst(`condense${this.exportedId(g_msg)}`, yn_enstructor, true);
+		const yn_condense = declareConst(`condense${this.clashFreeTypeId(g_msg)}`, yn_enstructor, true);
 
-		return print(yn_condense, [
-			`Takes the JSON representation of a message and converts it to its protobuf form`,
-			`@returns {@link Encoded${si_exported}}`,
-		]);
+		return [
+			print(yn_condense, [
+				`Takes the JSON representation of a message and converts it to its protobuf form`,
+				`@returns {@link Encoded${this.clashFreeTypeId(g_msg)}}`,
+			]),
+		];
 	}
 
 	// 

@@ -1,7 +1,6 @@
 import type {Optional} from 'ts-toolbelt/out/Object/Optional';
 
 import type {AugmentedEnum, AugmentedField, AugmentedFile} from './env';
-import type {NeutrinoImpl} from './impl-neutrino';
 import type {RpcImplementor} from './rpc-impl';
 import type {ProtoWriterMethod} from '../api/protobuf-writer';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
@@ -259,7 +258,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		},
 
 		proto: {
-			writer: 'PROTO_ENCODING_FOR_DOUBLE_NOT_IMPLEMENTED' as 'v',  // TODO: fix this?
+			writer: 'i',
 		},
 	}),
 
@@ -382,23 +381,17 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 
 	// enum
 	[H_FIELD_TYPES.TYPE_ENUM](si_field, g_field) {
-		// locate source
-		const sr_path = k_impl.pathOfFieldType(g_field);
-
-		// extract type reference ident
-		const si_ref = g_field.typeName!.split('.').at(-1)!;
-
 		const g_enum = k_impl.resolveType(g_field.typeName!) as AugmentedEnum;
 
 		// construct ts field
 		return {
 			calls: {
 				name: `si_${snake(si_field)}`,
-				type: k_impl.importType(sr_path, (k_impl as NeutrinoImpl).enumId(g_enum, 'Json')),
+				type: k_impl.importType(g_enum, 'JsonEnum'),
 			},
 			proto: {
 				writer: 'v',
-				type: k_impl.importType(sr_path, (k_impl as NeutrinoImpl).enumId(g_enum, 'Proto')),
+				type: k_impl.importType(g_enum, 'ProtoEnum'),
 			},
 		};
 	},
@@ -408,13 +401,11 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		// prep name
 		const si_name = snake(si_field);
 
-		// locate source
-		const sr_path = k_impl.pathOfFieldType(g_field);
-
 		// resolve type for imports and ids
 		const g_refable = k_impl.resolveType(g_field.typeName!);
 
-		const yn_json = k_impl.importType(sr_path, g_refable);
+		// import message JSON type
+		const yn_json = k_impl.importType(g_refable);
 
 		// import nested decoder
 		const yn_decoder = k_impl.importConstant(g_refable, 'decode');
@@ -432,9 +423,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 
 			nests: {
 				name: `a_${si_name}`,
-				// type: typeRef('Uint8Array'),
-				// type: typeRef('ReturnType', [typeOf(yn_decoder.text)]),
-				type: k_impl.importType(sr_path, `Decoded${k_impl.exportedId(g_refable)}`),
+				type: k_impl.importType(g_refable, 'Decoded'),
 				hints: literal(g_field.repeated? 0: 1),  // make singular if not repeated
 				// parse: yn_data => callExpr(ident('decode_protobuf'), [yn_data]),
 				// parse: yn_data => callExpr(ident(`decode${k_impl.exportedId(g_refable)}`), [yn_data]),
@@ -447,7 +436,6 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 					type: typeRef('Encoded', [
 						litType(string(g_field.typeName!.replace(/^\./, '/'))),
 					]),
-					// type: k_impl.importType(k_impl.pathOfFieldType(g_field), `EncodedThing`),
 					// prefers_call: 1,
 				},
 			},
@@ -466,7 +454,6 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 					name: `sa_${si_name}`,
 					type: typeRef('WeakAccountAddr'),
 					to_proto: yn_expr => callExpr('bech32_decode', [yn_expr]),
-					from_json: yn_expr => callExpr('bech32_encode', [string('DYNAMIC_HRP_NOT_IMPLEMENTED'), callExpr('safe_base64_to_buffer', [yn_expr])]),
 					to_json: yn_expr => callExpr('safe_buffer_to_base64', [callExpr('bech32_decode', [yn_expr])]),
 					convert: F_IDENTITY,
 					return_type: typeRef('CwAccountAddr'),
@@ -521,7 +508,7 @@ export const H_FIELD_TYPE_TO_HUMAN_READABLE: Dict = {
 
 export {H_FIELD_TYPES};
 
-export const map_proto_path = (g_proto: AugmentedFile): string => g_proto.name!.split('.').slice(0, -1).join('.');
+export const map_proto_path = (g_proto: Pick<AugmentedFile, 'name'>): string => g_proto.name!.split('.').slice(0, -1).join('.');
 
 
 type VersionSelector = [n_major: number, s_tag: string, n_minor: number];
