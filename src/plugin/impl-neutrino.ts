@@ -1396,7 +1396,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			const s_value = g_value.options?.enumvalueCustomname || si_name;
 
 			// enum symbol suffix
-			const si_redundant = g_enum.name!.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase();
+			const si_redundant = snake(g_enum.name!).toUpperCase();  // .replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase();
 			const si_symbol = this.exportedConst(g_enum).replace(new RegExp(`_${si_redundant}$`), '')
 				+'_'+si_name;
 
@@ -1509,6 +1509,15 @@ export class NeutrinoImpl extends RpcImplementor {
 		})), true);
 
 		return [
+			// message type key
+			print(declareConst(
+				`SI_MESSAGE_TYPE_${snake(si_name).toUpperCase()}`,
+				string('/'+g_msg.path.slice(1)),
+				true
+			), [
+				`Message type string constant`,
+			]),
+
 			print(yn_alias, [
 				`JSON serialization of \`${g_msg.path.slice(1)}\` - ${g_msg.comments}`,
 			]),
