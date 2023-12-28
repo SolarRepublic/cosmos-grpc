@@ -3,7 +3,7 @@ import type {Dict, Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
 
 import type {SlimCoin} from '@solar-republic/types';
 
-import {safe_json, ode, buffer_to_base64, __UNDEFINED} from '@blake.regalia/belt';
+import {safe_json, ode, bytes_to_base64, __UNDEFINED, is_array} from '@blake.regalia/belt';
 
 type Voidable = void | undefined;
 
@@ -28,14 +28,14 @@ export type NetworkJsonResponse<
 // };
 
 const json_to_flatdot = (w_value: JsonValue<Voidable | Uint8Array>, h_root: Dict, sr_path: string): void => {
-	if(Array.isArray(w_value)) {
+	if(is_array(w_value)) {
 		// eslint-disable-next-line array-callback-return
 		w_value.map((w_item, i_item) => {
 			json_to_flatdot(w_item, h_root, `${sr_path}[${i_item}]`);
 		});
 	}
 	else if(ArrayBuffer.isView(w_value)) {
-		h_root[sr_path] = buffer_to_base64(w_value);
+		h_root[sr_path] = bytes_to_base64(w_value);
 	}
 	else if('object' === typeof w_value) {
 		json_object_to_flatdot(w_value as JsonObject, h_root, sr_path);
@@ -79,7 +79,6 @@ const json_object_to_flatdot = (h_object: JsonObject<Voidable | Uint8Array>, h_r
 
 
 /**
- * Submits a query to the RESTful gRPC-gateway endpoint
  * @param f_req - the {@link RpcRequest `RpcRequest`}
  * @param f_res - a response-processing callback
  * @param g_init - optional {@link RequestInit} object
@@ -89,6 +88,13 @@ const json_object_to_flatdot = (h_object: JsonObject<Voidable | Uint8Array>, h_r
  * 	- 1: s_res - the response body as text
  *    - 2?: g_res - the parsed response response JSON if valid
 */
+
+/**
+ * Constructs a function that submits a query/submit to the RESTful gRPC-gateway endpoint
+ * @param f_req 
+ * @param g_init 
+ * @returns request function
+ */
 export const restful_grpc = <
 	a_args extends any[],
 	w_parsed extends JsonValue<Voidable>,

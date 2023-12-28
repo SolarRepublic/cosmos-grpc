@@ -128,7 +128,7 @@ function preprocess_messages(
 		}
 
 		// each field
-		g_msg.fieldList.forEach((g_field, i_field) => {
+		g_msg.fieldList.sort((g_a, g_b) => g_a.number! - g_b.number!).forEach((g_field, i_field) => {
 			// whether the field has the repeated modifier
 			const b_repeated = FieldLabel.LABEL_REPEATED === g_field.label;
 

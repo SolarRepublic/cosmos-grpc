@@ -124,6 +124,7 @@ info "generating module..."
 
 s_core="""
 cosmos.*
+tendermint.*
 cosmwasm.*
 akash.*
 gaia.*

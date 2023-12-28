@@ -1,21 +1,21 @@
 import type {TsThing} from './common';
-import type {AugmentedEnum, AugmentedFile, AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
+import type {AugmentedEnum, AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod, ExtendedMethodOptions} from './env';
 
 import type {InterfacesDict, Params, TypesDict} from './plugin';
 import type {FileCategory} from './rpc-impl';
 import type {Dict} from '@blake.regalia/belt';
-import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement, Identifier} from 'typescript';
+import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement, Identifier, ArrayBindingElement} from 'typescript';
 
 import {readFileSync} from 'node:fs';
 
-import {__UNDEFINED, fold, oderac, proper, snake, escape_regex, fodemtv, odem, F_IDENTITY} from '@blake.regalia/belt';
+import {__UNDEFINED, fold, oderac, proper, snake, escape_regex, fodemtv, odem, F_IDENTITY, odk, odv} from '@blake.regalia/belt';
 
 import {ts} from 'ts-morph';
 
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding, arrayAccess, exclaim, callChain, chain} from './ts-factory';
+import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding, arrayAccess, exclaim, callChain, chain, andAnd, ternary, binary} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 type ReturnThing = {
@@ -50,7 +50,7 @@ const reset_consts = (): Draft['consts'] => ({
 });
 
 export class NeutrinoImpl extends RpcImplementor {
-	static condensorFile(): Pick<AugmentedFile, 'name'> {
+	static condenserFile(): Pick<AugmentedFile, 'name'> {
 		return {
 			name: '_any_condense.proto',
 		};
@@ -352,7 +352,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 			// // bytes
 			// if(H_FIELD_TYPES.TYPE_BYTES === g_field.type) {
-			// 	yn_parser = yn => call('safe_base64_to_buffer', [yn]);
+			// 	yn_parser = yn => call('safe_base64_to_bytes', [yn]);
 			// }
 
 			return {
@@ -577,9 +577,15 @@ export class NeutrinoImpl extends RpcImplementor {
 		// prep unique type
 		const si_singleton = `Encoded${this.exportedId(g_msg)}`;
 
+		// list of types the encoded payload implements
+		const a_encoded_types = [litType(string(`/${g_msg.source.pb_package}.${g_msg.local}`))];
+
+		// add all types from implements interfaces list
+		g_msg.options?.implementsInterfaceList?.forEach(p_type => a_encoded_types.push(litType(string(p_type))));
+
 		// declare unique type
 		const yn_type = declareAlias(si_singleton, typeRef('Encoded', [
-			litType(string(`/${g_msg.source.pb_package}.${g_msg.local}`)),
+			union(a_encoded_types),
 		]), true);
 
 		// add type decl to preamble
@@ -603,9 +609,9 @@ export class NeutrinoImpl extends RpcImplementor {
 		];
 	}
 
-	msgCondensor(g_msg: AugmentedMessage): string[] {
-		// open condensor output
-		this.open(NeutrinoImpl.condensorFile(), true);
+	msgCondenser(g_msg: AugmentedMessage): string[] {
+		// open condenser output
+		this.open(NeutrinoImpl.condenserFile(), true);
 
 		const yn_enstructor = arrow(
 			[
@@ -615,17 +621,17 @@ export class NeutrinoImpl extends RpcImplementor {
 				// convert field to thing
 				const g_thing = this.route(g_field);
 
-				// base accessor expression
-				const yn_access = access('g_msg', g_field.name!);
-
-				const f_dejson = g_thing.calls.convert;
-
 				// resolve field type
 				const g_resolved = g_field.typeName? this.resolveType(g_field.typeName): __UNDEFINED;
 
+				// base accessor expression
+				const yn_access = access('g_msg', g_field.name!);
+
+				const f_condense = g_thing.calls.condense;
+
 				// 
-				if(F_IDENTITY !== f_dejson) {
-					const yn_applied = f_dejson(yn_access);
+				if(F_IDENTITY !== f_condense) {
+					const yn_applied = f_condense(yn_access);
 
 					if(g_resolved && '.google.protobuf.Any' === g_field.typeName && g_field.options?.acceptsInterface) {
 						const yn_encoded = typeRef('Encoded', [litType(string(g_field.options.acceptsInterface))]);
@@ -652,19 +658,16 @@ export class NeutrinoImpl extends RpcImplementor {
 					}
 					// message
 					else {
-						// // import field condensor
-						// const yn_condensor = this.importConstant(g_resolved, 'condense');
-
-						// ref field condensor
-						const yn_condensor = ident(`condense${this.clashFreeTypeId(g_resolved)}`);
+						// ref field condenser
+						const yn_condenser = ident(`condense${this.clashFreeTypeId(g_resolved)}`);
 
 						// encode expr
-						const f_encode = (yn: Expression) => callExpr(yn_condensor, [yn]);
+						const f_encode = (yn: Expression) => callExpr(yn_condenser, [yn]);
 
 						const yn_each = g_field.repeated
-							? callExpr('map', [yn_access, yn_condensor])
+							? callExpr('map', [yn_access, yn_condenser])
 							: g_thing.optional
-								? callExpr('apply_opt', [yn_access, yn_condensor])
+								? callExpr('apply_opt', [yn_access, yn_condenser])
 								: f_encode(yn_access);
 
 						return yn_each;
@@ -673,7 +676,6 @@ export class NeutrinoImpl extends RpcImplementor {
 
 				return yn_access;
 			})),
-			// typeRef(`Encoded${si_exported}`)
 			this.importType(g_msg, 'Encoded')
 		);
 
@@ -683,6 +685,224 @@ export class NeutrinoImpl extends RpcImplementor {
 			print(yn_condense, [
 				`Takes the JSON representation of a message and converts it to its protobuf form`,
 				`@returns {@link Encoded${this.clashFreeTypeId(g_msg)}}`,
+			]),
+			...this.msgExpander(g_msg),
+		];
+	}
+
+	msgExpander(g_msg: AugmentedMessage): string[] {
+		// open condenser output
+		this.open(NeutrinoImpl.condenserFile(), true);
+
+		// field identifiers, keyed by field idnex (not field number)
+		const a_field_idents: Identifier[] = [];
+
+		// bindings for continuous fields and higher fields, respectively
+		const a_fields_continuous: ArrayBindingElement[] = [];
+		const a_fields_access: BindingElement[] = [];
+
+		// keep track of the expected field number to determine when there are gaps
+		let n_field_expected = 1;
+		let b_continuous = true;
+
+		let a_single_access: [Identifier, number, AugmentedField, TsThing];
+
+		// each field
+		for(const g_field of g_msg.fieldList) {
+			// convert field to thing
+			const g_thing = this.route(g_field);
+
+			// select which ident to use
+			const yn_ident = g_thing.nests? ident(g_thing.nests.name): g_thing.calls.id;
+
+			// add to ident list
+			a_field_idents.push(yn_ident);
+
+			// ref field number
+			const i_number = g_field.number!;
+
+			// field number does not immediately follow previous, or continuity is already broken
+			GAPS:
+			if(i_number !== n_field_expected++ || !b_continuous) {
+				// still continuous and gap is clearable
+				if(b_continuous && (i_number - (n_field_expected -1)) < N_MAX_PROTO_FIELD_NUMBER_GAP) {
+					// clear the gap
+					for(let i_fill=n_field_expected-1; i_fill<i_number; i_fill++) {
+						// add to sequence
+						a_fields_continuous.push(y_factory.createOmittedExpression());
+					}
+
+					// update expected field
+					n_field_expected = i_number + 1;
+
+					// proceed
+					break GAPS;
+				}
+
+				// set continuity break
+				b_continuous = false;
+
+				// add to object biding
+				a_fields_access.push(binding(yn_ident, numericLit(i_number-1)));
+				a_single_access = [yn_ident, i_number-1, g_field, g_thing];
+
+				// next
+				continue;
+			}
+
+			// add to continuous params
+			a_fields_continuous.push(binding(yn_ident));
+		}
+
+
+		const a_params: ParameterDeclaration[] = [];
+
+		if(a_fields_continuous.length + a_fields_access.length) {
+			// continuous
+			if(b_continuous) {
+				// destructure fields using array binding
+				a_params.push(param(arrayBinding(a_fields_continuous)));
+			}
+			// not continuous
+			else {
+				const yn_payload = ident('a_fields');
+
+				// capture fields in param
+				a_params.push(param(yn_payload));
+
+				// destructure continuous fields in array binding if any
+				if(a_fields_continuous.length) {
+					a_params.push(param(arrayBinding(a_fields_continuous), __UNDEFINED, false, yn_payload));
+				}
+
+				// destructure higher fields in object binding
+				if(1 === a_fields_access.length) {
+					a_params.push(param(
+						a_single_access![0],
+						__UNDEFINED,
+						false,
+						// recastAs(
+						arrayAccess(yn_payload, a_single_access![1])
+							// , this.importType(this.resolveType(a_single_access![2].typeName!), 'Decoded'))
+					));
+				}
+				else {
+					a_params.push(param(objectBinding(a_fields_access), __UNDEFINED, false, yn_payload));
+				}
+			}
+		}
+
+
+		// const yn_destruct = declareConst(
+		// 	arrayBinding(g_msg.fieldList.map((g_field) => {
+		// 		// convert field to thing
+		// 		const g_thing = this.route(g_field);
+
+		// 		// resolve field type
+		// 		const g_resolved = g_field.typeName? this.resolveType(g_field.typeName): __UNDEFINED;
+
+		// 		return binding(ident(g_field.name!));
+		// 	})),
+		// 	callExpr(this.importConstant(g_msg, 'decode'), [yn_payload])
+		// );
+
+		// const a_param_idents = g_msg.fieldList.map((g_field) => {
+		// 	// convert field to thing
+		// 	const g_thing = this.route(g_field);
+
+		// 	// select which ident to use
+		// 	return g_thing.nests? ident(g_thing.nests.name): g_thing.calls.id;
+		// });
+
+		const yn_body = arrow([
+			// param(yn_payload),
+			// param(
+			// 	arrayBinding(g_msg.fieldList.map((g_field) => {
+			// 		// convert field to thing
+			// 		const g_thing = this.route(g_field);
+
+			// 		// resolve field type
+			// 		const g_resolved = g_field.typeName? this.resolveType(g_field.typeName): __UNDEFINED;
+
+			// 		return binding(g_thing.calls.id);
+			// 	})),
+			// 	__UNDEFINED, false,
+			// 	// callExpr(this.importConstant(g_msg, 'expand'), [yn_payload])
+			// 	callExpr(`expand${this.clashFreeTypeId()}`)
+			// ),
+
+			// ...g_msg.fieldList.length
+				// ? [param(
+				// 	arrayBinding(g_msg.fieldList.map((g_field, i_field) =>
+				// 		// // convert field to thing
+				// 		// const g_thing = this.route(g_field);
+
+				// 		// // resolve field type
+				// 		// const g_resolved = g_field.typeName? this.resolveType(g_field.typeName): __UNDEFINED;
+
+				// 		// return binding(g_thing.nests? g_thing.nests.name: g_thing.calls.id);
+
+				// 		binding(a_param_idents[i_field])
+				// 	))
+				// )]
+				// : [],
+
+			...a_params.length? a_params: [],
+		], objectLit(fold(g_msg.fieldList, (g_field, i_field) => {
+			// convert field to thing
+			const g_thing = this.route(g_field);
+
+			// resolve field type
+			const g_resolved = g_field.typeName? this.resolveType(g_field.typeName): __UNDEFINED;
+
+			// const yn_src = g_thing.calls.id;
+			const yn_src = a_field_idents[i_field];
+
+			const f_expand = g_thing.calls.expand;
+
+			let yn_expanded = f_expand(yn_src);
+
+			// enum
+			if('enum' === g_resolved?.form && !g_field.repeated) {
+				yn_expanded = ternary(
+					binary(y_factory.createToken(SyntaxKind.GreaterThanEqualsToken), castAs(yn_src, keyword('number')), numericLit(0)),
+					f_expand(exclaim(yn_src)),
+					ident('__UNDEFINED')
+				);
+			}
+			else if(F_IDENTITY !== f_expand) {
+				if(g_field.typeName && !['.google.protobuf.Timestamp', '.google.protobuf.Duration'].includes(g_field.typeName)) {
+					yn_expanded = andAnd(yn_src, yn_expanded);
+				}
+			}
+
+			// const yn_expanded = g_field.repeated
+			// 	? callExpr('map', [yn_src, yn_condenser])
+			// 	: g_thing.optional
+			// 		? callExpr('apply_opt', [yn_access, yn_condenser])
+			// 		: f_expand(yn_access);
+
+
+			return {
+				[g_field.name!]: yn_expanded,
+			};
+		})));
+
+		const yn_expand = declareConst(
+			`expand${this.clashFreeTypeId(g_msg)}`,
+			yn_body, true,
+			funcType([param('a_fields', this.importType(g_msg, 'Decoded'))], this.importType(g_msg))
+		);
+
+		// const si_name = this.exportedId(g_msg);
+
+		// const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, g_field => ({
+		// 	[g_field.name!]: [this.route(g_field).json!.type, g_field.optional],
+		// }))), true);
+
+		return [
+			print(yn_expand, [
+				`Takes the protobuf representation of a message and converts it to its JSON form \`${g_msg.path.slice(1)}\` - ${g_msg.comments}`,
 			]),
 		];
 	}
@@ -700,7 +920,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		let b_processed = false;
 
 		const a_types: [string, boolean, TypeNode][] = [];
-		const a_things: TsThing[] = [];
+		const h_things: Dict<TsThing> = {};
 		const a_hints: Expression[] = [];
 		const a_returns: Expression[] = [];
 
@@ -721,16 +941,17 @@ export class NeutrinoImpl extends RpcImplementor {
 		}> = {};
 
 		// each field in sorted order
-		g_msg.fieldList.sort((g_a, g_b) => g_a.number! - g_b.number!).forEach((g_field, i_field) => {
+		let i_expect = 1;
+		g_msg.fieldList.forEach((g_field) => {
 			const i_number = g_field.number!;
 
 			// found a gap, fields are not continuous
-			if(i_number !== i_field + 1) {
+			if(i_number !== i_expect) {
 				// mark as processed
 				b_processed = true;
 
 				// gap is skippable
-				const n_gap = i_number - (i_field + 1);
+				const n_gap = i_number - i_expect;
 				if(n_gap < N_MAX_PROTO_FIELD_NUMBER_GAP) {
 					// clear the gap
 					for(let i_omit=0; i_omit<n_gap; i_omit++) {
@@ -742,6 +963,11 @@ export class NeutrinoImpl extends RpcImplementor {
 
 						// add hint to arg
 						a_hints.push(literal(ProtoHint.NONE));
+
+						a_returns.push(ident('__UNDEFINED'));
+
+						// add return type to tuple
+						a_types.push([`w_${i_omit}`, true, keyword('undefined')]);
 					}
 				}
 				// gap is not skippable; flag as not continuous
@@ -749,6 +975,8 @@ export class NeutrinoImpl extends RpcImplementor {
 					b_continuous = false;
 				}
 			}
+
+			i_expect = i_number + 1;
 
 			// prep components
 			let yn_hint: Expression;
@@ -778,11 +1006,12 @@ export class NeutrinoImpl extends RpcImplementor {
 				yn_type = g_nests.type;
 
 				// defer
-				yn_generic = g_thing.field.repeated? arrayType(yn_type): yn_type;
+				// yn_generic = g_thing.field.repeated? arrayType(yn_type): yn_type;
+				yn_generic = yn_type = g_thing.field.repeated? arrayType(yn_type): yn_type;
 
 				yn_return = yn_ident;
 
-				if(g_nests.parser) a_decoders[i_field] = g_nests.parser;
+				if(g_nests.parser) a_decoders[i_number-1] = g_nests.parser;
 
 				// // add expression to return list
 				// yn_return = g_nests.parse(yn_ident);
@@ -798,7 +1027,7 @@ export class NeutrinoImpl extends RpcImplementor {
 					v: 's' === g_thing.calls.name[0]? ProtoHint.BIGINT: ProtoHint.NONE,
 					g: ProtoHint.BIGINT,
 					s: ProtoHint.STRING,
-					b: ProtoHint.NONE,
+					b: H_FIELD_TYPES.TYPE_MESSAGE === g_field.type? ProtoHint.MESSAGE: ProtoHint.NONE,
 				}[g_thing.proto.writer.toLowerCase()] || 0));
 
 				// apply same logic to generic parameter
@@ -826,7 +1055,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				a_hints.push(yn_hint);
 				a_generics.push(yn_generic);
 				a_returns.push(yn_return);
-				a_things.push(g_thing);
+				h_things[i_number-1] = g_thing;
 
 				// add return type to tuple
 				a_types.push([s_type_label, g_thing.optional, yn_type]);
@@ -1007,11 +1236,11 @@ export class NeutrinoImpl extends RpcImplementor {
 			print(yn_type_decl, [
 				`A decoded protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} message`,
 				'',
-				...1 === a_things.length
-					? [`Alias for: ${a_things[0].field.name} - ${a_things[0].field.comments}`]
+				...1 === odk(h_things).length
+					? [`Alias for: ${odv(h_things)[0].field.name} - ${odv(h_things)[0].field.comments}`]
 					: [
 						'Tuple where:',
-						...a_things.map((g_type, i_type) => `  - ${i_type}: ${g_type.field.name} - ${g_type.field.comments}`),
+						...oderac(h_things, (s_index, g_type) => `  - ${s_index}: ${g_type.field.name} - ${g_type.field.comments}`),
 						...odem(h_arbitrary_fields, ([si_index, g_arb]) => ` - ${si_index}: ${g_arb.thing.field.name} - ${g_arb.thing.field.comments}`),
 					],
 			]),
@@ -1107,7 +1336,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		// final return type
 		let yn_return: TypeNode = tuple(a_returns);
 
-		// non-monotonic field numbers, wrap in intersection type
+		// non-continuous field numbers, wrap in intersection type
 		if(Object.keys(h_indicies).length) {
 			yn_return = intersection([yn_return, typeLit(h_indicies)]);
 		}
@@ -1267,9 +1496,17 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		const si_name = this.exportedId(g_msg);
 
-		const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, g_field => ({
-			[g_field.name!]: [this.route(g_field).json!.type, g_field.optional],
-		}))), true);
+		const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, (g_field) => {
+			const yn_type = this.route(g_field).json!.type;
+			return {
+				[g_field.name!]: g_field.optional
+					? [union([
+						yn_type,
+						keyword('undefined'),
+					]), true]
+					: [yn_type, false],
+			};
+		})), true);
 
 		return [
 			print(yn_alias, [

@@ -6,10 +6,10 @@ import type {ProtoWriterMethod} from '../api/protobuf-writer';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
 
-import {snake, type Dict, F_IDENTITY} from '@blake.regalia/belt';
+import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, tuple} from './ts-factory';
+import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, tuple, not, arrayAccess} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 // destructure members from protobuf
@@ -38,7 +38,10 @@ export type TsThingBare = {
 		from_json?: (yn_expr: Expression) => Expression;
 
 		// how to convert a JSON-encoded value into its protobuf equivalent
-		convert?: (yn_expr: Expression) => Expression;
+		condense?: (yn_expr: Expression) => Expression;
+
+		// how to convert a protobuf value into its JSON equivalent
+		expand?: (yn_expr: Expression) => Expression;
 	};
 
 	// when using the type to submit gateway request or parse a response
@@ -163,7 +166,8 @@ const H_OVERRIDE_MIXINS: Dict<
 				type: typeRef('SlimCoin'),
 				to_proto: yn_expr => callExpr('coin', [yn_expr]),
 				to_json: yn_expr => callExpr('restruct_coin', [yn_expr]),
-				convert: yn_expr => callExpr('slimify_coin', [yn_expr]),
+				condense: yn_expr => callExpr('slimify_coin', [yn_expr]),
+				expand: yn_expr => callExpr('expand_coin', [yn_expr]),
 			},
 
 			proto: {
@@ -190,6 +194,7 @@ const H_OVERRIDE_MIXINS: Dict<
 		calls: {
 			to_json: yn_expr => callExpr('timestamp_to_json', [yn_expr]),
 			from_json: yn_expr => callExpr('parse_timestamp', [yn_expr]),
+			expand: yn => callExpr('expand_timestamp', [yn]),
 		},
 		json: {
 			type: typeRef('WeakTimestampStr'),
@@ -201,6 +206,7 @@ const H_OVERRIDE_MIXINS: Dict<
 		calls: {
 			to_json: yn_expr => callExpr('duration_to_json', [yn_expr]),
 			from_json: yn_expr => callExpr('parse_duration', [yn_expr]),
+			expand: yn => callExpr('expand_duration', [yn]),
 		},
 		json: {
 			type: typeRef('WeakDurationStr'),
@@ -230,7 +236,8 @@ const H_OVERRIDE_MIXINS: Dict<
 			calls: {
 				name: `atu8_${g_field.name!}`,
 				type: yn_proto_type,
-				convert: yn_expr => callExpr('condenseJsonAny', [yn_expr]),
+				condense: yn_expr => callExpr('condenseJsonAny', [yn_expr]),
+				expand: yn_expr => callExpr('expandJsonAny', [yn_expr]),
 			},
 
 			json: {
@@ -277,6 +284,11 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			name: `b_${si_field}`,
 			type: union([keyword('boolean'), ...[0, 1].map(x => litType(numericLit(x)))]),
 			return_type: union([0, 1].map(x => litType(numericLit(x)))),
+			expand: yn => not(not(yn)),
+		},
+
+		json: {
+			type: keyword('boolean'),
 		},
 
 		proto: {
@@ -386,7 +398,12 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		// construct ts field
 		return {
 			calls: {
-				name: `si_${snake(si_field)}`,
+				name: `xc_${snake(si_field)}`,
+				// type: k_impl.importType(g_enum, 'JsonEnum'),
+				type: k_impl.importType(g_enum, 'ProtoEnum'),
+				expand: yn => arrayAccess(k_impl.importConstant(g_enum, 'ProtoToJsonEnum'), yn),
+			},
+			json: {
 				type: k_impl.importType(g_enum, 'JsonEnum'),
 			},
 			proto: {
@@ -415,6 +432,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			calls: {
 				name: `g_${si_name}`,
 				type: yn_json,
+				expand: yn => callExpr(`expand${k_impl.clashFreeTypeId(g_refable)}`, [yn]),
 			},
 
 			json: {
@@ -454,9 +472,14 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 					name: `sa_${si_name}`,
 					type: typeRef('WeakAccountAddr'),
 					to_proto: yn_expr => callExpr('bech32_decode', [yn_expr]),
-					to_json: yn_expr => callExpr('safe_buffer_to_base64', [callExpr('bech32_decode', [yn_expr])]),
-					convert: F_IDENTITY,
+					to_json: yn_expr => callExpr('safe_bytes_to_base64', [callExpr('bech32_decode', [yn_expr])]),
+					// condense: F_IDENTITY,
+					condense: yn => callExpr('addr_bytes_to_bech32', [yn]),
 					return_type: typeRef('CwAccountAddr'),
+				},
+
+				json: {
+					type: typeRef('CwBase64'),
 				},
 
 				proto: {
@@ -476,7 +499,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			calls: {
 				name: si_self,
 				type: yn_type,
-				from_json: yn_expr => callExpr('safe_base64_to_buffer', [yn_expr]),
+				from_json: yn_expr => callExpr('safe_base64_to_bytes', [yn_expr]),
 				// return_type: typeRef('CwBase64'),
 				// to_proto: yn_expr => callExpr(),
 

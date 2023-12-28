@@ -4,7 +4,7 @@ import type {PropagateUndefined} from './types';
 import type {Nilable} from '@blake.regalia/belt';
 import type {SlimCoin} from '@solar-republic/types';
 
-import {ATU8_NIL, __UNDEFINED, buffer, dataview, text_to_buffer} from '@blake.regalia/belt';
+import {ATU8_NIL, __UNDEFINED, bytes, dataview, text_to_bytes} from '@blake.regalia/belt';
 
 type NodeValue = number | bigint | number[] | Uint8Array;
 
@@ -142,7 +142,7 @@ export const Protobuf = (): ProtoWriter => {
 			]));
 		},
 
-		i: (x_value, i_field=i_auto++, atu8_data=buffer(8), dv_view=dataview(atu8_data.buffer)) => x_value
+		i: (x_value, i_field=i_auto++, atu8_data=bytes(8), dv_view=dataview(atu8_data.buffer)) => x_value
 			? (field(i_field, 5), dv_view.setFloat64(0, x_value), push([encode_bytes, atu8_data, 8]))
 			: g_self,
 
@@ -162,7 +162,7 @@ export const Protobuf = (): ProtoWriter => {
 			);
 		},
 
-		s: (s_data, i_field=i_auto++) => s_data? g_self.b(text_to_buffer(s_data), i_field): g_self,
+		s: (s_data, i_field=i_auto++) => s_data? g_self.b(text_to_bytes(s_data), i_field): g_self,
 
 		V: map_self('v'),
 		G: map_self('g'),
@@ -175,7 +175,7 @@ export const Protobuf = (): ProtoWriter => {
 
 		get o(): Uint8Array {
 			// eslint-disable-next-line prefer-const
-			let atu8_out = buffer(cb_buffer);
+			let atu8_out = bytes(cb_buffer);
 
 			// write offset
 			let ib_write = 0;
@@ -237,6 +237,8 @@ export const coin = <
 
 export const coins = (a_coins: Nilable<SlimCoin[]>): Uint8Array[] | undefined => map(a_coins, coin);
 
-export const slimify_coin = (g_coin?: {denom?: string; amount?: string}) => g_coin? [g_coin.amount!, g_coin.denom!] as SlimCoin: __UNDEFINED;
+export const slimify_coin = (g_coin?: {
+	denom?: string | undefined;
+	amount?: string | undefined;
+}) => g_coin? [g_coin.amount!, g_coin.denom!] as SlimCoin: __UNDEFINED;
 
-// export const 

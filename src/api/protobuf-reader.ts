@@ -3,7 +3,7 @@
 import type {NestedArrayable} from '@blake.regalia/belt';
 import type {SlimCoin} from '@solar-republic/types';
 
-import {buffer_to_text} from '@blake.regalia/belt';
+import {bytes_to_text, is_array} from '@blake.regalia/belt';
 
 export type DecodedProtobufFieldPrimitive<w_inject=never> = w_inject | number | string | Uint8Array;
 
@@ -37,7 +37,7 @@ export const enum ProtoHint {
 	SINGULAR_BIGINT=3,  // SINGULAR | BIGINT
 
 	/**
-	 * Indicates that the varint should be converted into a string
+	 * Indicates that the bytes should be converted into a string
 	 */
 	STRING=4,
 
@@ -45,6 +45,16 @@ export const enum ProtoHint {
 	 * Shortcut for `ProtoHint.SINGULAR | ProtoHint.STRING`
 	 */
 	SINGULAR_STRING=5,  // SINGULAR | STRING
+
+	/**
+	 * Indicates that the bytes should be decoded as a nested protobuf message
+	 */
+	MESSAGE=8,
+
+	/**
+	 * Shortcut for `ProtoHint.SINGULAR | ProtoHint.STRING`
+	 */
+	SINGULAR_MESSAGE=9,  // SINGULAR | MESSAGE
 }
 
 
@@ -152,7 +162,9 @@ export const decode_protobuf = <
 
 		// invalid field index (precedes previous or lowest) or not the expected field type
 		if(xn_field < i_field || xn_type > 2) {
-			return atu8_data as unknown as w_return;
+			debugger;
+			throw Error(`Failed to decode message`);
+			// return atu8_data as unknown as w_return;
 		}
 
 		// update field index
@@ -187,16 +199,27 @@ export const decode_protobuf = <
 				const atu8_section = atu8_data.subarray(ib_start, ib_read);
 
 				// decoder supplied; apply it
-				if(a_decoders?.[i_field]) return (a_decoders[i_field] as ProtobufNestedDecoder)(atu8_section);
+				{if(a_decoders?.[i_field]) return (a_decoders[i_field] as ProtobufNestedDecoder)(atu8_section);}
 
-				// decode that section of the buffer
-				const w_read = decode_protobuf(
-					atu8_section,
-					((w_hint as number) > 0? []: w_hint) as ProtoHint[]
-				);
+				// message hint
+				if(is_array(w_hint) || ProtoHint.MESSAGE & (w_hint as number)) {
+					// // decode that section of the buffer
+					// const w_read = decode_protobuf(
+					// 	atu8_section,
+					// 	((w_hint as number) > 0? []: w_hint) as ProtoHint[]
+					// );
+
+					return decode_protobuf(
+						atu8_section,
+						((w_hint as number) > 0? []: w_hint) as ProtoHint[]
+					);
+				}
 
 				// apply hint, expecting non-protobuf messages to be returned as raw bytes
-				return ProtoHint.STRING & (w_hint as number)? buffer_to_text(w_read as unknown as Uint8Array): w_read;
+				return ProtoHint.STRING & (w_hint as number)? bytes_to_text(atu8_section): atu8_section;
+
+				// // apply hint, expecting non-protobuf messages to be returned as raw bytes
+				// return ProtoHint.STRING & (w_hint as number)? bytes_to_text(w_read as unknown as Uint8Array): w_read;
 			},
 		][xn_type](xc_hint_local);
 

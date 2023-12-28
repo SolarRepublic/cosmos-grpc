@@ -16,9 +16,10 @@ import type {
 	MemberName,
 	ImportSpecifier,
 	PropertyName,
+	BinaryOperatorToken,
 } from 'typescript';
 
-import {__UNDEFINED, fodemtv, oderac} from '@blake.regalia/belt';
+import {__UNDEFINED, fodemtv, is_array, oderac} from '@blake.regalia/belt';
 import {ts, NodeFlags} from 'ts-morph';
 
 export type TupleEntryDescriptor = [z_ident: string | Identifier, b_opt: boolean, yn_type: TypeNode];
@@ -85,6 +86,8 @@ export const callChain = (yn_prime: Expression, a_args?: Expression[], a_types?:
 
 export const castAs = (yn_subject: Expression, yn_type: TypeNode) => y_factory.createAsExpression(yn_subject, yn_type);
 
+export const recastAs = (yn_subject: Expression, yn_type: TypeNode) => y_factory.createAsExpression(y_factory.createAsExpression(yn_subject, keyword('unknown')), yn_type);
+
 export const ternary = (yn_if: Expression, yn_then: Expression, yn_else: Expression) => y_factory.createConditionalExpression(
 	yn_if,
 	y_factory.createToken(SyntaxKind.QuestionToken),
@@ -105,8 +108,8 @@ export const typeLit = (h_props: Dict<TypeNode | [TypeNode, boolean]>) => y_fact
 	oderac(h_props, (si_key, z_type) => y_factory.createPropertySignature(
 		__UNDEFINED,
 		ident(si_key),
-		Array.isArray(z_type) && z_type[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
-		Array.isArray(z_type)? z_type[0]: z_type
+		is_array(z_type) && z_type[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
+		is_array(z_type)? z_type[0]: z_type
 	)));
 
 export const declareAlias = (si_name: string, yn_assign: TypeNode, b_export?: boolean) => y_factory.createTypeAliasDeclaration(
@@ -135,7 +138,7 @@ export const declareConst = (
 
 export const tuple = (a_members: Array<TypeNode | TupleEntryDescriptor>) => y_factory
 	.createTupleTypeNode(
-		a_members.map(z_member => Array.isArray(z_member)
+		a_members.map(z_member => is_array(z_member)
 			? y_factory
 				.createNamedTupleMember(
 					__UNDEFINED,
@@ -172,7 +175,7 @@ export const arrow = (a_params: ParameterDeclaration[], yn_body: ConciseBody, yn
 );
 
 export const objectLit = (h_props: Dict<Expression | [Expression, Expression]>) => y_factory.createObjectLiteralExpression(
-	oderac(h_props, (si_key, z_value) => Array.isArray(z_value)
+	oderac(h_props, (si_key, z_value) => is_array(z_value)
 		? y_factory.createPropertyAssignment(y_factory.createComputedPropertyName(z_value[0]), z_value[1])
 		: y_factory.createPropertyAssignment(string(si_key), z_value)), true);
 
@@ -191,7 +194,7 @@ export const literal = (z_value: Arrayable<boolean | number | bigint | string | 
 			if(null === z_value) {
 				return y_factory.createToken(SyntaxKind.NullKeyword);
 			}
-			else if(Array.isArray(z_value)) {
+			else if(is_array(z_value)) {
 				return arrayLit(z_value.map(literal));
 			}
 			else {
@@ -300,3 +303,10 @@ export const keyOf = (yn_type: TypeNode) => y_factory.createTypeOperatorNode(Syn
 export const accessIndexed = (yn_obj: TypeNode, yn_index: TypeNode) => y_factory.createIndexedAccessTypeNode(yn_obj, yn_index);
 
 export const exclaim = (yn_expr: Expression) => y_factory.createNonNullExpression(yn_expr);
+
+export const not = (yn_expr: Expression) => y_factory.createPrefixUnaryExpression(SyntaxKind.ExclamationToken, yn_expr);
+
+export const binary = (yn_oper: BinaryOperatorToken, yn_a: Expression, yn_b: Expression) => y_factory.createBinaryExpression(yn_a, yn_oper, yn_b);
+
+export const andAnd = (yn_a: Expression, yn_b: Expression) => binary(y_factory.createToken(SyntaxKind.AmpersandAmpersandToken), yn_a, yn_b);
+

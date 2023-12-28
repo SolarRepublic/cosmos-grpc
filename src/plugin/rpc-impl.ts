@@ -4,20 +4,41 @@ import type {AugmentedField, AugmentedFile, AugmentedMessage, AugmentedMethod} f
 import type {InterfacesDict, RefableType, TypesDict, Params} from './plugin';
 import type {Dict} from '@blake.regalia/belt';
 
-import type {TypeNode, ImportSpecifier, Identifier, CallExpression} from 'typescript';
+import type {TypeNode, ImportSpecifier, Identifier, CallExpression, Expression} from 'typescript';
 
 import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex, odv} from '@blake.regalia/belt';
+import {ts} from 'ts-morph';
+const {SyntaxKind} = ts;
+
 
 import {map_proto_path} from './common';
 import {parse_package_parts} from './plugin';
 
-import {access, arrayType, arrow, callExpr, ident, importModule, litType, param, print, string, typeRef, y_factory, chain, callChain, union} from './ts-factory';
+import {arrayType, arrow, callExpr, ident, importModule, param, print, typeRef, y_factory, chain, callChain, union, keyword} from './ts-factory';
 
 
 export type FileCategory = 'lcd' | 'any' | 'encoder' | 'decoder';
 
 
 const F_SORT_PATH = ([sr_a]: [string, any], [sr_b]: [string, any]) => sr_a === sr_b? 0: sr_a < sr_b? -1: 1;
+
+type ExpressionTransformer = (yn: Expression) => Expression;
+
+const pluralize = (f_gen: ExpressionTransformer, s_name_singular='w'): ExpressionTransformer => {
+	// cache singular form
+	const yn_singular = f_gen(ident(s_name_singular)) as CallExpression;
+
+	// callable
+	if(SyntaxKind.CallExpression === (yn_singular.kind as typeof SyntaxKind.CallExpression) && 1 === yn_singular.arguments.length) {
+		return yn_expr => callExpr('map', [yn_expr, yn_singular.expression]);
+	}
+
+	// shorten to using `map` import if single argument
+	return yn_expr => callChain(
+		chain(yn_expr, 'map'),
+		[arrow([param(s_name_singular)], yn_singular)]
+	);
+};
 
 export abstract class RpcImplementor {
 	protected _h_router!: FieldRouter;
@@ -76,7 +97,8 @@ export abstract class RpcImplementor {
 
 		// create type reference to JSON form of Any with appropriate generics
 		return typeRef('JsonAny', [
-			litType(string(si_interface)),
+			// litType(string(si_interface)),
+			keyword('string'),
 			...a_msgs
 				? [union(a_msgs.map(g_msg => this.importType(g_msg)))]
 				: [],  // keyword('never'),
@@ -126,13 +148,13 @@ export abstract class RpcImplementor {
 	}
 
 	importType(g_ref: RefableType, s_prefix=''): TypeNode {
-		const b_ignore = this._b_clash_free && !['', 'Encoded'].includes(s_prefix);
+		const b_ignore = this._b_clash_free && !['', 'Encoded', 'Decoded'].includes(s_prefix);
 
 		return typeRef(this._import(this._h_type_imports, g_ref, s_prefix, b_ignore));
 	}
 
 	importConstant(g_ref: RefableType, s_prefix=''): Identifier {
-		const b_ignore = this._b_clash_free && !['', 'encode', 'JsonToProtoEnum'].includes(s_prefix);
+		const b_ignore = this._b_clash_free && !['', 'encode', 'decode', 'JsonToProtoEnum', 'ProtoToJsonEnum'].includes(s_prefix);
 
 		return ident(this._import(this._h_imports, g_ref, s_prefix, b_ignore));
 	}
@@ -179,6 +201,8 @@ export abstract class RpcImplementor {
 		const g_nests = g_bare.nests? {...g_bare.nests}: __UNDEFINED as TsThing['nests'] || null;
 		const g_json = {...g_bare.json} as TsThing['json'];
 
+		// if(H_FIELD_TYPES.TYPE_BOOL === g_field.type) debugger;
+
 		// auto-fill proto
 		{
 			let si_proto = g_calls.name;
@@ -191,21 +215,19 @@ export abstract class RpcImplementor {
 			g_proto.type ||= g_calls.type;
 		}
 
+		// ref singular name format
 		const si_snake = g_calls.name;
 
 		// repeated field
 		if(g_field.repeated) {
-			// ref singular name format
-			const s_name_singular = g_calls.name;
-
 			// assert write type exists
 			if(!g_proto.writer) {
 				debugger;
-				throw new Error(`Repeated field type is not mapped to a proto writer function: ${s_name_singular}`);
+				throw new Error(`Repeated field type is not mapped to a proto writer function: ${si_snake}`);
 			}
 
 			// pluralize names
-			g_proto.name = g_calls.name = s_name_singular.replace(/^[^_]+/, 'a')
+			g_proto.name = g_calls.name = si_snake.replace(/^[^_]+/, 'a')
 				.replace(/(\w\w)$/, (s_match, s_term) => s_term + (
 					's' === s_term[1]
 						? 'e' === s_term[0]
@@ -226,84 +248,45 @@ export abstract class RpcImplementor {
 			g_proto.writer = g_proto.writer.toUpperCase();
 
 			// wrap to_json
-			const f_json = g_calls.to_json;
-			if(f_json) {
-				// cache singular form
-				const yn_json = f_json(ident(s_name_singular)) as CallExpression;
-
-				// shorten to using `map` import if single argument
-				g_calls.to_json = 1 === yn_json.arguments.length
-					? yn_expr => callExpr('map', [yn_expr, yn_json.expression])
-					: yn_expr => callChain(
-						chain(yn_expr, 'map'),
-						[arrow([param(s_name_singular)], yn_json)]
-					);
-			}
+			const f_to_json = g_calls.to_json;
+			if(f_to_json) g_calls.to_json = pluralize(f_to_json, si_snake);
 
 			// wrap from_json
 			const f_from_json = g_calls.from_json;
-			if(f_from_json) {
-				// cache singular form
-				const yn_json = f_from_json(ident(s_name_singular)) as CallExpression;
-
-				// shorten to using `map` import if single argument
-				g_calls.from_json = 1 === yn_json.arguments.length
-					? yn_expr => callExpr('map', [yn_expr, yn_json.expression])
-					: yn_expr => callChain(chain(yn_expr, 'map'), [
-						arrow([param(s_name_singular)], f_from_json(ident(s_name_singular))),
-					]);
-			}
+			if(f_from_json) g_calls.from_json = pluralize(f_from_json, si_snake);
 
 			// wrap to_proto
-			if(g_calls.to_proto) {
+			const f_to_proto = g_calls.to_proto;
+			if(f_to_proto) {
 				// special wrap for Coin[]
 				if('.cosmos.base.v1beta1.Coin' === g_field.typeName) {
 					g_calls.to_proto = yn_expr => callExpr('coins', [yn_expr]);
 				}
 				// map items
 				else {
-					const f_original = g_calls.to_proto;
-
-					// cache singular form
-					const yn_singular = f_original(ident(s_name_singular)) as CallExpression;
-
-					// shorten to using `map` import if single argument
-					g_calls.to_proto = 1 === yn_singular.arguments.length
-						? yn_expr => callExpr('map', [yn_expr, yn_singular.expression])
-						: yn_expr => callExpr(
-							// access(g_calls.name, 'map'),
-							access(yn_expr, 'map'),
-							[arrow([param(s_name_singular)], yn_singular)]
-						);
+					g_calls.to_proto = pluralize(f_to_proto, si_snake);
 				}
 			}
 
-			// convert
-			const f_convert = g_calls.convert;
-			if(f_convert) {
-				// cache singular form
-				const yn_singular = f_convert(ident(s_name_singular)) as CallExpression;
+			// condense
+			const f_condense = g_calls.condense;
+			if(f_condense) g_calls.condense = pluralize(f_condense, si_snake);
 
-				// shorten to using `map` import if single argument
-				g_calls.convert = 1 === yn_singular.arguments.length
-					? yn_expr => callExpr('map', [yn_expr, yn_singular.expression])
-					: yn_expr => callChain(chain(yn_expr, 'map'), [
-						arrow([param(s_name_singular)], f_from_json(ident(s_name_singular))),
-					]);
-			}
+			// expand
+			const f_expand = g_calls.expand;
+			if(f_expand) g_calls.expand = pluralize(f_expand, si_snake);
 
-			if(g_json?.type) {
-				g_json.type = arrayType(g_json.type);
-			}
-
-			if(g_calls.return_type) {
-				g_calls.return_type = arrayType(g_calls.return_type);
-			}
+			// convert types into array
+			if(g_json?.type) g_json.type = arrayType(g_json.type);
+			if(g_calls.return_type) g_calls.return_type = arrayType(g_calls.return_type);
 		}
 
 		// auto-fill calls
 		if(si_snake.startsWith('atu8_')) {
-			g_calls.to_json ||= yn_expr => callExpr('safe_buffer_to_base64', [yn_expr]);
+			g_calls.to_json ||= yn_expr => callExpr('safe_bytes_to_base64', [yn_expr]);
+
+			// repeated
+			if(g_field.repeated) g_calls.to_json = pluralize(g_calls.to_json, si_snake);
 		}
 
 		g_calls.to_json ||= F_IDENTITY;
@@ -312,7 +295,8 @@ export abstract class RpcImplementor {
 		g_calls.to_proto ||= F_IDENTITY;  // ident(g_proto.prefers_call? g_calls.name: g_proto.name);
 		g_calls.return_type ||= g_calls.type;
 
-		g_calls.convert ||= g_calls.from_json;
+		g_calls.condense ||= g_calls.from_json;
+		g_calls.expand ||= g_calls.to_json;
 
 		const yn_json = g_json?.type || g_calls.return_type;
 

@@ -4,11 +4,11 @@ import type {AugmentedEnum, AugmentedMessage} from './env';
 import type {Dict} from '@blake.regalia/belt';
 
 
-import {ode, oderac, oderom, odv} from '@blake.regalia/belt';
+import {ode, oderaf, oderom, odv} from '@blake.regalia/belt';
 
 import {NeutrinoImpl} from './impl-neutrino';
 import {plugin} from './plugin';
-import {declareConst, funcType, ident, importModule, keyword, objectLit, param, print, typeRef} from './ts-factory';
+import {arrayLit, arrayType, castAs, declareAlias, declareConst, funcType, ident, importModule, keyword, objectLit, param, print, tuple, typeRef} from './ts-factory';
 
 // inject into preamble of any file, allow linter to delete unused imports
 const A_GLOBAL_PREAMBLE = [
@@ -23,8 +23,8 @@ const A_GLOBAL_PREAMBLE = [
 			'F_IDENTITY',
 			'__UNDEFINED',
 			'oda',
-			'base64_to_buffer',
-			'text_to_buffer',
+			'base64_to_bytes',
+			'text_to_bytes',
 		]),
 		importModule('@blake.regalia/belt', [
 			'NaiveHexLower',
@@ -44,21 +44,25 @@ const A_GLOBAL_PREAMBLE = [
 			'CwAccountAddr',
 			'CwValidatorAddr',
 		], true),
-		importModule('#/api/bech32', [
+		importModule('@solar-republic/crypto', [
 			'bech32_encode',
 			'bech32_decode',
 		]),
 		importModule('#/api/util', [
-			'safe_buffer_to_base64',
-			'safe_buffer_to_text',
-			'safe_base64_to_buffer',
+			'safe_bytes_to_base64',
+			'safe_bytes_to_text',
+			'safe_base64_to_bytes',
 			'safe_base64_to_text',
+			'addr_bytes_to_bech32',
 		]),
 		importModule('#/api/json', [
 			'parse_duration',
 			'parse_timestamp',
 			'duration_to_json',
 			'timestamp_to_json',
+			'expand_timestamp',
+			'expand_duration',
+			'expand_coin',
 		]),
 		importModule('#/api/protobuf-writer', [
 			'Protobuf',
@@ -113,10 +117,11 @@ export const main = () => {
 
 		// [typePath: string]: serialized message
 		const h_encoders: SerializedMessages = {};
-		const h_condensors: SerializedMessages = {};
 		const h_decoders: SerializedMessages = {};
 		const h_destructors: SerializedMessages = {};
 		const h_accessors: SerializedMessages = {};
+		const h_condensers: SerializedMessages = {};
+		const h_expanders: SerializedMessages = {};
 
 		// 
 		type ClosureStruct = {
@@ -238,7 +243,7 @@ export const main = () => {
 						// ensure its fields can be encoded
 						mark_fields(g_msg, g_encoders);
 
-						// ensure its fields can be accessed for condensor
+						// ensure its fields can be accessed for condenser
 						mark_fields(g_msg, g_accessible);
 					}
 				}
@@ -258,6 +263,9 @@ export const main = () => {
 
 						// ensure its fields can be decoded
 						mark_fields(g_msg, g_decoders);
+
+						// ensure its fields can be accessed for expander
+						mark_fields(g_msg, g_accessible);
 					}
 				}
 
@@ -409,10 +417,10 @@ export const main = () => {
 				contents: k_impl.msgEncoder(g_msg),
 			};
 
-			// add condensor
-			h_condensors[g_msg.path] = {
+			// add condenser
+			h_condensers[g_msg.path] = {
 				message: g_msg,
-				contents: k_impl.msgCondensor(g_msg),
+				contents: k_impl.msgCondenser(g_msg),
 			};
 		}
 
@@ -423,6 +431,12 @@ export const main = () => {
 			h_decoders[g_msg.path] = {
 				message: g_msg,
 				contents: k_impl.msgDecoder(g_msg),
+			};
+
+			// add expander
+			h_expanders[g_msg.path] = {
+				message: g_msg,
+				contents: k_impl.msgExpander(g_msg),
 			};
 
 			const a_destructor = k_impl.msgDestructor(g_msg);
@@ -456,11 +470,15 @@ export const main = () => {
 			}
 		}
 
-		// condensors
+		// condensers
 		{
 			// open file
-			k_impl.open(NeutrinoImpl.condensorFile(), true);
+			k_impl.open(NeutrinoImpl.condenserFile(), true);
 			const p_output = k_impl.path;
+
+			for(const g_encoder of odv(h_encoders)) {
+				k_impl.importConstant(g_encoder.message, 'decode');
+			}
 
 			// prep file parts
 			const g_parts = {
@@ -469,7 +487,7 @@ export const main = () => {
 					`import type {JsonObject} from '@blake.regalia/belt';`,
 					...k_impl.imports(),
 				],
-				body: oderac(h_condensors, (sr, g_condensor) => g_condensor.contents),
+				body: oderaf(h_condensers, (sr, g_condenser) => g_condenser.contents),
 			};
 
 			// save output
@@ -478,20 +496,51 @@ export const main = () => {
 				...g_parts.body,
 
 				...[
-					declareConst(`H_REGISTRY_ANY_CONDENSOR`, objectLit(oderom(h_encoders, (si, g_encoder) => {
+					declareAlias('Expander', funcType(
+						[param('a_decoded', arrayType(keyword('any')))],
+						typeRef('JsonObject')
+					)),
+
+					declareAlias('Decoder', funcType(
+						[param('atu8_payload', typeRef('Uint8Array'))],
+						arrayType(keyword('any'))
+					)),
+
+					declareConst(`H_REGISTRY_ANY`, objectLit(oderom(h_encoders, (si, g_encoder) => {
 						const g_msg = g_encoder.message;
 
 						return {
-							[g_msg.path.replace(/^\./, '/')]: ident(`condense${k_impl.clashFreeTypeId(g_msg)}`),
+							[g_msg.path.replace(/^\./, '/')]: arrayLit([
+								ident(`condense${k_impl.clashFreeTypeId(g_msg)}`),
+								castAs(ident(`expand${k_impl.clashFreeTypeId(g_msg)}`), typeRef('Expander')),
+								ident(`decode${k_impl.clashFreeTypeId(g_msg)}`),
+							]),
 						};
 					})), false, typeRef('Record', [
 						keyword('string'),
-						funcType([param('g_msg', typeRef('JsonObject'))], typeRef('Uint8Array')),
+						tuple([
+							funcType([param('g_msg', typeRef('JsonObject'))], typeRef('Uint8Array')),
+							typeRef('Expander'),
+							typeRef('Decoder'),
+						]),
 					])),
 				].map(yn => print(yn)),
 
 				`
-					export const condenseJsonAny = (g_any: JsonAny | undefined, p_type: string|undefined=g_any?.['@type']): Uint8Array | undefined => g_any? encodeGoogleProtobufAny(p_type!, H_REGISTRY_ANY_CONDENSOR[p_type!](g_any)): __UNDEFINED;
+					export const condenseJsonAny = (g_any: JsonAny | undefined, p_type: string|undefined=g_any?.['@type']): Uint8Array | undefined => g_any? encodeGoogleProtobufAny(p_type!, H_REGISTRY_ANY[p_type!][0](g_any)): __UNDEFINED;
+
+					export const expandJsonAny = <
+						p_type extends string=string,
+						g_msg extends JsonObject=JsonObject,
+					>([s_type_url, atu8_value]: [
+						s_type_url?: p_type,
+						atu8_value?: Uint8Array,
+					]): JsonAny<p_type, g_msg> => ({
+						'@type': s_type_url!,
+						...H_REGISTRY_ANY[s_type_url!][2](atu8_value!) as unknown as g_msg,
+					});
+
+					//export const expandProtobufAny = (atu8_any: DecodedGoogleProtobufAny | undefined): JsonAny | undefined => g_any? expandGoogleProtobufAny(p_type!, H_REGISTRY_ANY[p_type!][1](g_any)): __UNDEFINED;
 				`,
 
 			].join('\n\n');
@@ -648,7 +697,7 @@ export const main = () => {
 
 		// 		const h_imports: Record<string, ImportSpecifier[]> = {};
 		// 		const h_import_types: Record<string, ImportSpecifier[]> = {};
-		// 		const a_condensors: string[] = [];
+		// 		const a_condensers: string[] = [];
 
 		// 		for(const [, g_encoder] of ode(h_encoders)) {
 		// 			const g_msg = g_encoder.message;
@@ -671,7 +720,7 @@ export const main = () => {
 		// 				ident(`${s_pre}${k_impl.clashFreeTypeId(g_msg)}`)
 		// 			)));
 
-		// 			a_condensors.push(k_impl.msgCondensor(g_msg));
+		// 			a_condensers.push(k_impl.msgCondenser(g_msg));
 		// 		}
 
 		// 		h_outputs[`_any_${s_prefix}.ts`] = [
@@ -685,7 +734,7 @@ export const main = () => {
 		// 					.map(([sr_import, a_imports]) => importModule(sr_import, a_imports)),
 		// 			].map(yn => print(yn)),
 
-		// 			...a_condensors,
+		// 			...a_condensers,
 
 		// 			...[
 		// 				declareConst(`H_REGISTRY_ANY_${s_prefix.toUpperCase()}`, objectLit(oderom(h_encoders, (si, g_encoder) => {
