@@ -41,7 +41,8 @@ const json_to_flatdot = (w_value: JsonValue<Voidable | Uint8Array>, h_root: Dict
 		json_object_to_flatdot(w_value as JsonObject, h_root, sr_path);
 	}
 	else {
-		h_root[sr_path] = encodeURIComponent(w_value+'');
+		// do not encode URI component here, allow transport to do escaping
+		h_root[sr_path] = w_value+'';
 	}
 };
 
