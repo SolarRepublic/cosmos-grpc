@@ -20,11 +20,6 @@
   resolved "https://registry.yarnpkg.com/@blake.regalia/belt/-/belt-0.27.1.tgz#004baf9af064b126f80b025ae0f72c542408cb6c"
   integrity sha512-rCGo9Kvz/ZT2/RKGOTdVQHCgcNkLs8rftOsou4VccZlJSCz315t0QKvQZP/Z4bphrkmzK26q6uvqlBLbkBEBxw==
 
-"@blake.regalia/belt@^0.30.0":
-  version "0.30.0"
-  resolved "https://registry.yarnpkg.com/@blake.regalia/belt/-/belt-0.30.0.tgz#6525204c53ae777cecddeb1385d5e97d0d58c21a"
-  integrity sha512-MrzMsVoxYMruA2tsrNBDABpgCpGoCWCYr8qggZ7B6aSgjJKKetzFZj6Cuc4RgWyo4mABXJp/3VGJL101pvxkmg==
-
 "@blake.regalia/belt@^0.31.0":
   version "0.31.0"
   resolved "https://registry.yarnpkg.com/@blake.regalia/belt/-/belt-0.31.0.tgz#35b90b81779458bc81c69b2e1cf9d86031abca71"
@@ -231,20 +226,20 @@
   resolved "https://registry.yarnpkg.com/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
   integrity sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==
 
-"@solar-republic/crypto@^0.2.1":
-  version "0.2.1"
-  resolved "https://registry.yarnpkg.com/@solar-republic/crypto/-/crypto-0.2.1.tgz#f41edd365dba16450b5530189ad3ffebff294dbf"
-  integrity sha512-WM9xmDAuiMxKn33Z6Gdou4YuuDzuV5GK0i2NK/zCqD2K5NKhQMxaDsBdvFtd8lmd0OsvTXgE5jctv7d/a8TfzA==
+"@solar-republic/crypto@^0.2.2":
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/@solar-republic/crypto/-/crypto-0.2.2.tgz#13e191469556c6f31cb15bae2bc048d743f1bac1"
+  integrity sha512-E0s4ntrhU8l/CVlIfr6FisAyscqTRcB72XKX7N+6bndx44WtyiVBR0dgOEZdE/TLgWJfIf8EIjrcuQx9CxNrKw==
   dependencies:
-    "@blake.regalia/belt" "^0.30.0"
+    "@blake.regalia/belt" "^0.31.0"
     "@cosmjs/encoding" "^0.32.2"
     "@solar-republic/wasm-secp256k1" "^0.2.1"
     hash-wasm "^4.11.0"
 
-"@solar-republic/types@^0.2.0":
-  version "0.2.0"
-  resolved "https://registry.yarnpkg.com/@solar-republic/types/-/types-0.2.0.tgz#7af26ec80117b7ce05155f39f082dab92f06fad1"
-  integrity sha512-pYrNxWkezCGslMC3rL7NThkONIy2eeENx3YGWSXI2eqqKUBt1quju6rdnuEGbAiBNccGj6DcUMk6Am41Sr6FOA==
+"@solar-republic/types@^0.2.1":
+  version "0.2.1"
+  resolved "https://registry.yarnpkg.com/@solar-republic/types/-/types-0.2.1.tgz#7880ad5890533929a11b851e33b89d421aefff5d"
+  integrity sha512-RTycdGNNpoBKN9IO3njtUrimxR9AyDhysbhBeCAlp2yIuJcCF6oOxlHKCxAvt7++2p7qJVUe8UlTHOnN3n9Anw==
 
 "@solar-republic/wasm-secp256k1@^0.2.1":
   version "0.2.1"
