@@ -30,3 +30,6 @@
 [submodule "submodules/gaia"]
 	path = submodules/gaia
 	url = https://github.com/cosmos/gaia
+[submodule "submodules/axelar"]
+	path = submodules/axelar
+	url = https://github.com/axelarnetwork/axelar-core

@@ -127,6 +127,7 @@ cosmos.*
 tendermint.*
 cosmwasm.*
 akash.*
+axelar.*
 gaia.*
 secret.*
 osmosis.*
