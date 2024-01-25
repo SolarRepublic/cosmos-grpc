@@ -142,7 +142,7 @@ export const tuple = (a_members: Array<TypeNode | TupleEntryDescriptor>) => y_fa
 			? y_factory
 				.createNamedTupleMember(
 					__UNDEFINED,
-					'string' === typeof z_member[0] && ['class', 'package', 'delete', 'enum', 'type'].includes(z_member[0])
+					'string' === typeof z_member[0] && ['class', 'private', 'protected', 'public', 'package', 'delete', 'enum', 'type'].includes(z_member[0])
 						? ident(z_member[0]+'_')
 						: ident(z_member[0]),
 					z_member[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,

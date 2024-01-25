@@ -157,6 +157,8 @@ export class NeutrinoImpl extends RpcImplementor {
 			_s_path_prefix,
 		} = this;
 
+		// if('/axelar/nexus/v1beta1/latest_deposit_address/{recipient_addr}/{recipient_chain}/{deposit_chain}')
+
 		const h_fields = fold(g_input.fieldList, g_field => ({
 			[g_field.name!]: g_field,
 		}));
@@ -407,7 +409,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		const si_module_ident = g_parts.module.replace(/\//g, '_');
 
 		// 
-		const si_const = this._si_const = `SR_LCD_${g_parts.vendor.toUpperCase()}_${si_module_ident.toUpperCase()}`;
+		const si_const = this._si_const = `SR_LCD_${g_parts.vendor.toUpperCase()}_${si_module_ident.toUpperCase()}_${g_method.service.name!.toUpperCase()}`;
 
 		// const s_path_prefix = this._s_path_prefix = `${'secret' === si_vendor? '': `/${si_vendor}`}/${si_module}/${s_version}/`;
 		this._s_path_prefix = sr_path_prefix;
