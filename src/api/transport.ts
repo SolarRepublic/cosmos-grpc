@@ -1,5 +1,5 @@
 /* eslint-disable prefer-const */
-import type {Dict, Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
+import type {Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
 
 import type {SlimCoin} from '@solar-republic/types';
 
@@ -21,28 +21,27 @@ export type NetworkJsonResponse<
 	g_res: w_type,
 ];
 
-// export const query_error = (a_details: NetworkErrorDetails) => {
-// 	Object.assign(Error('Query'), {
-// 		d: a_details,
-// 	});
-// };
-
-const json_to_flatdot = (w_value: JsonValue<Voidable | Uint8Array>, h_root: Dict, sr_path: string): void => {
+const json_to_flatdot = (
+	w_value: JsonValue<Voidable | Uint8Array>,
+	a_entries: [string, string][],
+	sr_path: string
+): void => {
 	if(is_array(w_value)) {
 		// eslint-disable-next-line array-callback-return
 		w_value.map((w_item, i_item) => {
-			json_to_flatdot(w_item, h_root, `${sr_path}[${i_item}]`);
+			// in grpc-gateway, repeated fields simply repeat the url param key instead of `${sr_path}[${i_item}]`
+			json_to_flatdot(w_item, a_entries, sr_path);
 		});
 	}
 	else if(ArrayBuffer.isView(w_value)) {
-		h_root[sr_path] = bytes_to_base64(w_value);
+		a_entries.push([sr_path, bytes_to_base64(w_value)]);
 	}
 	else if('object' === typeof w_value) {
-		json_object_to_flatdot(w_value as JsonObject, h_root, sr_path);
+		json_object_to_flatdot(w_value as JsonObject, a_entries, sr_path);
 	}
 	else {
 		// do not encode URI component here, allow transport to do escaping
-		h_root[sr_path] = w_value+'';
+		a_entries.push([sr_path, w_value+'']);
 	}
 };
 
@@ -60,22 +59,26 @@ const json_to_flatdot = (w_value: JsonValue<Voidable | Uint8Array>, h_root: Dict
  * 
  * becomes:
  * ```
- * {
- *   "foo.bar[0]": "25",
- *   "foo.bar[1]": "42"
- * }
+ * [
+ *   ["foo.bar", "25"],
+ *   ["foo.bar": "42"],
+ * ]
  * ```
  */
-const json_object_to_flatdot = (h_object: JsonObject<Voidable | Uint8Array>, h_root: Dict={}, sr_path=''): Dict => {
+const json_object_to_flatdot = (
+	h_object: JsonObject<Voidable | Uint8Array>,
+	a_entries: [string, string][]=[],
+	sr_path=''
+): [string, string][] => {
 	for(const [si_key, w_value] of ode(h_object)) {
 		// anything falsy is default, skip it
 		if(!w_value) continue;
 
 		// encode
-		json_to_flatdot(w_value as JsonObject<Uint8Array>, h_root, (sr_path? sr_path+'.': '')+si_key);
+		json_to_flatdot(w_value as JsonObject<Uint8Array>, a_entries, (sr_path? sr_path+'.': '')+si_key);
 	}
 
-	return h_root;
+	return a_entries;
 };
 
 
