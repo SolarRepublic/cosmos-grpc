@@ -113,15 +113,16 @@ export const restful_grpc = <
 
 	// indicated submit action
 	if(1 === g_init) {
-		// convert to POST request
-		g_init = {method:'POST'};
+		// replace init object
+		g_init = {
+			// convert to POST request
+			method: 'POST',
 
-		// args were supplied; convert to JSON-encoded body
-		if(h_args) {
-			g_init = {
+			// args were supplied; convert to JSON-encoded body
+			...h_args? {
 				body: JSON.stringify(h_args),
-			};
-		}
+			}: {},
+		};
 	}
 	// query action, args are defined
 	else if(h_args) {
