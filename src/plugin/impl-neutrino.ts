@@ -188,20 +188,41 @@ export class NeutrinoImpl extends RpcImplementor {
 				a_parts.push(y_factory.createStringLiteral(sx_pattern.slice(i_prev, i_match)));
 			}
 
-			// param id
-			const si_param = d_match[1];
+			// param path
+			const a_param_path = d_match[1].replace(/=\*+$/, '').split('.');
 
-			// lookup field
-			const g_field = h_fields[si_param];
+			// ref 0th part
+			const si_param_0 = a_param_path[0];
+
+			// lookup base field
+			const g_field = h_fields[si_param_0];
 
 			// convert to thing
-			const g_thing = this.route(g_field);
+			let g_thing = this.route(g_field);
+
+			// each subsequent part
+			for(const si_param_part of a_param_path.slice(1)) {
+				// resolve parent type
+				const g_resolved = this.resolveType(g_field.typeName!);
+
+				// message type
+				if('message' === g_resolved.form) {
+					// locate the subfield
+					const g_subfield = g_resolved.fieldList.find(g => si_param_part === g.name);
+
+					// convert to thing
+					g_thing = this.route(g_subfield!);
+				}
+				else {
+					throw Error(`Non-message fields not implemented for resolving dot-notation member`);
+				}
+			}
 
 			// push param
 			a_parts.push(g_thing.calls.to_json(g_thing.calls.id));
 
 			// remove from unused
-			delete h_fields_unused[si_param];
+			delete h_fields_unused[si_param_0];
 
 			// advance pointer
 			i_prev = i_match + d_match[0].length;

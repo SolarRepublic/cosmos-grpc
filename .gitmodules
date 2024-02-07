@@ -33,3 +33,9 @@
 [submodule "submodules/axelar"]
 	path = submodules/axelar
 	url = https://github.com/axelarnetwork/axelar-core
+[submodule "submodules/ibc"]
+	path = submodules/ibc
+	url = https://github.com/cosmos/ibc-go
+[submodule "submodules/ics23"]
+	path = submodules/ics23
+	url = https://github.com/cosmos/ics23

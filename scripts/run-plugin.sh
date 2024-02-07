@@ -21,7 +21,7 @@ srd_dist="$srd_build/dist"
 
 
 # dirs to target proto files
-srd_chains=($srd_proto/{tendermint,cosmos,secret,akash,axelar,gaia,osmosis})
+srd_chains=($srd_proto/{tendermint,cosmos,ibc,secret,akash,axelar,gaia,osmosis})
 
 # subdir to annotations to generate
 srd_annotations="$srd_gen/annotations"
@@ -123,8 +123,9 @@ SX_PROTOC_IGNORE_PATTERN="Import .* is unused"
 info "generating module..."
 
 s_core="""
-cosmos.*
 tendermint.*
+cosmos.*
+ibc.*
 cosmwasm.*
 akash.*
 axelar.*

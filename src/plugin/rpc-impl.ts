@@ -182,6 +182,8 @@ export abstract class RpcImplementor {
 	}
 
 	route(g_field: AugmentedField): TsThing {
+		if(!g_field) debugger;
+
 		// lookup transformer
 		const f_transformer = this._h_router[g_field.type!];
 		if(!f_transformer) {

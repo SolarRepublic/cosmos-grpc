@@ -22,6 +22,8 @@ copy googleapis
 copy cosmos-proto/proto
 copy cosmos-sdk/proto
 copy wasmd/proto
+copy ibc/proto
+copy ics23/proto
 
 # TODO: perform additive merging of protobufs from different projects
 # copy secret/third_party/proto/cosmos cosmos
@@ -32,7 +34,6 @@ merge() {
 }
 
 merge secret/third_party/proto/cosmos cosmos
-
 
 copy gaia/proto/gaia gaia
 copy akash/proto/node/akash akash
