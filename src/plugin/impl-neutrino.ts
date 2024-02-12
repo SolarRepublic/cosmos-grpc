@@ -200,6 +200,9 @@ export class NeutrinoImpl extends RpcImplementor {
 			// convert to thing
 			let g_thing = this.route(g_field);
 
+			// prep access expression
+			let yn_access: Expression = g_thing.calls.id;
+
 			// each subsequent part
 			for(const si_param_part of a_param_path.slice(1)) {
 				// resolve parent type
@@ -212,6 +215,9 @@ export class NeutrinoImpl extends RpcImplementor {
 
 					// convert to thing
 					g_thing = this.route(g_subfield!);
+
+					// add accessor
+					yn_access = chain(yn_access, g_subfield!.name!);
 				}
 				else {
 					throw Error(`Non-message fields not implemented for resolving dot-notation member`);
@@ -219,7 +225,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			}
 
 			// push param
-			a_parts.push(g_thing.calls.to_json(g_thing.calls.id));
+			a_parts.push(g_thing.calls.to_json(yn_access));
 
 			// remove from unused
 			delete h_fields_unused[si_param_0];

@@ -7,6 +7,7 @@ mkdir -p build/proto
 # gaia: https://github.com/cosmos/gaia
 # akash: https://github.com/akash-network/akash-api
 # axelar: https://github.com/axelarnetwork/axelar-core
+# juno: https://github.com/CosmosContracts/juno
 # osmosis: https://github.com/osmosis-labs/osmosis
 # secret: https://github.com/scrtlabs/SecretNetwork
 
@@ -38,8 +39,12 @@ merge secret/third_party/proto/cosmos cosmos
 copy gaia/proto/gaia gaia
 copy akash/proto/node/akash akash
 copy axelar/proto/axelar axelar
+copy juno/proto/juno juno
 copy osmosis/proto/osmosis osmosis
 copy secret/proto
+
+merge juno/proto/gaia gaia
+merge juno/proto/osmosis osmosis
 
 copy gogoproto
 

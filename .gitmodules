@@ -39,3 +39,6 @@
 [submodule "submodules/ics23"]
 	path = submodules/ics23
 	url = https://github.com/cosmos/ics23
+[submodule "submodules/juno"]
+	path = submodules/juno
+	url = https://github.com/CosmosContracts/juno
