@@ -179,11 +179,12 @@ const H_OVERRIDE_MIXINS: Dict<
 			nests: {
 				name: `a_${si_name}`,
 				type: tuple([keyword('string'), keyword('string')]),
-				hints: literal([ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING]),
+				// hints: literal([ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING]),
+				hints: g_field.repeated? literal(ProtoHint.NONE): literal(ProtoHint.SINGULAR),
 				// parse: yn_data => callExpr(ident('decode_coin'), [yn_data]),
 				// parse: F_IDENTITY,
 				// parser: null,
-				parser: ident(`decode_coin`),
+				parser: ident('decode_coin'),
 			},
 
 
