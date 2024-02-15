@@ -182,7 +182,8 @@ const H_OVERRIDE_MIXINS: Dict<
 				hints: literal([ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING]),
 				// parse: yn_data => callExpr(ident('decode_coin'), [yn_data]),
 				// parse: F_IDENTITY,
-				parser: null,
+				// parser: null,
+				parser: ident(`decode_coin`),
 			},
 
 
