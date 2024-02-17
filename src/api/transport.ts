@@ -104,11 +104,15 @@ export const restful_grpc = <
 	w_parsed extends JsonValue<Voidable>,
 >(
 	f_req: RpcRequest<a_args>,
-	g_init?: 1 | RequestInit
+	g_init_default?: 1 | RequestInit
 ) => async(
 	z_req: string | {origin: string} & RequestInit,
 	...a_args: a_args
 ): Promise<NetworkJsonResponse<w_parsed>> => {
+	// set default init object
+	let g_init = g_init_default;
+
+	// retrieve args
 	let [sr_append, h_args] = f_req(...a_args);
 
 	// indicated submit action
