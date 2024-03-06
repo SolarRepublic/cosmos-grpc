@@ -2,7 +2,8 @@
 
 import {readFileSync} from 'fs';
 
-import {ode, type Dict} from '@blake.regalia/belt';
+import type {Dict} from '@blake.regalia/belt';
+import {entries} from '@blake.regalia/belt';
 import * as diff from 'diff';
 import * as proto from 'proto-parser';
 
@@ -33,7 +34,7 @@ function success(y_result: ParseResult): y_result is proto.ProtoDocument {
 
 const stringify_keys = (h_fields: Dict<any>) => JSON.stringify(Object.keys(h_fields).sort());
 
-const stringify_fields = (h_fields: Dict<any>) => JSON.stringify(Object.fromEntries(ode(h_fields).sort(([si_a], [si_b]) => si_a.localeCompare(si_b))));
+const stringify_fields = (h_fields: Dict<any>) => JSON.stringify(Object.fromEntries(entries(h_fields).sort(([si_a], [si_b]) => si_a.localeCompare(si_b))));
 
 function merge(sx_a: string, sx_b: string) {
 	// prep debug hint
@@ -119,7 +120,7 @@ function merge(sx_a: string, sx_b: string) {
 	}
 }
 
-const a_out = [];
+const a_out: string[] = [];
 let sx_tmp = '';
 
 // each diff

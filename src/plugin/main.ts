@@ -4,7 +4,7 @@ import type {AugmentedEnum, AugmentedMessage} from './env';
 import type {Dict} from '@blake.regalia/belt';
 
 
-import {ode, oderaf, oderom, odv} from '@blake.regalia/belt';
+import {entries, flatten_entries, transform_object, values} from '@blake.regalia/belt';
 
 import {NeutrinoImpl} from './impl-neutrino';
 import {plugin} from './plugin';
@@ -22,7 +22,7 @@ const A_GLOBAL_PREAMBLE = [
 		importModule('@blake.regalia/belt', [
 			'F_IDENTITY',
 			'__UNDEFINED',
-			'oda',
+			'assign',
 			'base64_to_bytes',
 			'text_to_bytes',
 		]),
@@ -410,7 +410,7 @@ export const main = () => {
 
 
 		// each message in need of an encoder
-		for(const [, g_msg] of ode(g_encoders.messages)) {
+		for(const [, g_msg] of entries(g_encoders.messages)) {
 			// add encoder
 			h_encoders[g_msg.path] = {
 				message: g_msg,
@@ -426,7 +426,7 @@ export const main = () => {
 
 		debugger;
 		// each message in need of a decoder
-		for(const [, g_msg] of ode(g_decoders.messages)) {
+		for(const [, g_msg] of entries(g_decoders.messages)) {
 			// add decoder
 			h_decoders[g_msg.path] = {
 				message: g_msg,
@@ -449,7 +449,7 @@ export const main = () => {
 		}
 
 		// each message in need of a destructor
-		for(const [, g_msg] of ode(g_destructors.messages)) {
+		for(const [, g_msg] of entries(g_destructors.messages)) {
 			const a_destructor = k_impl.msgDestructor(g_msg);
 			if(a_destructor) {
 				h_destructors[g_msg.path] = {
@@ -460,7 +460,7 @@ export const main = () => {
 		}
 
 		// each message in need of an accessor
-		for(const [, g_msg] of ode(g_accessible.messages)) {
+		for(const [, g_msg] of entries(g_accessible.messages)) {
 			const a_accessors = k_impl.msgAccessor(g_msg);
 			if(a_accessors) {
 				h_accessors[g_msg.path] = {
@@ -476,7 +476,7 @@ export const main = () => {
 			k_impl.open(NeutrinoImpl.condenserFile(), true);
 			const p_output = k_impl.path;
 
-			for(const g_encoder of odv(h_encoders)) {
+			for(const g_encoder of values(h_encoders)) {
 				k_impl.importConstant(g_encoder.message, 'decode');
 			}
 
@@ -487,7 +487,7 @@ export const main = () => {
 					`import type {JsonObject} from '@blake.regalia/belt';`,
 					...k_impl.imports(),
 				],
-				body: oderaf(h_condensers, (sr, g_condenser) => g_condenser.contents),
+				body: flatten_entries(h_condensers, (sr, g_condenser) => g_condenser.contents),
 			};
 
 			// save output
@@ -506,7 +506,7 @@ export const main = () => {
 						arrayType(keyword('any'))
 					)),
 
-					declareConst(`H_REGISTRY_ANY`, objectLit(oderom(h_encoders, (si, g_encoder) => {
+					declareConst(`H_REGISTRY_ANY`, objectLit(transform_object(h_encoders, (si, g_encoder) => {
 						const g_msg = g_encoder.message;
 
 						return {
@@ -548,7 +548,7 @@ export const main = () => {
 
 		debugger;
 		// every file
-		for(const [, g_proto] of ode(h_inputs)) {
+		for(const [, g_proto] of entries(h_inputs)) {
 			// open
 			k_impl.open(g_proto);
 			const p_output = k_impl.path;
@@ -592,7 +592,7 @@ export const main = () => {
 
 			// encoders
 			const a_encoders: string[] = [];
-			for(const g_encoder of odv(h_encoders)) {
+			for(const g_encoder of values(h_encoders)) {
 				if(g_proto === g_encoder.message.source) {
 					a_encoders.push(...g_encoder.contents);
 				}
@@ -609,7 +609,7 @@ export const main = () => {
 
 			// decoders
 			const a_decoders: string[] = [];
-			for(const g_decoder of odv(h_decoders)) {
+			for(const g_decoder of values(h_decoders)) {
 				if(g_proto === g_decoder.message.source) {
 					a_decoders.push(...g_decoder.contents);
 				}
@@ -626,7 +626,7 @@ export const main = () => {
 
 			// destructors
 			const a_destructors: string[] = [];
-			for(const g_destructor of odv(h_destructors)) {
+			for(const g_destructor of values(h_destructors)) {
 				if(g_proto === g_destructor.message.source) {
 					a_destructors.push(...g_destructor.contents);
 				}
@@ -641,7 +641,7 @@ export const main = () => {
 
 			// accessors
 			const a_accessors: string[] = [];
-			for(const [p_accessor, g_accessor] of ode(h_accessors)) {
+			for(const [p_accessor, g_accessor] of entries(h_accessors)) {
 				// skip redundant
 				if(h_destructors[p_accessor]) continue;
 

@@ -8,7 +8,7 @@ import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclarat
 
 import {readFileSync} from 'node:fs';
 
-import {__UNDEFINED, fold, oderac, proper, snake, escape_regex, fodemtv, odem, F_IDENTITY, odk, odv} from '@blake.regalia/belt';
+import {__UNDEFINED, fold, concat_entries, proper, snake, escape_regex, transform_values, map_entries, F_IDENTITY, keys, values} from '@blake.regalia/belt';
 
 import {ts} from 'ts-morph';
 
@@ -255,7 +255,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		// other params remain
 		if(Object.keys(h_fields_unused).length) {
 			// convert each to property signature
-			const a_properties = oderac(h_fields_unused, (si_param, g_field) => {
+			const a_properties = concat_entries(h_fields_unused, (si_param, g_field) => {
 				const g_thing = this.route(g_field);
 
 				return y_factory.createPropertyAssignment(
@@ -328,7 +328,7 @@ export class NeutrinoImpl extends RpcImplementor {
 	override body(si_category: FileCategory): string[] {
 		// all statements
 		return [
-			...oderac(this._g_consts[si_category], (si_const, yn_const) => print(yn_const)),
+			...concat_entries(this._g_consts[si_category], (si_const, yn_const) => print(yn_const)),
 		];
 	}
 
@@ -1121,7 +1121,7 @@ export class NeutrinoImpl extends RpcImplementor {
 					// intersect with each arbitrary field index
 					? intersection([
 						tuple(a_generics),
-						typeLit(fodemtv(h_arbitrary_fields, g => g.generic)),
+						typeLit(transform_values(h_arbitrary_fields, g => g.generic)),
 					])
 					: tuple(a_generics),
 			]
@@ -1184,7 +1184,7 @@ export class NeutrinoImpl extends RpcImplementor {
 				// need to destructure arbitrary indexes
 				a_params_arbitrary = [
 					// e.g., `{1023: field_1024} = a_decoded`
-					param(objectBinding(odem(h_arbitrary_fields, ([si_field, g]) => {
+					param(objectBinding(map_entries(h_arbitrary_fields, ([si_field, g]) => {
 						const yn_ident = ident((g.binding.name as Identifier).text);
 						return binding(yn_ident, numericLit(+si_field));
 					})), __UNDEFINED, false, ident('a_decoded')),
@@ -1198,10 +1198,10 @@ export class NeutrinoImpl extends RpcImplementor {
 					);
 				}
 
-				// wrap return value, e.g., `oda([field_1], {1023: field:1024})`
-				yn_body = callExpr('oda', [
+				// wrap return value, e.g., `assign([field_1], {1023: field:1024})`
+				yn_body = callExpr('assign', [
 					yn_body,
-					objectLit(fodemtv(h_arbitrary_fields, g_arb => g_arb.binding.name as Identifier)),
+					objectLit(transform_values(h_arbitrary_fields, g_arb => g_arb.binding.name as Identifier)),
 				]);
 
 				// extend return type with intersection
@@ -1209,7 +1209,7 @@ export class NeutrinoImpl extends RpcImplementor {
 					yn_return,
 
 					// add arbitrary-index fields to type lit, each one with question token (i.e., optional)
-					typeLit(fodemtv(h_arbitrary_fields, g => [g.type, g.thing.optional])),
+					typeLit(transform_values(h_arbitrary_fields, g => [g.type, g.thing.optional])),
 				]);
 			}
 		}
@@ -1265,12 +1265,12 @@ export class NeutrinoImpl extends RpcImplementor {
 			print(yn_type_decl, [
 				`A decoded protobuf ${g_msg.name!.replace(/^Msg|Response$/g, '')} message`,
 				'',
-				...1 === odk(h_things).length
-					? [`Alias for: ${odv(h_things)[0].field.name} - ${odv(h_things)[0].field.comments}`]
+				...1 === keys(h_things).length
+					? [`Alias for: ${values(h_things)[0].field.name} - ${values(h_things)[0].field.comments}`]
 					: [
 						'Tuple where:',
-						...oderac(h_things, (s_index, g_type) => `  - ${s_index}: ${g_type.field.name} - ${g_type.field.comments}`),
-						...odem(h_arbitrary_fields, ([si_index, g_arb]) => ` - ${si_index}: ${g_arb.thing.field.name} - ${g_arb.thing.field.comments}`),
+						...concat_entries(h_things, (s_index, g_type) => `  - ${s_index}: ${g_type.field.name} - ${g_type.field.comments}`),
+						...map_entries(h_arbitrary_fields, ([si_index, g_arb]) => ` - ${si_index}: ${g_arb.thing.field.name} - ${g_arb.thing.field.comments}`),
 					],
 			]),
 			print(yn_statement, [
@@ -1359,7 +1359,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// function body
 		const yn_body = Object.keys(h_assigns).length
-			? callExpr('oda', [yn_base, objectLit(h_assigns)])
+			? callExpr('assign', [yn_base, objectLit(h_assigns)])
 			: yn_base;
 
 		// final return type

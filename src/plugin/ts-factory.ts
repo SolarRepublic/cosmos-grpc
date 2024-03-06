@@ -19,7 +19,7 @@ import type {
 	BinaryOperatorToken,
 } from 'typescript';
 
-import {__UNDEFINED, fodemtv, is_array, oderac} from '@blake.regalia/belt';
+import {__UNDEFINED, concat_entries, transform_values, is_array} from '@blake.regalia/belt';
 import {ts, NodeFlags} from 'ts-morph';
 
 export type TupleEntryDescriptor = [z_ident: string | Identifier, b_opt: boolean, yn_type: TypeNode];
@@ -105,7 +105,7 @@ export const doReturn = (yn_expr: Expression) => y_factory.createReturnStatement
 export const litType = (yn_lit: Parameters<ts.NodeFactory['createLiteralTypeNode']>[0]) => y_factory.createLiteralTypeNode(yn_lit);
 
 export const typeLit = (h_props: Dict<TypeNode | [TypeNode, boolean]>) => y_factory.createTypeLiteralNode(
-	oderac(h_props, (si_key, z_type) => y_factory.createPropertySignature(
+	concat_entries(h_props, (si_key, z_type) => y_factory.createPropertySignature(
 		__UNDEFINED,
 		ident(si_key),
 		is_array(z_type) && z_type[1]? y_factory.createToken(SyntaxKind.QuestionToken): __UNDEFINED,
@@ -175,7 +175,7 @@ export const arrow = (a_params: ParameterDeclaration[], yn_body: ConciseBody, yn
 );
 
 export const objectLit = (h_props: Dict<Expression | [Expression, Expression]>) => y_factory.createObjectLiteralExpression(
-	oderac(h_props, (si_key, z_value) => is_array(z_value)
+	concat_entries(h_props, (si_key, z_value) => is_array(z_value)
 		? y_factory.createPropertyAssignment(y_factory.createComputedPropertyName(z_value[0]), z_value[1])
 		: y_factory.createPropertyAssignment(string(si_key), z_value)), true);
 
@@ -198,7 +198,7 @@ export const literal = (z_value: Arrayable<boolean | number | bigint | string | 
 				return arrayLit(z_value.map(literal));
 			}
 			else {
-				return objectLit(fodemtv(z_value, literal));
+				return objectLit(transform_values(z_value, literal));
 			}
 		}
 	}
@@ -293,7 +293,7 @@ export const enumDecl = (si_enum: string, h_values: Dict<Expression | undefined>
 		...b_const? [y_factory.createToken(SyntaxKind.ConstKeyword)]: [],
 	],
 	ident(si_enum),
-	oderac(h_values, (si_key, w_value) => y_factory.createEnumMember(ident(si_key), w_value))
+	concat_entries(h_values, (si_key, w_value) => y_factory.createEnumMember(ident(si_key), w_value))
 );
 
 export const typeOf = (z_ref: string | Identifier) => y_factory.createTypeQueryNode(ident(z_ref));

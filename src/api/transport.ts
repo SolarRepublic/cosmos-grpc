@@ -3,7 +3,7 @@ import type {Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
 
 import type {SlimCoin} from '@solar-republic/types';
 
-import {safe_json, ode, bytes_to_base64, __UNDEFINED, is_array} from '@blake.regalia/belt';
+import {bytes_to_base64, __UNDEFINED, is_array, parse_json_safe, entries} from '@blake.regalia/belt';
 
 type Voidable = void | undefined;
 
@@ -70,7 +70,7 @@ const json_object_to_flatdot = (
 	a_entries: [string, string][]=[],
 	sr_path=''
 ): [string, string][] => {
-	for(const [si_key, w_value] of ode(h_object)) {
+	for(const [si_key, w_value] of entries(h_object)) {
 		// anything falsy is default, skip it
 		if(!w_value) continue;
 
@@ -148,7 +148,7 @@ export const restful_grpc = <
 	const sx_res = await d_res.text();
 
 	// parse json
-	const g_res = safe_json<w_parsed>(sx_res);
+	const g_res = parse_json_safe<w_parsed>(sx_res);
 
 	// response tuple
 	const a_tuple: NetworkJsonResponse<w_parsed> = [d_res, sx_res, g_res!];

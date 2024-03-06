@@ -4,7 +4,7 @@ import type {Dict, Promisable} from '@blake.regalia/belt';
 import type {CodeGeneratorRequest as CodeGenReq} from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 import type {DescriptorProto, EnumDescriptorProto, FileDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {fold, concat2, escape_regex, fodemtv, ode, ofe} from '@blake.regalia/belt';
+import {fold, concat2, escape_regex, transform_values, entries, from_entries} from '@blake.regalia/belt';
 
 import pluginPb from 'google-protobuf/google/protobuf/compiler/plugin_pb';
 
@@ -179,7 +179,7 @@ export function parse_package_parts(si_thing: string, s_char: string) {
 	const a_path = si_thing.split(s_char);
 
 	// prep path parts
-	const si_vendor = a_path[0]!;
+	const si_vendor = a_path[0];
 	let si_module = a_path[1];
 	let s_version = '';
 	let s_purpose = '';
@@ -214,7 +214,7 @@ function parse_file_parts(g_proto_raw: FileDescriptorProto.AsObject): AugmentedF
 	const a_path = g_proto_raw.name!.split('/');
 
 	// prep path parts
-	const si_vendor = a_path[0]!;
+	const si_vendor = a_path[0];
 	let si_module = a_path[1];
 	let s_version = '';
 	let s_purpose = '';
@@ -281,7 +281,7 @@ export const plugin = async(
 				: new RegExp('^'+escape_regex(s).replace(/\\\*/g, '.*')+'$'));
 		}
 		else if(['decoder_types', 'augmentations'].includes(si_opt)) {
-			z_return = ofe(a_values.map(s_config => s_config.split(':', 2) as [string, string]));
+			z_return = from_entries(a_values.map(s_config => s_config.split(':', 2) as [string, string]));
 		}
 		else {
 			throw Error(`Unrecognized option "${si_opt}"`);
@@ -312,7 +312,7 @@ export const plugin = async(
 	const h_interfaces: InterfacesDict = {};
 
 	// each included file
-	const h_augmented = fodemtv(h_files, (g_proto_raw) => {
+	const h_augmented = transform_values(h_files, (g_proto_raw) => {
 		// skip anonymous
 		const si_package = g_proto_raw.pb_package;
 		if(!si_package) throw new Error(`Proto file missing name: ${JSON.stringify(g_proto_raw)}`);
@@ -356,7 +356,7 @@ export const plugin = async(
 
 	// process results
 	try {
-		for(const [sr_file, sx_contents] of ode(h_results)) {
+		for(const [sr_file, sx_contents] of entries(h_results)) {
 			const y_file = new pluginPb.CodeGeneratorResponse.File();
 			y_file.setName(sr_file);
 			y_file.setContent(sx_contents);

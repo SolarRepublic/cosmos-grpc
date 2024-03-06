@@ -6,7 +6,7 @@ import type {Dict} from '@blake.regalia/belt';
 
 import type {TypeNode, ImportSpecifier, Identifier, CallExpression, Expression} from 'typescript';
 
-import {oderac, F_IDENTITY, proper, __UNDEFINED, escape_regex, odv} from '@blake.regalia/belt';
+import {concat_entries, F_IDENTITY, proper, __UNDEFINED, escape_regex, values} from '@blake.regalia/belt';
 import {ts} from 'ts-morph';
 const {SyntaxKind} = ts;
 
@@ -162,22 +162,22 @@ export abstract class RpcImplementor {
 	imports(): string[] {
 		// reduce type imports by path
 		const h_types: Dict<ImportSpecifier[]> = {};
-		for(const [sr_path, yn_import] of odv(this._h_type_imports).sort(F_SORT_PATH)) {
+		for(const [sr_path, yn_import] of values(this._h_type_imports).sort(F_SORT_PATH)) {
 			(h_types[sr_path] ??= []).push(yn_import);
 		}
 
 		// reduce module imports by path
 		const h_modules: Dict<ImportSpecifier[]> = {};
-		for(const [sr_path, yn_import] of odv(this._h_imports).sort(F_SORT_PATH)) {
+		for(const [sr_path, yn_import] of values(this._h_imports).sort(F_SORT_PATH)) {
 			(h_modules[sr_path] ??= []).push(yn_import);
 		}
 
 		return [
 			// // type imports
-			...oderac(h_types, (sr_path, a_imports) => importModule(sr_path, a_imports, true)).map(yn => print(yn)),
+			...concat_entries(h_types, (sr_path, a_imports) => importModule(sr_path, a_imports, true)).map(yn => print(yn)),
 
 			// // dependencies on other generated proto files
-			...oderac(h_modules, (sr_path, a_imports) => importModule(sr_path, a_imports)).map(yn => print(yn)),
+			...concat_entries(h_modules, (sr_path, a_imports) => importModule(sr_path, a_imports)).map(yn => print(yn)),
 		];
 	}
 
