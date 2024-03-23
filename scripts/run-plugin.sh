@@ -73,7 +73,7 @@ mkdir -p "$srd_dist" "$srd_annotations" "$srd_plugin" "$srd_lib_cosmos" "$srd_li
 tsc -p tsconfig.gen.json
 
 # fix
-yarn tsc-esm-fix --target="$srd_gen"
+pnpm exec tsc-esm-fix --target="$srd_gen"
 
 # chmod
 chmod u+x $srd_plugin/{run,debug}.js
@@ -211,7 +211,7 @@ inspect_lib() {
 
 # run through linter with fix-all
 info "running eslint..."
-yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --color --fix "$srd_lib" \
+pnpm exec eslint --no-ignore --parser-options project:tsconfig.lib.json --color --fix "$srd_lib" \
 	| grep -v "warning"  # ignore warnings from initial lint cycle
 
 if [[ $? -ne 0 ]]; then
@@ -225,7 +225,7 @@ info "---- end of first lint cycle ----"
 info " "
 
 # run through linter again with fix-all
-yarn eslint --no-ignore --parser-options project:tsconfig.lib.json --fix "$srd_lib"
+pnpm exec eslint --no-ignore --parser-options project:tsconfig.lib.json --fix "$srd_lib"
 
 info ""
 info "---- end of repeated lint cycle ----"
@@ -249,9 +249,9 @@ info "fixing import specifiers..."
 cp tsconfig.dist.json "$srd_dist/tsconfig.json"
 
 # resolve tsconfig paths
-yarn resolve-tspaths -s "$srd_dist" -p "$srd_dist/tsconfig.json"
+pnpm exec resolve-tspaths -s "$srd_dist" -p "$srd_dist/tsconfig.json"
 
 # fix relative paths
-yarn tsc-esm-fix --target="$srd_dist"
+pnpm exec tsc-esm-fix --target="$srd_dist"
 
 info "Done"
