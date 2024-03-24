@@ -181,7 +181,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// each match
 		for(const d_match of sx_pattern.matchAll(/\{([^}]+)\}/g)) {
-			const i_match = d_match.index!;
+			const i_match = d_match.index;
 
 			// push constant string part
 			if(i_prev !== i_match) {
@@ -1113,20 +1113,6 @@ export class NeutrinoImpl extends RpcImplementor {
 			// }
 		});
 
-		// prep generics args
-		const yn_generics_args = b_processed
-			? [
-				// arbitrary fields are set
-				Object.keys(h_arbitrary_fields).length
-					// intersect with each arbitrary field index
-					? intersection([
-						tuple(a_generics),
-						typeLit(transform_values(h_arbitrary_fields, g => g.generic)),
-					])
-					: tuple(a_generics),
-			]
-			: __UNDEFINED;
-
 		// build args
 		const a_args: Expression[] = [
 			// payload argument
@@ -1151,7 +1137,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		}
 
 		// call expression to decode payload
-		const yn_decode = callExpr('decode_protobuf', a_args, yn_generics_args);
+		const yn_decode = callExpr('decode_protobuf', a_args, [typeRef(`Decoded${this.exportedId(g_msg)}`)]);
 
 		let yn_init!: Expression;
 		let yn_body!: ConciseBody;
