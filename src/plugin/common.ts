@@ -47,6 +47,7 @@ export type TsThingBare = {
 	// when using the type to submit gateway request or parse a response
 	json?: {
 		type: TypeNode;
+		weak?: TypeNode;
 	};
 
 	proto: {
@@ -305,6 +306,10 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			type: keyword('number'),
 		},
 
+		json: {
+			type: typeRef('number'),
+		},
+
 		proto: {
 			writer: 'v',
 		},
@@ -315,6 +320,10 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		calls: {
 			name: `n_${si_field}`,
 			type: keyword('number'),
+		},
+
+		json: {
+			type: typeRef('number'),
 		},
 
 		proto: {
@@ -330,6 +339,11 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			return_type: typeRef(`CwUint64`),
 		},
 
+		json: {
+			type: typeRef('CwUint64'),
+			weak: typeRef('WeakUint64Str'),
+		},
+
 		proto: {
 			writer: 'g',
 		},
@@ -341,6 +355,10 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			name: `sg_${si_field}`,
 			type: typeRef('WeakInt64Str'),
 			return_type: typeRef(`CwInt64`),
+		},
+
+		json: {
+			type: typeRef('WeakInt64Str'),
 		},
 
 		proto: {
@@ -482,6 +500,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 
 				json: {
 					type: typeRef('CwBase64'),
+					weak: typeRef('NaiveBase64'),
 				},
 
 				proto: {
@@ -511,6 +530,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 
 			json: {
 				type: typeRef('CwBase64'),
+				weak: typeRef('NaiveBase64'),
 			},
 
 			proto: {

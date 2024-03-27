@@ -108,7 +108,7 @@ export const restful_grpc = <
 ) => async(
 	z_req: string | {origin: string} & RequestInit,
 	...a_args: a_args
-): Promise<NetworkJsonResponse<w_parsed>> => {
+): Promise<NetworkJsonResponse<w_parsed | undefined>> => {
 	// set default init object
 	let g_init = g_init_default;
 
@@ -147,18 +147,11 @@ export const restful_grpc = <
 	// resolve as text
 	const sx_res = await d_res.text();
 
-	// parse json
+	// attempt to parse json
 	const g_res = parse_json_safe<w_parsed>(sx_res);
 
 	// response tuple
-	const a_tuple: NetworkJsonResponse<w_parsed> = [d_res, sx_res, g_res!];
-
-	// not json or response/network error
-	// eslint-disable-next-line no-throw-literal
-	if(!g_res || !d_res.ok) throw a_tuple;
-
-	// return truple
-	return a_tuple;
+	return [d_res, sx_res, g_res];
 };
 
 

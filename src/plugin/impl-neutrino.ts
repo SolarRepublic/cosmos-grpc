@@ -15,7 +15,7 @@ import {ts} from 'ts-morph';
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
 import {RpcImplementor} from './rpc-impl';
-import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding, arrayAccess, exclaim, callChain, chain, andAnd, ternary, binary} from './ts-factory';
+import {access, arrayBinding, arrayLit, arrow, binding, callExpr, castAs, declareAlias, declareConst, funcType, ident, intersection, literal, numericLit, param, parens, print, string, tuple, keyword, litType, typeRef, union, y_factory, typeLit, objectLit, arrayType, typeOf, objectBinding, arrayAccess, exclaim, callChain, chain, andAnd, ternary, binary, unknown} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 type ReturnThing = {
@@ -1356,10 +1356,13 @@ export class NeutrinoImpl extends RpcImplementor {
 			yn_return = intersection([yn_return, typeLit(h_indicies)]);
 		}
 
+		// request object needs to be recast from intentionally weakened fields
+		const yn_body_casted = /Request$/.test(si_name)? castAs(yn_body, unknown()): yn_body;
+
 		// content
 		const yn_const = declareConst(`destruct${si_name}`, arrow([
 			param('g_struct', typeRef(si_name)),
-		], castAs(yn_body, yn_return)), true);
+		], castAs(yn_body_casted, yn_return)), true);
 
 		return [
 			print(yn_const, [
@@ -1512,7 +1515,11 @@ export class NeutrinoImpl extends RpcImplementor {
 		const si_name = this.exportedId(g_msg);
 
 		const yn_alias = declareAlias(si_name, typeLit(fold(g_msg.fieldList, (g_field) => {
-			const yn_type = this.route(g_field).json!.type;
+			const g_resolved = this.route(g_field);
+
+			// if the message is a "Request", then weaken the accessor's fields datatypes
+			const yn_type = /Request$/.test(g_msg.name || '')? g_resolved.json!.weak: g_resolved.json!.type;
+
 			return {
 				[g_field.name!]: g_field.optional
 					? [union([

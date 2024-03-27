@@ -28,6 +28,8 @@ const A_GLOBAL_PREAMBLE = [
 		]),
 		importModule('@blake.regalia/belt', [
 			'NaiveHexLower',
+			'NaiveBase64',
+			'WeakUintStr',
 		], true),
 		importModule('@solar-republic/types', [
 			'WeakInt64Str',

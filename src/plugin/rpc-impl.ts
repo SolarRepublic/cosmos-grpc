@@ -246,7 +246,7 @@ export abstract class RpcImplementor {
 			g_proto.type = arrayType(g_proto.type);
 
 			// turn into repeated writer
-			// @ts-expect-error ignore
+			// @ts-expect-error ignore string assignment
 			g_proto.writer = g_proto.writer.toUpperCase();
 
 			// wrap to_json
@@ -280,6 +280,7 @@ export abstract class RpcImplementor {
 
 			// convert types into array
 			if(g_json?.type) g_json.type = arrayType(g_json.type);
+			if(g_json?.weak) g_json.weak = arrayType(g_json.weak);
 			if(g_calls.return_type) g_calls.return_type = arrayType(g_calls.return_type);
 		}
 
@@ -320,6 +321,7 @@ export abstract class RpcImplementor {
 
 			json: {
 				type: yn_json,
+				weak: g_json?.weak || yn_json,
 			},
 
 			proto: {

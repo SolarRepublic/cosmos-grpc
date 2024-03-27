@@ -1,4 +1,5 @@
 import type {
+	NaiveBase64,
 	Nilable,
 } from '@blake.regalia/belt';
 
@@ -20,4 +21,4 @@ export const safe_base64_to_bytes = (sb64_data: Nilable<string>): Uint8Array | u
 
 export const safe_base64_to_text = (sb64_data: Nilable<string>): string | undefined => sb64_data? base64_to_text(sb64_data): __UNDEFINED;
 
-export const addr_bytes_to_bech32 = (sb64_data: CwBase64 | undefined): WeakBech32Addr | undefined => sb64_data? '1'+safe_base64_to_text(sb64_data) as WeakBech32Addr: __UNDEFINED;
+export const addr_bytes_to_bech32 = (sb64_data: NaiveBase64 | undefined): WeakBech32Addr | undefined => sb64_data? '1'+safe_base64_to_text(sb64_data) as WeakBech32Addr: __UNDEFINED;
