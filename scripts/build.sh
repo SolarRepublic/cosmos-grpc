@@ -41,6 +41,8 @@ copy akash/proto/node/akash akash
 copy axelar/proto/axelar axelar
 copy juno/proto/juno juno
 copy osmosis/proto/osmosis osmosis
+copy noble-cctp/proto/circle circle
+copy noble/proto
 copy secret/proto
 
 merge juno/proto/gaia gaia

@@ -42,3 +42,9 @@
 [submodule "submodules/juno"]
 	path = submodules/juno
 	url = https://github.com/CosmosContracts/juno
+[submodule "submodules/noble"]
+	path = submodules/noble
+	url = https://github.com/noble-assets/noble
+[submodule "submodules/noble-cctp"]
+	path = submodules/noble-cctp
+	url = https://github.com/circlefin/noble-cctp

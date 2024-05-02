@@ -21,7 +21,7 @@ srd_dist="$srd_build/dist"
 
 
 # dirs to target proto files
-srd_chains=($srd_proto/{tendermint,cosmos,ibc,cosmwasm,secret,akash,axelar,gaia,juno,osmosis})
+srd_chains=($srd_proto/{tendermint,cosmos,ibc,cosmwasm,secret,akash,axelar,gaia,juno,osmosis,noble,noble-cctp})
 
 # subdir to annotations to generate
 srd_annotations="$srd_gen/annotations"
@@ -133,6 +133,8 @@ gaia.*
 juno.*
 secret.*
 osmosis.*
+noble.*
+circle.*
 """
 
 # prep list of forced encoders

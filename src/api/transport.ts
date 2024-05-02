@@ -3,7 +3,7 @@ import type {Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
 
 import type {SlimCoin} from '@solar-republic/types';
 
-import {bytes_to_base64, __UNDEFINED, is_array, parse_json_safe, entries} from '@blake.regalia/belt';
+import {bytes_to_base64, __UNDEFINED, is_array, parse_json_safe, entries, is_object, is_string} from '@blake.regalia/belt';
 
 type Voidable = void | undefined;
 
@@ -36,7 +36,7 @@ const json_to_flatdot = (
 	else if(ArrayBuffer.isView(w_value)) {
 		a_entries.push([sr_path, bytes_to_base64(w_value)]);
 	}
-	else if('object' === typeof w_value) {
+	else if(is_object(w_value)) {
 		json_object_to_flatdot(w_value as JsonObject, a_entries, sr_path);
 	}
 	else {
@@ -136,7 +136,7 @@ export const restful_grpc = <
 
 	// normalize origin and request init
 	let p_origin = z_req as string;
-	if('string' !== typeof z_req) {
+	if(!is_string(z_req)) {
 		p_origin = z_req.origin;
 		g_init = {...z_req, ...g_init};
 	}
