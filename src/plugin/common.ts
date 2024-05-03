@@ -89,8 +89,8 @@ export type TsThing = {
 	destruct_type: TypeNode;
 };
 
-const route_not_impl = (si_field: string) => {
-	throw new Error(`Route not implemented for ${si_field} field type`);
+const route_not_impl = (s_type: string) => (si_field: string) => {
+	throw new Error(`Route not implemented for ${s_type} ${si_field} field type`);
 };
 
 
@@ -258,9 +258,9 @@ const H_OVERRIDE_MIXINS: Dict<
 
 // field transformers
 export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
-	[H_FIELD_TYPES.TYPE_GROUP]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_GROUP]: route_not_impl('group'),
 
-	[H_FIELD_TYPES.TYPE_FLOAT]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_FLOAT]: route_not_impl('float'),
 	[H_FIELD_TYPES.TYPE_DOUBLE]: si_field => ({
 		calls: {
 			name: `x_${si_field}`,
@@ -272,14 +272,32 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		},
 	}),
 
-	[H_FIELD_TYPES.TYPE_FIXED32]: route_not_impl,
-	[H_FIELD_TYPES.TYPE_FIXED64]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_FIXED32]: route_not_impl('fixed32'),
+	[H_FIELD_TYPES.TYPE_FIXED64]: route_not_impl('fixed64'),
 
-	[H_FIELD_TYPES.TYPE_SFIXED32]: route_not_impl,
-	[H_FIELD_TYPES.TYPE_SFIXED64]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_SFIXED32]: si_field => ({
+		calls: {
+			name: `sx32_${si_field}`,
+			type: keyword('string'),
+		},
 
-	[H_FIELD_TYPES.TYPE_SINT32]: route_not_impl,
-	[H_FIELD_TYPES.TYPE_SINT64]: route_not_impl,
+		proto: {
+			writer: 's',
+		},
+	}),
+	[H_FIELD_TYPES.TYPE_SFIXED64]: si_field => ({
+		calls: {
+			name: `sx64_${si_field}`,
+			type: keyword('string'),
+		},
+
+		proto: {
+			writer: 's',
+		},
+	}),
+
+	[H_FIELD_TYPES.TYPE_SINT32]: route_not_impl('sint32'),
+	[H_FIELD_TYPES.TYPE_SINT64]: route_not_impl('sint64'),
 
 	// boolean
 	[H_FIELD_TYPES.TYPE_BOOL]: si_field => ({

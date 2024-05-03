@@ -48,3 +48,9 @@
 [submodule "submodules/noble-cctp"]
 	path = submodules/noble-cctp
 	url = https://github.com/circlefin/noble-cctp
+[submodule "submodules/tendermint"]
+	path = submodules/tendermint
+	url = https://github.com/tendermint/tendermint
+[submodule "submodules/cometbft"]
+	path = submodules/cometbft
+	url = https://github.com/cometbft/cometbft

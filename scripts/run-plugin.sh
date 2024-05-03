@@ -21,7 +21,7 @@ srd_dist="$srd_build/dist"
 
 
 # dirs to target proto files
-srd_chains=($srd_proto/{tendermint,cosmos,ibc,cosmwasm,secret,akash,axelar,gaia,juno,osmosis,noble,noble-cctp})
+srd_chains=($srd_proto/{tendermint,cometbft,cosmos,ibc,cosmwasm,secret,akash,axelar,gaia,juno,osmosis,circle})
 
 # subdir to annotations to generate
 srd_annotations="$srd_gen/annotations"
@@ -124,6 +124,7 @@ info "generating module..."
 
 s_core="""
 tendermint.*
+cometbft.*
 cosmos.*
 ibc.*
 cosmwasm.*
@@ -161,7 +162,7 @@ s_destructors="""
 cosmos.base.abci.*
 cosmos.base.kv.*
 /^cosmos\.base\.tendermint\.(Block|Header)$/
-/^tendermint\.abci\..*(Response|Result)/
+/^(tendermint|cometbft)\.abci\..*(Response|Result)/
 """
 
 # override types of specific decoders. format is MSG_ID:TYPE_REF
@@ -193,7 +194,7 @@ protoc \
 	$(find "${srd_chains[@]}" -path -prune -o -name '*.proto' -print0 | xargs -0) \
 	2> >(grep -v "$SX_PROTOC_IGNORE_PATTERN" >&2)
 
-if [[ $? -ne 0 ]]; then
+if [ $? -ne 0 ]; then
 	>&2 echo "[ERROR] Errors encountered during generation"
 	exit 1
 fi
@@ -216,7 +217,7 @@ info "running eslint..."
 pnpm exec eslint --no-ignore --parser-options project:tsconfig.lib.json --color --fix "$srd_lib" \
 	| grep -v "warning"  # ignore warnings from initial lint cycle
 
-if [[ $? -ne 0 ]]; then
+if [ $? -ne 0 ]; then
 	>&2 echo "[ERROR] Errors encountered during linting"
 	inspect_lib
 	exit 1
@@ -240,7 +241,7 @@ inspect_lib
 info "compiling to dist..."
 
 # compile to dist
-tsc -p tsconfig.lib.json
+pnpm exec tsc -p tsconfig.lib.json
 
 info "Done"
 

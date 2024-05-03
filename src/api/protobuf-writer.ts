@@ -65,7 +65,7 @@ const encode_bytes: Encoder<Uint8Array> = (atu8_out, ib_write, atu8_data) => atu
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export const Protobuf = (): ProtoWriter => {
-	// @ts-expect-error low-opt
+	// @ts-expect-error low-optimization
 	// eslint-disable-next-line prefer-const
 	let a_head: BufNode = [];
 	// eslint-disable-next-line prefer-const

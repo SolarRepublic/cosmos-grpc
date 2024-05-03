@@ -1195,7 +1195,7 @@ export class NeutrinoImpl extends RpcImplementor {
 					yn_return,
 
 					// add arbitrary-index fields to type lit, each one with question token (i.e., optional)
-					typeLit(transform_values(h_arbitrary_fields, g => [g.type, g.thing.optional])),
+					typeLit(transform_values(h_arbitrary_fields, g => [g.type, g.thing.optional] as [TypeNode, boolean])),
 				]);
 			}
 		}
