@@ -54,3 +54,6 @@
 [submodule "submodules/cometbft"]
 	path = submodules/cometbft
 	url = https://github.com/cometbft/cometbft
+[submodule "submodules/noble-fiattokenfactory"]
+	path = submodules/noble-fiattokenfactory
+	url = https://github.com/circlefin/noble-fiattokenfactory
