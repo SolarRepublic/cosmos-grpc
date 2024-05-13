@@ -57,3 +57,9 @@
 [submodule "submodules/noble-fiattokenfactory"]
 	path = submodules/noble-fiattokenfactory
 	url = https://github.com/circlefin/noble-fiattokenfactory
+[submodule "submodules/noble-forwarding"]
+	path = submodules/noble-forwarding
+	url = https://github.com/noble-assets/forwarding
+[submodule "submodules/noble-authority"]
+	path = submodules/noble-authority
+	url = https://github.com/noble-assets/authority

@@ -73,6 +73,8 @@ copy juno/proto/juno juno
 copy osmosis/proto/osmosis osmosis
 copy noble/proto
 copy noble-cctp/proto/circle circle
+copy noble-authority/proto/noble noble
+copy noble-forwarding/proto/noble/forwarding noble/forwarding
 copy secret/proto
 
 merge juno/proto/gaia gaia
