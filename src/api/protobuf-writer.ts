@@ -111,7 +111,7 @@ export const Protobuf = (): ProtoWriter => {
 		si_key extends keyof ProtoWriterScalar,
 	>(si_key: si_key) => (
 		a_items?: NonNullable<Parameters<ProtoWriterScalar[si_key]>[0]>[],
-		i_field=i_auto
+		i_field=i_auto++
 	) => ((
 		a_items?.map(w_item => g_self[si_key](w_item as never, i_field)),
 		g_self

@@ -1442,7 +1442,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			a_types_json.push(typeOf(ident(si_json)));
 
 			// declare json const
-			const yn_json = declareConst(si_json, string(s_value), true);
+			const yn_json = declareConst(si_json, string(si_name), true);
 
 
 			// print values to putput

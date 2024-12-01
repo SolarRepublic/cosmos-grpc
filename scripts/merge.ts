@@ -253,9 +253,12 @@ function merge(sx_a_src: string, sx_b_src: string, g_diff: diff.Change) {
 					return sx_b;
 				}
 
-				// different fields
-				debugger;
-				throw new Error(`Merge resolution path for enum values not yet defined`);
+				// just take b
+				return sx_b;
+
+				// // different fields
+				// debugger;
+				// throw new Error(`Merge resolution path for enum values not yet defined; ${sr_file_a} ${sr_file_b}`);
 			}
 			// `b` succeeded
 			else if(success(y_doc_b)) {

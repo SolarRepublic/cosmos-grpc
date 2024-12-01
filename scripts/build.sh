@@ -53,12 +53,8 @@ copy cosmos-proto/proto
 copy cosmos-sdk/proto
 
 copy cometbft/proto
-copy tendermint/proto
+# copy tendermint/proto
 merge cometbft/proto/tendermint tendermint
-
-# copy cometbft/proto
-# # copy tendermint/proto
-# merge tendermint/proto/tendermint tendermint
 
 copy wasmd/proto
 copy ibc/proto
@@ -74,6 +70,7 @@ copy osmosis/proto/osmosis osmosis
 copy noble/proto
 copy noble-cctp/proto/circle circle
 copy noble-authority/proto/noble noble
+copy noble-fiattokenfactory/proto/fiattokenfactory noble/fiattokenfactory
 copy noble-forwarding/proto/noble/forwarding noble/forwarding
 copy secret/proto
 
@@ -84,3 +81,14 @@ copy gogoproto
 
 
 rm -rf "$tmpdir"
+
+
+
+function replace() {
+	echo "replace $1 $2 $3"
+	bun run ./scripts/replace.ts "$1" "$2" "$3"
+}
+
+# cleanup
+replace build/proto/cosmos/ics23/v1/proofs.proto 'option go_package = "github.com/confio/ics23/go";' ''
+replace build/proto/cosmos/bank/module/v1/module.proto '(string authority = 2;)\n+}' '$1'
