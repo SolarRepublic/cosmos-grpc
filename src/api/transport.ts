@@ -15,14 +15,26 @@ export type RpcRequest<
 
 export const F_RPC_REQ_NO_ARGS: RpcRequest = () => [''];
 
+/**
+ * Response wrapper tuple where:
+ *  - 0: g_res - parsed response body JSON on OK response code
+ *  - 1: g_err - parsed response body JSON on non-OK response code
+ *  - 2: d_res - the {@link Response}
+ *  - 3: sx_res - response body text
+ */
 export type NetworkJsonResponse<
 	w_type extends JsonValue<Voidable>=JsonValue | undefined,
+	w_err extends JsonValue<Voidable>=JsonValue | undefined,
 > = [
+	g_res: w_type,
+	g_err: w_err,
 	d_res: Response,
 	sx_res: string,
-	g_res: w_type,
 ];
 
+/**
+ * Returned when a query error occurred
+ */
 export type CosmosQueryErrorResult = {
 	code: number;
 	details: string[];
@@ -116,7 +128,7 @@ export const restful_grpc = <
 ) => async(
 	z_req: RequestDescriptor | CosmosClient,
 	...a_args: a_args
-): Promise<NetworkJsonResponse<w_parsed | CosmosQueryErrorResult | undefined>> => {
+): Promise<NetworkJsonResponse<w_parsed | undefined, CosmosQueryErrorResult | undefined>> => {
 	// set default init object
 	let g_init = g_init_default;
 
@@ -157,7 +169,9 @@ export const restful_grpc = <
 	const g_res = parse_json_safe<w_parsed>(sx_res);
 
 	// response tuple
-	return [d_res, sx_res, g_res];
+	return d_res.ok
+		? [g_res, __UNDEFINED, d_res, sx_res]
+		: [__UNDEFINED, g_res as CosmosQueryErrorResult, d_res, sx_res];
 };
 
 
