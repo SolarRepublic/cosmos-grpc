@@ -29,6 +29,7 @@ yarn add @solar-republic/cosmos-grpc
 
 ## Contributing
 ```shell
+git submodule update --init
 yarn install
 yarn build
 ```
