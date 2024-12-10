@@ -29,7 +29,7 @@ type RetryParams = Promisable<undefined | boolean | number | [
 
 type RetryHandler = (e_fail: unknown, i_retry: number) => RetryParams;
 
-export type ExpoentialBackoffParams = [
+export type BackoffParams = [
 	xt_backoff?: number,
 	xt_maximum?: number,
 	n_max_attempts?: number,
@@ -41,43 +41,90 @@ export const exponential_backoff = ([
 	xt_maximum=Infinity,
 	n_max_attempts=Infinity,
 	x_growth=2,
-]: ExpoentialBackoffParams) => (i_attempt: number) => i_attempt >= n_max_attempts
+]: BackoffParams) => (i_attempt: number) => i_attempt >= n_max_attempts
 	? __UNDEFINED
 	: Math.min(xt_maximum, xt_backoff * (x_growth ** i_attempt));
 
-export type ResponseChecker = (a_backoff?: ExpoentialBackoffParams) => ((d_res: Response, i_retry: number) => RetryParams);
+/**
+ * Wraps backoff params and checks whether the given response should be retried
+ */
+export type ResponseChecker = (a_backoff?: BackoffParams) => ((d_res: Response, i_retry: number) => RetryParams);
 
+/**
+ * Response checker for when response code is 429 (too many requests)
+ * @param a_backoff - {@link BackoffParams} to be passed to backoff function
+ * @param f_backoff - the backoff function (defaults to exponential backoff)
+ * @returns either {@link RetryParams} on matching response or `undefined` on no match
+ */
 export const response_is_429: ResponseChecker = (
 	a_backoff=[],
 	f_backoff=exponential_backoff(a_backoff)
 ) => (d_res, i_retry) => 429 === d_res.status
 	? f_backoff(i_retry)
-	: false;
+	: __UNDEFINED;
 
+/**
+ * Response checker for when response code is 5xx (server error)
+ * @param a_backoff - {@link BackoffParams} to be passed to backoff function
+ * @param f_backoff - the backoff function (defaults to exponential backoff)
+ * @returns either {@link RetryParams} on matching response or `undefined` on no match
+ */
 export const response_is_5xx: ResponseChecker = (
 	a_backoff=[],
 	f_backoff=exponential_backoff(a_backoff)
 ) => (d_res, i_retry, xc_status=d_res.status) => xc_status >= 500 && xc_status < 600
 	? f_backoff(i_retry)
-	: false;
+	: __UNDEFINED;
 
+/**
+ * Response checker for when response code is 429 (too many requests) or 5xx (server error)
+ * @param a_backoff - {@link BackoffParams} to be passed to backoff function
+ * @param f_backoff - the backoff function (defaults to exponential backoff)
+ * @returns either {@link RetryParams} on matching response or `undefined` on no match
+ */
 export const response_is_429_or_5xx: ResponseChecker = (
 	a_backoff=[],
 	f_backoff=exponential_backoff(a_backoff)
 ) => (d_res, i_retry, xc_status=d_res.status) => 429 === xc_status || (xc_status >= 500 && xc_status < 600)
 	? f_backoff(i_retry)
-	: false;
+	: __UNDEFINED;
 
+/**
+ * Response checker for when response code is 429 (too many requests) or 501 - 599
+ * @param a_backoff - {@link BackoffParams} to be passed to backoff function
+ * @param f_backoff - the backoff function (defaults to exponential backoff)
+ * @returns either {@link RetryParams} on matching response or `undefined` on no match
+ */
+export const response_is_429_or_501_thru_599: ResponseChecker = (
+	a_backoff=[],
+	f_backoff=exponential_backoff(a_backoff)
+) => (d_res, i_retry, xc_status=d_res.status) => 429 === xc_status || (xc_status >= 501 && xc_status < 600)
+	? f_backoff(i_retry)
+	: __UNDEFINED;
 
-
+/**
+ * Executes the given 
+ * @param f_test - test function to check the response and return retry params if retry is wanted
+ * @param f_fetch - the fetch function to use
+ * @returns 
+ */
 export const retry_when_response = (
-	f_test: (d_res: Response, i_retry: number) => RetryParams
+	f_test: (d_res: Response, i_retry: number) => RetryParams,
+	f_fetch=fetch
 ): RetryableRequestWrapper => async(z_req, z_init, i_retry) => {
 	// attempt request
-	const d_res = await fetch(z_req, z_init);
+	const d_res = await f_fetch(z_req, z_init);
 
-	// check if retry is needed
-	return await f_test(d_res, i_retry);
+	// debug
+	if(import.meta.env?.DEV) {
+		// not OK
+		if(!d_res.ok) {
+			console.warn(`Remote <${z_req instanceof Request? z_req.url: z_req+''}> responded with non-OK ${d_res.status} code`);
+		}
+	}
+
+	// check if retry is needed, otherwise returns the response
+	return await f_test(d_res, i_retry) ?? d_res;
 };
 
 /**
@@ -98,12 +145,12 @@ export const retryable_fetcher = (
 	for(;;) {
 		// attempt the request
 		// eslint-disable-next-line @typescript-eslint/no-loop-func
-		const [z_res, e_fail] = await try_async(() => (z_desc ?? fetch)(z_req, z_init, c_attempts));
+		const [z_res, e_fail] = await try_async(() => (z_desc ?? fetch)(z_req, z_init, c_attempts++));
 
 		// determine if retry is needed
 		const z_retry = e_fail
 			// request failed, ask for retry
-			? await f_retry?.(e_fail, c_attempts++) || 0
+			? await f_retry?.(e_fail, c_attempts) || 0
 			// user returned retry params
 			: !(z_res instanceof Response)
 				// retry with returned params
@@ -113,6 +160,12 @@ export const retryable_fetcher = (
 
 		// retry wanted
 		if(!is_undefined(z_retry)) {
+			// debug
+			if(import.meta.env?.DEV) {
+				// eslint-disable-next-line no-console
+				console.debug(`⚠️ Retrying request #${c_attempts} to ${z_req instanceof Request? z_req.url: z_req+''} after ${is_number(z_retry)? z_retry: 0}ms backoff`);
+			}
+
 			// wait for given time
 			await timeout(is_number(z_retry)? z_retry: 0);
 
@@ -137,7 +190,10 @@ export const retryable_fetcher = (
  * @param a_backoff 
  * @returns 
  */
-export const basic_retryable_fetcher = (a_backoff: ExpoentialBackoffParams=[200, 30e3, 10]) => retryable_fetcher(retry_when_response(response_is_429_or_5xx(a_backoff)));
+export const basic_retryable_fetcher = (
+	a_backoff: BackoffParams=[200, 30e3, 10],
+	f_fetch: typeof fetch=fetch
+) => retryable_fetcher(retry_when_response(response_is_429_or_501_thru_599(a_backoff), f_fetch));
 
 
 
@@ -228,13 +284,3 @@ export const pooling_cosmos_client = (
 	};
 };
 
-const f_fetcher = basic_retryable_fetcher([200, 30e3, 5]);
-
-pooling_cosmos_client(([
-	['http://10.0.0.23:26657', 5e3, 16],
-	['https://ss1-secret.lavenderfive.com', 5e3],
-] as const).map(([p_url, xt_recovery, n_max]) => [direct_cosmos_client(p_url, f_fetcher), xt_recovery, n_max]));
-
-const y_client = direct_cosmos_client('http://10.0.0.23:26657');
-
-// queryCosmosAuthAccount(y_client);

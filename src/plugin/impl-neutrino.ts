@@ -4,13 +4,14 @@ import type {AugmentedEnum, AugmentedField, AugmentedFile, AugmentedMessage, Aug
 import type {InterfacesDict, Params, TypesDict} from './plugin';
 import type {FileCategory} from './rpc-impl';
 import type {Dict} from '@blake.regalia/belt';
-import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement, Identifier, ArrayBindingElement} from 'typescript';
+
 
 import {readFileSync} from 'node:fs';
 
-import {__UNDEFINED, fold, concat_entries, proper, snake, escape_regex, transform_values, map_entries, F_IDENTITY, keys, values} from '@blake.regalia/belt';
+import {__UNDEFINED, fold, concat_entries, proper, snake, escape_regex, transform_values, map_entries, F_IDENTITY, keys, values, is_number, is_array} from '@blake.regalia/belt';
 
 import {ts} from 'ts-morph';
+import {type Statement, type TypeNode, type Expression, type ImportSpecifier, type ParameterDeclaration, type ConciseBody, type OmittedExpression, type BindingElement, type Identifier, type ArrayBindingElement} from 'typescript';
 
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
@@ -950,7 +951,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		const a_types: [string, boolean, TypeNode][] = [];
 		const h_things: Dict<TsThing> = {};
-		const a_hints: Expression[] = [];
+		const a_hints: (ProtoHint | ProtoHint[] | Expression)[] = [];
 		const a_returns: Expression[] = [];
 
 		// prep generic args and destructure bindings, omitting 0th item
@@ -991,7 +992,7 @@ export class NeutrinoImpl extends RpcImplementor {
 						a_bindings.push(y_factory.createOmittedExpression());
 
 						// add hint to arg
-						a_hints.push(literal(ProtoHint.NONE));
+						a_hints.push(ProtoHint.NONE);
 
 						a_returns.push(ident('__UNDEFINED'));
 
@@ -1008,7 +1009,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			i_expect = i_number + 1;
 
 			// prep components
-			let yn_hint: Expression;
+			let z_hint: ProtoHint | ProtoHint[] | Expression;
 			let yn_generic: TypeNode;
 			let yn_return: Expression;
 
@@ -1025,7 +1026,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			const g_nests = g_thing.nests;
 			if(g_nests) {
 				// set hint
-				yn_hint = g_nests.hints;
+				z_hint = g_nests.hints;
 
 				s_type_label = g_nests.name;
 
@@ -1052,12 +1053,12 @@ export class NeutrinoImpl extends RpcImplementor {
 			}
 			else {
 				// infer hint from write type
-				yn_hint = literal((g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR) | ({
+				z_hint = (g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR) | ({
 					v: 's' === g_thing.calls.name[0]? ProtoHint.BIGINT: ProtoHint.NONE,
 					g: ProtoHint.BIGINT,
 					s: ProtoHint.STRING,
 					b: H_FIELD_TYPES.TYPE_MESSAGE === g_field.type? ProtoHint.MESSAGE: ProtoHint.NONE,
-				}[g_thing.proto.writer.toLowerCase()] || 0));
+				}[g_thing.proto.writer.toLowerCase()] || 0);
 
 				// apply same logic to generic parameter
 				const yn_primitive = {
@@ -1081,7 +1082,7 @@ export class NeutrinoImpl extends RpcImplementor {
 
 			// fields up to this point are continuous (or gaps have been tolerated)
 			if(b_continuous) {
-				a_hints.push(yn_hint);
+				a_hints.push(z_hint);
 				a_generics.push(yn_generic);
 				a_returns.push(yn_return);
 				h_things[i_number-1] = g_thing;
@@ -1095,7 +1096,11 @@ export class NeutrinoImpl extends RpcImplementor {
 			else {
 				h_arbitrary_fields[i_number-1] = {
 					thing: g_thing,
-					hint: yn_hint,
+					hint: is_number(z_hint)
+						? literal(z_hint)
+						: is_array(z_hint)
+							? arrayLit(z_hint.map(x => literal(x)))
+							: z_hint,
 					generic: yn_generic,
 					return: yn_return,
 					type: yn_type,
@@ -1121,7 +1126,22 @@ export class NeutrinoImpl extends RpcImplementor {
 
 		// 2nd arg is needed; add hints if there are any
 		if(a_hints.length || a_decoders.length) {
-			a_args.push(a_hints.length? arrayLit(a_hints): ident('__UNDEFINED'));
+			// optimization: all hints are numbers less than 16
+			if(a_hints.length && a_hints.length < 8 && a_hints.every(z => is_number(z) && (z as number) < 16)) {
+				a_args.push(literal(
+					(a_hints as ProtoHint[]).slice().reverse()
+						.reduce((xm_out, z) => (xm_out << 4) | z, 0)
+				));
+			}
+			else {
+				a_args.push(a_hints.length
+					? arrayLit(a_hints.map(z => is_number(z)
+						? literal(z)
+						: is_array(z)
+							? arrayLit(z.map(x => literal(x)))
+							: z))
+					: ident('__UNDEFINED'));
+			}
 		}
 
 		// nested decoders are present

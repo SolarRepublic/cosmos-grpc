@@ -9,7 +9,7 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, tuple, not, arrayAccess} from './ts-factory';
+import {callExpr, ident, string, keyword, litType, typeRef, union, numericLit, tuple, not, arrayAccess} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 // destructure members from protobuf
@@ -63,7 +63,7 @@ export type TsThingBare = {
 	nests?: null | {
 		name: string;
 		type: TypeNode;
-		hints: Expression;
+		hints: ProtoHint | ProtoHint[] | Expression;
 		// parse: (yn_data: Expression) => Expression;
 		parser: Identifier | null;
 	};  // the field uses some other message for its type (for decoding)
@@ -144,7 +144,7 @@ const temporal = (g_mixin: {calls?: Optional<TsThingBare['calls']>; json?: TsThi
 		nests: {
 			name: `a_${snake(g_field.name!)}`,
 			type: tuple([keyword('string'), keyword('number')]),
-			hints: literal([ProtoHint.SINGULAR_BIGINT, ProtoHint.SINGULAR]),
+			hints: [ProtoHint.SINGULAR_BIGINT, ProtoHint.SINGULAR],
 			// parse: yn_expr => callExpr(ident('reduce_temporal'), [yn_expr]),
 			// parser: ident('reduce_temporal'),
 			parser: ident(`decode_temporal`),
@@ -181,7 +181,7 @@ const H_OVERRIDE_MIXINS: Dict<
 				name: `a_${si_name}`,
 				type: tuple([keyword('string'), keyword('string')]),
 				// hints: literal([ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING]),
-				hints: g_field.repeated? literal(ProtoHint.NONE): literal(ProtoHint.SINGULAR),
+				hints: g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR,
 				// parse: yn_data => callExpr(ident('decode_coin'), [yn_data]),
 				// parse: F_IDENTITY,
 				// parser: null,
@@ -480,7 +480,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			nests: {
 				name: `a_${si_name}`,
 				type: k_impl.importType(g_refable, 'Decoded'),
-				hints: literal(g_field.repeated? 0: 1),  // make singular if not repeated
+				hints: g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR,  // make singular if not repeated
 				// parse: yn_data => callExpr(ident('decode_protobuf'), [yn_data]),
 				// parse: yn_data => callExpr(ident(`decode${k_impl.exportedId(g_refable)}`), [yn_data]),
 				parser: yn_decoder,
