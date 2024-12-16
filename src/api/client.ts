@@ -184,7 +184,7 @@ export const retryable_fetcher = (
 
 
 /**
- * Convenience method for creating a basic fetcher that retries on 429 and 5xx with exponential backoff.
+ * Convenience method for creating a basic fetcher that retries on 429 and 501-599 with exponential backoff.
  * If exponential backoff params are omitted, fetcher defaults to waiting up to 30 seconds maximum between
  * retries, with a backoff param of 200ms, allowing up to 10 attempts in total.
  * @param a_backoff 
