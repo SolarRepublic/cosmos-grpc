@@ -3,7 +3,7 @@
 import type {NestedArrayable} from '@blake.regalia/belt';
 import type {SlimCoin} from '@solar-republic/types';
 
-import {bytes_to_text, is_array} from '@blake.regalia/belt';
+import {bytes_to_text, is_array, is_number} from '@blake.regalia/belt';
 
 export type DecodedProtobufFieldPrimitive<w_inject=never> = w_inject | number | string | Uint8Array;
 
@@ -121,7 +121,7 @@ export const decode_protobuf = <
 	w_return extends DecodedProtobufMessage<void>=DecodedProtobufMessage,
 >(
 	atu8_data: Uint8Array,
-	a_hints?: NestedArrayable<ProtoHint>[],
+	z_hints?: number | NestedArrayable<ProtoHint>[],
 	a_decoders?: Array<ProtobufNestedDecoder | 0 | undefined>
 ): w_return => {
 	// decode a varint from the next position in the input
@@ -171,7 +171,9 @@ export const decode_protobuf = <
 		i_field = xn_field;
 
 		// ref provided hint, if any
-		let xc_hint_local = a_hints?.[i_field] as ProtoHint;
+		let xc_hint_local = is_number(z_hints)
+			? (z_hints >> (i_field * 4)) & 0x0f
+			: z_hints?.[i_field] as ProtoHint;
 
 		// length-delimited
 		let w_value = [

@@ -14,6 +14,7 @@ import {
 	try_sync,
 } from '@blake.regalia/belt';
 
+
 export const safe_bytes_to_base64 = (atu8_buffer: Nilable<Uint8Array>): CwBase64 | undefined => atu8_buffer? try_sync(() => bytes_to_base64(atu8_buffer) as unknown as CwBase64)[0] || __UNDEFINED: __UNDEFINED;
 
 export const safe_bytes_to_text = (atu8_buffer: Nilable<Uint8Array>): string | undefined => atu8_buffer? try_sync(() => bytes_to_text(atu8_buffer))[0] || __UNDEFINED: __UNDEFINED;

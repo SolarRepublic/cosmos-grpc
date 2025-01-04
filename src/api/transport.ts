@@ -3,7 +3,9 @@ import type {Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
 
 import type {SlimCoin} from '@solar-republic/types';
 
-import {bytes_to_base64, __UNDEFINED, is_array, parse_json_safe, entries, is_object, is_string} from '@blake.regalia/belt';
+import {bytes_to_base64, __UNDEFINED, is_array, parse_json_safe, entries, is_object, is_function} from '@blake.regalia/belt';
+
+import {direct_cosmos_client, type CosmosClient, type RequestDescriptor} from './client';
 
 type Voidable = void | undefined;
 
@@ -13,13 +15,31 @@ export type RpcRequest<
 
 export const F_RPC_REQ_NO_ARGS: RpcRequest = () => [''];
 
+/**
+ * Response wrapper tuple where:
+ *  - 0: g_res - parsed response body JSON on OK response code
+ *  - 1: g_err - parsed response body JSON on non-OK response code
+ *  - 2: d_res - the {@link Response}
+ *  - 3: sx_res - response body text
+ */
 export type NetworkJsonResponse<
 	w_type extends JsonValue<Voidable>=JsonValue | undefined,
+	w_err extends JsonValue<Voidable>=JsonValue | undefined,
 > = [
+	g_res: w_type,
+	g_err: w_err,
 	d_res: Response,
 	sx_res: string,
-	g_res: w_type,
 ];
+
+/**
+ * Returned when a query error occurred
+ */
+export type CosmosQueryErrorResult = {
+	code: number;
+	details: string[];
+	message: string;
+};
 
 const json_to_flatdot = (
 	w_value: JsonValue<Voidable | Uint8Array>,
@@ -106,9 +126,9 @@ export const restful_grpc = <
 	f_req: RpcRequest<a_args>,
 	g_init_default?: 1 | RequestInit
 ) => async(
-	z_req: string | {origin: string} & RequestInit,
+	z_req: RequestDescriptor | CosmosClient,
 	...a_args: a_args
-): Promise<NetworkJsonResponse<w_parsed | undefined>> => {
+): Promise<NetworkJsonResponse<w_parsed | undefined, CosmosQueryErrorResult | undefined>> => {
 	// set default init object
 	let g_init = g_init_default;
 
@@ -134,15 +154,13 @@ export const restful_grpc = <
 		sr_append += '?'+new URLSearchParams(json_object_to_flatdot(h_args));
 	}
 
-	// normalize origin and request init
-	let p_origin = z_req as string;
-	if(!is_string(z_req)) {
-		p_origin = z_req.origin;
-		g_init = {...z_req, ...g_init};
-	}
+	// cosmos client
+	const y_client = is_function((z_req as CosmosClient).fetch)
+		? z_req as CosmosClient
+		: direct_cosmos_client(z_req as RequestDescriptor);
 
 	// submit request
-	const d_res = await fetch(p_origin+sr_append, g_init);
+	const d_res = await y_client.fetch(sr_append, g_init);
 
 	// resolve as text
 	const sx_res = await d_res.text();
@@ -151,7 +169,9 @@ export const restful_grpc = <
 	const g_res = parse_json_safe<w_parsed>(sx_res);
 
 	// response tuple
-	return [d_res, sx_res, g_res];
+	return d_res.ok
+		? [g_res, __UNDEFINED, d_res, sx_res]
+		: [__UNDEFINED, g_res as CosmosQueryErrorResult, d_res, sx_res];
 };
 
 

@@ -15,6 +15,7 @@
 **/.DS_Store
 **/*.ignore
 **/*.log
+**/*.bak
 /.git-*
 .yarn-integrity
 

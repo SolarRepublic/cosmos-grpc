@@ -48,3 +48,18 @@
 [submodule "submodules/noble-cctp"]
 	path = submodules/noble-cctp
 	url = https://github.com/circlefin/noble-cctp
+[submodule "submodules/tendermint"]
+	path = submodules/tendermint
+	url = https://github.com/tendermint/tendermint
+[submodule "submodules/cometbft"]
+	path = submodules/cometbft
+	url = https://github.com/cometbft/cometbft
+[submodule "submodules/noble-fiattokenfactory"]
+	path = submodules/noble-fiattokenfactory
+	url = https://github.com/circlefin/noble-fiattokenfactory
+[submodule "submodules/noble-forwarding"]
+	path = submodules/noble-forwarding
+	url = https://github.com/noble-assets/forwarding
+[submodule "submodules/noble-authority"]
+	path = submodules/noble-authority
+	url = https://github.com/noble-assets/authority

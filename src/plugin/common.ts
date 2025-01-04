@@ -9,7 +9,7 @@ import type {TypeNode, Identifier, Expression} from 'typescript';
 import {snake, type Dict} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
-import {callExpr, ident, literal, string, keyword, litType, typeRef, union, numericLit, tuple, not, arrayAccess} from './ts-factory';
+import {callExpr, ident, string, keyword, litType, typeRef, union, numericLit, tuple, not, arrayAccess} from './ts-factory';
 import {ProtoHint} from '../api/protobuf-reader';
 
 // destructure members from protobuf
@@ -63,7 +63,7 @@ export type TsThingBare = {
 	nests?: null | {
 		name: string;
 		type: TypeNode;
-		hints: Expression;
+		hints: ProtoHint | ProtoHint[] | Expression;
 		// parse: (yn_data: Expression) => Expression;
 		parser: Identifier | null;
 	};  // the field uses some other message for its type (for decoding)
@@ -89,8 +89,8 @@ export type TsThing = {
 	destruct_type: TypeNode;
 };
 
-const route_not_impl = (si_field: string) => {
-	throw new Error(`Route not implemented for ${si_field} field type`);
+const route_not_impl = (s_type: string) => (si_field: string) => {
+	throw new Error(`Route not implemented for ${s_type} ${si_field} field type`);
 };
 
 
@@ -144,7 +144,7 @@ const temporal = (g_mixin: {calls?: Optional<TsThingBare['calls']>; json?: TsThi
 		nests: {
 			name: `a_${snake(g_field.name!)}`,
 			type: tuple([keyword('string'), keyword('number')]),
-			hints: literal([ProtoHint.SINGULAR_BIGINT, ProtoHint.SINGULAR]),
+			hints: [ProtoHint.SINGULAR_BIGINT, ProtoHint.SINGULAR],
 			// parse: yn_expr => callExpr(ident('reduce_temporal'), [yn_expr]),
 			// parser: ident('reduce_temporal'),
 			parser: ident(`decode_temporal`),
@@ -181,7 +181,7 @@ const H_OVERRIDE_MIXINS: Dict<
 				name: `a_${si_name}`,
 				type: tuple([keyword('string'), keyword('string')]),
 				// hints: literal([ProtoHint.SINGULAR_STRING, ProtoHint.SINGULAR_STRING]),
-				hints: g_field.repeated? literal(ProtoHint.NONE): literal(ProtoHint.SINGULAR),
+				hints: g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR,
 				// parse: yn_data => callExpr(ident('decode_coin'), [yn_data]),
 				// parse: F_IDENTITY,
 				// parser: null,
@@ -258,9 +258,9 @@ const H_OVERRIDE_MIXINS: Dict<
 
 // field transformers
 export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
-	[H_FIELD_TYPES.TYPE_GROUP]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_GROUP]: route_not_impl('group'),
 
-	[H_FIELD_TYPES.TYPE_FLOAT]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_FLOAT]: route_not_impl('float'),
 	[H_FIELD_TYPES.TYPE_DOUBLE]: si_field => ({
 		calls: {
 			name: `x_${si_field}`,
@@ -272,14 +272,32 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		},
 	}),
 
-	[H_FIELD_TYPES.TYPE_FIXED32]: route_not_impl,
-	[H_FIELD_TYPES.TYPE_FIXED64]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_FIXED32]: route_not_impl('fixed32'),
+	[H_FIELD_TYPES.TYPE_FIXED64]: route_not_impl('fixed64'),
 
-	[H_FIELD_TYPES.TYPE_SFIXED32]: route_not_impl,
-	[H_FIELD_TYPES.TYPE_SFIXED64]: route_not_impl,
+	[H_FIELD_TYPES.TYPE_SFIXED32]: si_field => ({
+		calls: {
+			name: `sx32_${si_field}`,
+			type: keyword('string'),
+		},
 
-	[H_FIELD_TYPES.TYPE_SINT32]: route_not_impl,
-	[H_FIELD_TYPES.TYPE_SINT64]: route_not_impl,
+		proto: {
+			writer: 's',
+		},
+	}),
+	[H_FIELD_TYPES.TYPE_SFIXED64]: si_field => ({
+		calls: {
+			name: `sx64_${si_field}`,
+			type: keyword('string'),
+		},
+
+		proto: {
+			writer: 's',
+		},
+	}),
+
+	[H_FIELD_TYPES.TYPE_SINT32]: route_not_impl('sint32'),
+	[H_FIELD_TYPES.TYPE_SINT64]: route_not_impl('sint64'),
 
 	// boolean
 	[H_FIELD_TYPES.TYPE_BOOL]: si_field => ({
@@ -462,7 +480,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 			nests: {
 				name: `a_${si_name}`,
 				type: k_impl.importType(g_refable, 'Decoded'),
-				hints: literal(g_field.repeated? 0: 1),  // make singular if not repeated
+				hints: g_field.repeated? ProtoHint.NONE: ProtoHint.SINGULAR,  // make singular if not repeated
 				// parse: yn_data => callExpr(ident('decode_protobuf'), [yn_data]),
 				// parse: yn_data => callExpr(ident(`decode${k_impl.exportedId(g_refable)}`), [yn_data]),
 				parser: yn_decoder,
