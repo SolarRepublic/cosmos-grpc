@@ -174,7 +174,7 @@ export const retryable_fetcher = (
 		}
 
 		// throw error
-		if(e_fail) throw e_fail;
+		if(e_fail) throw e_fail as Error;
 
 		// done
 		return z_res as Response;
@@ -263,7 +263,7 @@ export const pooling_cosmos_client = (
 			// error
 			if(e_lcd) {
 				// reached ultimate fallback client
-				if(i_client === a_clients.length-1) throw e_lcd;
+				if(i_client === a_clients.length-1) throw e_lcd as Error;
 
 				// cancel previous timeout
 				clearTimeout(a_conn[1]);
