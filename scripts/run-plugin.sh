@@ -207,32 +207,64 @@ cp -r src/api/* "$srd_lib_api"
 
 # for inspection
 inspect_lib() {
-	cp .eslintrc.cjs "$srd_lib"
+	cp eslint.config.mjs "$srd_lib"
 	cp tsconfig.dist.json "$srd_lib/tsconfig.json"
 }
 
+# determine path to eslint binary
+eslint=./node_modules/eslint/bin/eslint.js
+
+# NODE_OPTIONS=--max_old_space_size=8192 $eslint --help
 
 # run through linter with fix-all
-info "running eslint..."
-pnpm exec eslint --no-ignore --parser-options project:tsconfig.lib.json --color --fix "$srd_lib" \
-	| grep -v "warning"  # ignore warnings from initial lint cycle
+lint_1() {
+	sr_target="$1"
+	info "running eslint 1st cycle on $sr_target..."
+	node --max_old_space_size=8192 "$eslint" --no-ignore --parser-options project:tsconfig.lib.json --color --fix "$sr_target" \
+		| grep -v "warning"  # ignore warnings from initial lint cycle
 
-if [ $? -ne 0 ]; then
-	>&2 echo "[ERROR] Errors encountered during linting"
-	inspect_lib
-	exit 1
-fi
+	if [ $? -ne 0 ]; then
+		>&2 echo "[ERROR] Errors encountered during linting"
+		inspect_lib
+		exit 1
+	fi
 
-info " "
-info "---- end of first lint cycle ----"
-info " "
+	info " "
+	info "---- end of first lint cycle for $sr_target ----"
+	info " "
+}
 
 # run through linter again with fix-all
-pnpm exec eslint --no-ignore --parser-options project:tsconfig.lib.json --fix "$srd_lib"
+lint_2() {
+	sr_target="$1"
+	info "running eslint 2nd cycle on $sr_target..."
+	node --max_old_space_size=8192 "$eslint" --no-ignore --parser-options project:tsconfig.lib.json --fix "$sr_target"
 
-info ""
-info "---- end of repeated lint cycle ----"
-info ""
+	info ""
+	info "---- end of repeated lint cycle for $sr_target ----"
+	info ""
+}
+
+# run both lint cycles
+lint() {
+	sr_subfile="$1"
+
+	lint_1 "$sr_subfile"
+	lint_2 "$sr_subfile"
+}
+
+# lint the API subdirectory
+lint "$srd_lib/api"
+
+# # lint root files
+# lint "proto/_any_condense.ts"
+
+# each proto subdirectory
+for srd_sub in $srd_lib/proto/*; do
+	if [ -d "$srd_sub" ]; then
+		lint "$srd_sub"
+	fi
+done
 
 
 inspect_lib

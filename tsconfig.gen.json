@@ -6,6 +6,7 @@
 		"baseUrl": "src",
 		"outDir": "build/gen",
 		"declaration": false,
+		"declarationMap": false,
 		"skipLibCheck": true,
 	},
 

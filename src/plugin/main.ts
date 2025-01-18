@@ -29,9 +29,9 @@ const A_GLOBAL_PREAMBLE = [
 		importModule('@blake.regalia/belt', [
 			'NaiveHexLower',
 			'NaiveBase64',
-			'WeakUintStr',
 		], true),
 		importModule('@solar-republic/types', [
+			'WeakUintStr',
 			'WeakInt64Str',
 			'WeakUint64Str',
 			'WeakInt128Str',
@@ -110,7 +110,7 @@ export const main = () => {
 			enums: Set<string>;
 		}> = {};
 
-		const h_outputs: Dict<string> = {};
+		const h_outputs: Dict = {};
 
 		type SerializedMessages = Dict<{
 			message: AugmentedMessage;
