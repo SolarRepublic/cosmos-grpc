@@ -12,7 +12,7 @@ export type RequestDescriptor =
 	| ({origin: TrustedContextUrl} & RequestInit);
 
 export type CosmosClient = {
-	debug?: `direct:<${TrustedContextUrl}>` | `pool:<${string}>`;
+	id?: `direct:<${TrustedContextUrl}>` | `pool:<${string}>`;
 };
 
 export type CosmosClientLcd = CosmosClient & {
@@ -216,7 +216,7 @@ export const CosmosClientLcdDirect = (
 
 	// return client struct
 	return {
-		debug: `direct:<${p_origin as TrustedContextUrl}>`,
+		id: `direct:<${p_origin as TrustedContextUrl}>`,
 		lcd: (sr_append: string, g_ammend?: RequestInit) => f_fetcher(p_origin+sr_append, {...g_init, ...g_ammend}),
 	};
 };
@@ -236,7 +236,7 @@ export const CosmosClientLcdPooling = (
 
 	// return client struct
 	return {
-		debug: `pool:<${a_clients.map(([y]) => y.debug).join(',')}>`,
+		id: `pool:<${a_clients.map(([y]) => y.id).join(',')}>`,
 		async lcd(sr_append: string, g_ammend?: RequestInit) {
 			// find an available client
 			let i_client = 0;
