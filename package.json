@@ -1,7 +1,7 @@
 {
   "name": "@solar-republic/cosmos-grpc",
   "description": "Generates tree-shakable TypeScript APIs from the .proto files of any blockchain built using Cosmos-SDK.",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "type": "module",
   "main": "build/dist/main.js",
   "files": [
