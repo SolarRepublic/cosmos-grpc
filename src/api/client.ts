@@ -12,8 +12,11 @@ export type RequestDescriptor =
 	| ({origin: TrustedContextUrl} & RequestInit);
 
 export type CosmosClient = {
-	debug?: string;
-	fetch: (sr_append: string, g_append?: RequestInit) => Promise<Response>;
+	debug?: `direct:<${TrustedContextUrl}>` | `pool:<${string}>`;
+};
+
+export type CosmosClientLcd = CosmosClient & {
+	lcd: (sr_append: string, g_append?: RequestInit) => Promise<Response>;
 };
 
 export type RetryableRequestWrapper = ((z_req: RequestInfo | URL, z_init: RequestInit | undefined, i_attempt: number) => Promise<Response | RetryParams>);
@@ -134,8 +137,8 @@ export const retry_when_response = (
  * @param f_retry - an optional retry handler to be used when fetch function throws, see {@link RetryHandler}
  * @returns a function idential to `fetch`
  */
-export const retryable_fetcher = (
-	z_desc?: RetryableRequestWrapper | undefined,
+export const fetcher_retryable = (
+	z_desc?: RetryableRequestWrapper,
 	f_retry?: RetryHandler
 ): (typeof fetch) => async(z_req, z_init) => {
 	// attempt counter
@@ -190,17 +193,17 @@ export const retryable_fetcher = (
  * @param a_backoff 
  * @returns 
  */
-export const basic_retryable_fetcher = (
+export const fetcher_retryable_basic = (
 	a_backoff: BackoffParams=[200, 30e3, 10],
 	f_fetch: typeof fetch=fetch
-) => retryable_fetcher(retry_when_response(response_is_429_or_501_thru_599(a_backoff), f_fetch));
+) => fetcher_retryable(retry_when_response(response_is_429_or_501_thru_599(a_backoff), f_fetch));
 
 
 
-export const direct_cosmos_client = (
+export const CosmosClientLcdDirect = (
 	z_desc: RequestDescriptor,
-	f_fetcher: typeof fetch=basic_retryable_fetcher()
-): CosmosClient => {
+	f_fetcher: typeof fetch=fetcher_retryable_basic()
+): CosmosClientLcd => {
 	// prep request init object
 	let g_init: RequestInit | undefined;
 
@@ -213,18 +216,18 @@ export const direct_cosmos_client = (
 
 	// return client struct
 	return {
-		debug: `direct:<${p_origin}>`,
-		fetch: (sr_append: string, g_ammend?: RequestInit) => f_fetcher(p_origin+sr_append, {...g_init, ...g_ammend}),
+		debug: `direct:<${p_origin as TrustedContextUrl}>`,
+		lcd: (sr_append: string, g_ammend?: RequestInit) => f_fetcher(p_origin+sr_append, {...g_init, ...g_ammend}),
 	};
 };
 
-export const pooling_cosmos_client = (
+export const CosmosClientLcdPooling = (
 	a_clients: [
-		y_client: CosmosClient,
+		y_client: CosmosClientLcd,
 		xt_recovery?: number | undefined,
 		n_max_conn?: number | undefined,
 	][]
-): CosmosClient => {
+): CosmosClientLcd => {
 	// form connection details from clients list
 	const a_conns: [
 		n_available: number,
@@ -234,7 +237,7 @@ export const pooling_cosmos_client = (
 	// return client struct
 	return {
 		debug: `pool:<${a_clients.map(([y]) => y.debug).join(',')}>`,
-		async fetch(sr_append: string, g_ammend?: RequestInit) {
+		async lcd(sr_append: string, g_ammend?: RequestInit) {
 			// find an available client
 			let i_client = 0;
 			for(; i_client<a_clients.length-1;) {
@@ -255,7 +258,7 @@ export const pooling_cosmos_client = (
 			a_conn[0]--;
 
 			// attempt request
-			const [d_res, e_lcd] = await try_async(() => y_client.fetch(sr_append, g_ammend));
+			const [d_res, e_lcd] = await try_async(() => y_client.lcd(sr_append, g_ammend));
 
 			// return client to pool
 			a_conn[0]++;
@@ -275,7 +278,7 @@ export const pooling_cosmos_client = (
 				}, xt_recovery || 5e3) as unknown as number;
 
 				// retry
-				return await this.fetch(sr_append, g_ammend);
+				return await this.lcd(sr_append, g_ammend);
 			}
 
 			// return response

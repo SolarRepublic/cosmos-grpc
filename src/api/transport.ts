@@ -1,11 +1,12 @@
 /* eslint-disable prefer-const */
+import type {CosmosClientLcd, RequestDescriptor} from './client';
 import type {Nilable, JsonObject, JsonValue} from '@blake.regalia/belt';
 
 import type {SlimCoin} from '@solar-republic/types';
 
 import {bytes_to_base64, __UNDEFINED, is_array, parse_json_safe, entries, is_object, is_function} from '@blake.regalia/belt';
 
-import {direct_cosmos_client, type CosmosClient, type RequestDescriptor} from './client';
+import {CosmosClientLcdDirect} from './client';
 
 type Voidable = void | undefined;
 
@@ -126,7 +127,7 @@ export const restful_grpc = <
 	f_req: RpcRequest<a_args>,
 	g_init_default?: 1 | RequestInit
 ) => async(
-	z_req: RequestDescriptor | CosmosClient,
+	z_req: RequestDescriptor | CosmosClientLcd,
 	...a_args: a_args
 ): Promise<NetworkJsonResponse<w_parsed | undefined, CosmosQueryErrorResult | undefined>> => {
 	// set default init object
@@ -155,12 +156,12 @@ export const restful_grpc = <
 	}
 
 	// cosmos client
-	const y_client = is_function((z_req as CosmosClient).fetch)
-		? z_req as CosmosClient
-		: direct_cosmos_client(z_req as RequestDescriptor);
+	const y_client = is_function((z_req as CosmosClientLcd).lcd)
+		? z_req as CosmosClientLcd
+		: CosmosClientLcdDirect(z_req as RequestDescriptor);
 
 	// submit request
-	const d_res = await y_client.fetch(sr_append, g_init);
+	const d_res = await y_client.lcd(sr_append, g_init);
 
 	// resolve as text
 	const sx_res = await d_res.text();

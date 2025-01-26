@@ -182,7 +182,7 @@ export const decode_protobuf = <
 
 			// i64
 			// @ts-expect-error paren-less param
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 			_ => 'i64',
 
 			// len (string, bytes, embedded, etc.)
@@ -244,7 +244,7 @@ export const decode_protobuf_r0 = <
 >(
 	atu8_payload: Uint8Array,
 	a_hints?: ProtoHint[]
-): w_return => decode_protobuf<DecodedProtobufMessage>(atu8_payload, a_hints)[0] as w_return;
+): w_return => decode_protobuf(atu8_payload, a_hints)[0] as w_return;
 
 
 export const decode_protobuf_r0_0 = <
