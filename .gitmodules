@@ -63,3 +63,6 @@
 [submodule "submodules/noble-authority"]
 	path = submodules/noble-authority
 	url = https://github.com/noble-assets/authority
+[submodule "submodules/babylon"]
+	path = submodules/babylon
+	url = https://github.com/babylonlabs-io/babylon
