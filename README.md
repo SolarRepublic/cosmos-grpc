@@ -27,8 +27,19 @@ yarn add @solar-republic/cosmos-grpc
 ```
 
 
-## Contributing
+## Contributing / Building from source
+
+Clone this repo with `--recurse-submodules`:
+```bash
+$ git clone --recurse-submodules http://github.com/SolarRepublic/cosmos-grpc
+```
+
+Requirements:
+ - node.js
+ - pnpm
+ - protoc-gen-js ([`brew install protoc-gen-js`](https://formulae.brew.sh/formula/protoc-gen-js))
+
 ```shell
-yarn install
-yarn build
+pnpm install
+pnpm build
 ```

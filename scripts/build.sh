@@ -73,6 +73,7 @@ copy noble-authority/proto/noble noble
 copy noble-fiattokenfactory/proto/fiattokenfactory noble/fiattokenfactory
 copy noble-forwarding/proto/noble/forwarding noble/forwarding
 copy secret/proto
+copy babylon/proto/babylon babylon
 
 merge juno/proto/gaia gaia
 merge juno/proto/osmosis osmosis
