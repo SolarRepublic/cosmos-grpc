@@ -1,10 +1,12 @@
 #!/usr/bin/env bun
-import {inspect} from 'node:util';
-import {readFileSync} from 'fs';
-
+import type {Change} from 'diff';
 import type {Dict} from '@blake.regalia/belt';
+
+import {inspect} from 'node:util';
+import {readFileSync} from 'node:fs';
+
 import {entries, from_entries, is_array, is_string, keys} from '@blake.regalia/belt';
-import * as diff from 'diff';
+import {diffLines} from 'diff';
 import * as proto from 'proto-parser';
 
 type ParseResult = proto.ProtoDocument | proto.ProtoError;
@@ -38,7 +40,10 @@ function parse_proto(z_content: string | string[], s_append='', b_strict=false) 
 	const y_try = proto.parse([
 		`syntax = "proto3";`,
 		sx_content.replace(/^\s*syntax\s*=\s*['"]proto3['"];?/, ''),
-	].join('\n'));
+	].join('\n'), {
+		resolve: true,
+		weakResolve: true,
+	});
 
 	if((y_try as proto.ProtoError).error) {
 		if('ProtoError' === y_try.syntaxType) {
@@ -109,7 +114,149 @@ function merge_lines(sx_a: string, sx_b: string) {
 
 let b_expect_discrepancy_take_b = false;
 
-function merge(sx_a_src: string, sx_b_src: string, g_diff: diff.Change) {
+function brute_parse(sx_a: string, sx_b: string) {
+	
+}
+
+const f_annotation = (b_term: boolean) => (sx: string) => ['message Test {', 'string fake_merge_test = 0 [', sx, (b_term? ' (cosmos.fake_annotation) = false': '')+'];', '}'];
+
+const f_brute = <w_def>(si_category: string, gc_brute: {
+	build: (sx: string) => string[];
+	dict: (y_doc: proto.ProtoDocument) => Dict<w_def>;
+	str: (g_def: Dict<w_def>) => string;
+	fallback: (sx_a: string, sx_b: string) => string;
+}) => {
+	return (
+		sx_a: string,
+		sx_b: string,
+		s_summary: string,
+	): 0 | string => {
+		// retry within message
+		const y_doc_a = parse_proto(gc_brute.build(sx_a));
+		const y_doc_b = parse_proto(gc_brute.build(sx_b));
+
+		// `a` succeeded
+		if(success(y_doc_a)) {
+			// `b` did not succeed
+			if(!success(y_doc_b)) {
+				debugger;
+				throw new Error(`Merge conflict; ${si_category}:${s_summary}`);
+			}
+
+			// get fields dict
+			const h_fields_a = gc_brute.dict(y_doc_a);
+			const h_fields_b = gc_brute.dict(y_doc_b);
+
+			// stringify
+			const s_json_a = gc_brute.str(h_fields_a);
+			const s_json_b = gc_brute.str(h_fields_b);
+
+			// same fields
+			if(stringify_keys(h_fields_a) === stringify_keys(h_fields_b)) {
+				// choose longer one, giving tie to origin
+				return s_json_b.length > s_json_a.length? sx_b: sx_a;
+			}
+
+			// create set
+			const as_fields_a = new Set(Object.keys(h_fields_a));
+			const as_fields_b = new Set(Object.keys(h_fields_b));
+
+			// check if `b` is entirely within in `a`
+			A_CONTAINS_B:
+			{
+				for(const si_field_b of Object.keys(h_fields_b)) {
+					if(!as_fields_a.has(si_field_b)) break A_CONTAINS_B;
+				}
+
+				return sx_a;
+			}
+
+			// check if `a` is in `b`
+			B_CONTAINS_A:
+			{
+				for(const si_field_a of Object.keys(h_fields_a)) {
+					if(!as_fields_b.has(si_field_a)) break B_CONTAINS_A;
+				}
+
+				return sx_b;
+			}
+
+			// // additive merge
+			// return merge_lines(sx_a, sx_b);
+
+			return gc_brute.fallback(sx_a, sx_b);
+		}
+		// `b` succeeded
+		else if(success(y_doc_b)) {
+			throw new Error(`Merge conflict; [0.0, 0.1]:${s_summary}`);
+		}
+		// neither could be parsed
+		else {
+			return 0;
+		}
+	};
+};
+
+const A_BRUTES = [
+	f_brute<proto.FieldDefinition>('message', {
+		build: sx => ['message Test {', sx, '}'],
+		dict: y_doc => (y_doc.root!.nested!['Test'] as proto.MessageDefinition).fields,
+		str: stringify_fields,
+		// additive merge
+		fallback: merge_lines,
+	}),
+	f_brute<number>('enum', {
+		build: sx => ['enum Test {', sx, '}'],
+		dict: y_doc => (y_doc.root!.nested!['Test'] as proto.EnumDefinition).values,
+		str: stringify_fields,
+		fallback(sx_a, sx_b) {
+			// just take b
+			return sx_b;
+		}
+	}),
+	f_brute<proto.MethodDefinition>('service', {
+		build: sx => ['service Test {', sx, '}'],
+		dict: y_doc => (y_doc.root.nested!['Test'] as proto.ServiceDefinition).methods,
+		str: stringify_method,
+		fallback(sx_a, sx_b) {
+			const y_doc_a_test = proto.parse(`service Test {\n${sx_a}\n}`);
+			if('ProtoError' === y_doc_a_test.syntaxType && RT_EOF.test(y_doc_a_test.message)) {
+				// // find the next closing paren in `a`
+				const i_start_a = sx_file_a.indexOf(sx_a)+sx_a.length;
+				const i_end_a = sx_file_a.indexOf('}', i_start_a)+1;
+
+				const sx_tmp = sx_a + sx_file_a.slice(i_start_a, i_end_a)+'\n' + sx_b;
+
+				b_expect_discrepancy_take_b = true;
+
+				return sx_tmp;
+			}
+
+			debugger;
+			throw new Error(`Merge resolution path for methods not yet defined`);
+		},
+	}),
+	f_brute<proto.FieldDefinition>('annotation_last', {
+		build: f_annotation(false),
+		dict: y_doc => (y_doc.root.nested!['Test'] as proto.MessageDefinition).fields,
+		str: stringify_fields,
+		fallback(sx_a, sx_b) {
+			// different methods
+			throw new Error(`unresolved merge conflict strategy within fields`);
+		},
+	}),
+	f_brute<proto.FieldDefinition>('annotation_more', {
+		build: f_annotation(true),
+		dict: y_doc => (y_doc.root.nested!['Test'] as proto.MessageDefinition).fields,
+		str: stringify_fields,
+		fallback(sx_a, sx_b) {
+			// different methods
+			throw new Error(`unresolved merge conflict strategy within fields`);
+		},
+	}),
+];
+
+function merge(sx_a_src: string, sx_b_src: string, g_diff: Change) {
 	if(is_concatable(sx_a_src)) {
 		return sx_a_src+'\n'+sx_b_src;
 	}
@@ -127,7 +274,19 @@ function merge(sx_a_src: string, sx_b_src: string, g_diff: diff.Change) {
 	}
 
 	// prep debug hint
-	const s_summary = `\n${sx_a}\n${'#'.repeat(30)}\n${sx_b}`;
+	const s_summary = `\n${sx_a}\n${'╌'.repeat(30)}\n${sx_b}`;
+
+	// step through brutes
+	for(const f_brute of A_BRUTES) {
+		const z_result = f_brute(sx_a, sx_b, s_summary);
+
+		// string
+		if(is_string(z_result)) {
+			return z_result;
+		}
+	}
+
+	debugger;
 
 	let y_doc_a: ParseResult;
 	let y_doc_b: ParseResult;
@@ -286,7 +445,7 @@ function merge(sx_a_src: string, sx_b_src: string, g_diff: diff.Change) {
 					const s_json_b = stringify_method(h_methods_b);
 					
 					// same fields
-					if(stringify_keys(s_json_a) === stringify_keys(s_json_b)) {
+					if(stringify_keys(h_methods_a) === stringify_keys(h_methods_b)) {
 						// choose longer one, giving tie to origin
 						return s_json_b.length > s_json_a.length? sx_b: sx_a;
 					}
@@ -339,6 +498,66 @@ function merge(sx_a_src: string, sx_b_src: string, g_diff: diff.Change) {
 				}
 				// neither could be parsed
 				else {
+					// retry within fields
+					const f_fake_annotation = (sx: string, b_term=false) => parse_proto(['message Test {', 'string fake_merge_test = 0 [', sx, (b_term? ' (cosmos.fake_annotation) = false': '')+'];', '}']);
+					y_doc_a = f_fake_annotation(sx_a);
+					y_doc_b = f_fake_annotation(sx_b);
+
+					// `a` succeeded
+					if(success(y_doc_a)) {
+						// `b` did not succeed
+						if(!success(y_doc_b)) {
+							throw new Error(`Merge conflict; [0.0.0.0.1, 0.0.0.0.0]:${s_summary}`);
+						}
+	
+						// get methods dict
+						const h_fields_a = (y_doc_a.root.nested!['Test'] as proto.MessageDefinition).fields;
+						const h_fields_b = (y_doc_b.root.nested!['Test'] as proto.MessageDefinition).fields;
+						
+						// stringify
+						const s_json_a = stringify_fields(h_fields_a);
+						const s_json_b = stringify_fields(h_fields_b);
+						
+						debugger;
+						// same fields
+						if(stringify_keys(h_fields_a) === stringify_keys(h_fields_b)) {
+							// choose longer one, giving tie to origin
+							return s_json_b.length > s_json_a.length? sx_b: sx_a;
+						}
+
+						// create set
+						const as_fields_a = new Set(Object.keys(h_fields_a));
+						const as_fields_b = new Set(Object.keys(h_fields_b));
+								
+						// check if `b` is entirely within in `a`
+						A_CONTAINS_B:
+						{
+							for(const si_field_b of Object.keys(h_fields_b)) {
+								if(!as_fields_a.has(si_field_b)) break A_CONTAINS_B;
+							}
+
+							return sx_a;
+						}
+
+						// check if `a` is in `b`
+						B_CONTAINS_A:
+						{
+							for(const si_field_a of Object.keys(h_fields_a)) {
+								if(!as_fields_b.has(si_field_a)) break B_CONTAINS_A;
+							}
+
+							return sx_b;
+						}
+
+						// different methods
+						throw new Error(`unresolved merge conflict strategy within fields`);
+					}
+					// `b` succeeded
+					else if(success(y_doc_b)) {
+						throw new Error(`Merge conflict; [0.0.0.0.0, 0.0.0.0.1]:${s_summary}`);
+					}
+
+
 					// expected this
 					if(b_expect_discrepancy_take_b) {
 						// unset flag
@@ -359,7 +578,7 @@ function merge(sx_a_src: string, sx_b_src: string, g_diff: diff.Change) {
 	
 					y_doc_a = parse_proto(remove_comments(sx_a)+'\n}');
 					y_doc_b = parse_proto(remove_comments(sx_b)+'\n}');
-					throw new Error(`Unable to parse diff:\n${remove_comments(s_summary)}\n${inspect(y_doc_a)}\n${inspect(y_doc_b)}`);
+					throw new Error(`Unable to parse diff [${sr_file_a}, ${sr_file_b}]:\n\n${remove_comments(s_summary)}\n\n\n${inspect(y_doc_a)}\n${inspect(y_doc_b)}`);
 				}
 			}
 		}
@@ -406,7 +625,14 @@ if(!sr_file_a || !sr_file_b) {
 const sx_file_a = readFileSync(sr_file_a, 'utf-8');
 const sx_file_b = readFileSync(sr_file_b, 'utf-8');
 
-const a_diff = diff.diffLines(sx_file_a, sx_file_b);
+debugger;
+// parse each
+const y_docf_a = parse_proto(sx_file_a);
+const y_docf_b = parse_proto(sx_file_b);
+
+debugger;
+
+const a_diff = diffLines(sx_file_a, sx_file_b);
 
 const a_out: string[] = [];
 let sx_tmp = '';
@@ -461,8 +687,35 @@ for(let i_diff=0; i_diff<a_diff.length; i_diff++) {
 	}
 }
 
-// output merged file contents
-const sx_out = a_out.join('\n');
+// proof merged file contents
+const sx_proof = a_out.join('\n');
+
+// eliminate redundant imports
+let sx_out = '';
+{
+	// split by line
+	const a_proof = sx_proof.split('\n');
+
+	// track imports
+	const as_imports = new Set<string>();
+	for(const s_line of a_proof) {
+		if(/^import/.test(s_line)) {
+			as_imports.add(s_line);
+		}
+	}
+
+	// index of first import
+	let i_import = a_proof.findIndex(s_line => /^import/.test(s_line));
+
+	// remove all imports
+	const a_out = a_proof.filter(s_line => !/^import/.test(s_line));
+
+	// re-insert imports
+	a_out.splice(i_import, 0, ...as_imports);
+
+	// join
+	sx_out = a_out.join('\n');
+}
 
 // // ensure output document can be parsed
 // const y_doc_out = parse_proto(sx_out);

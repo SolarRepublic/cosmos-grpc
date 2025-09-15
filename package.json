@@ -29,31 +29,31 @@
     "update-modules": "git submodule update --recursive --remote --init"
   },
   "dependencies": {
-    "@solar-republic/crypto": "^0.4.0",
+    "@solar-republic/crypto": "^0.5.4",
     "google-protobuf": "^3.21.4",
-    "protobufjs": "7.4.0"
+    "protobufjs": "7.5.4"
   },
   "devDependencies": {
-    "@blake.regalia/belt": "^0.54.1",
-    "@blake.regalia/eslint-config-elite": "^0.5.18",
+    "@blake.regalia/belt": "^0.57.8",
+    "@blake.regalia/eslint-config-elite": "^0.5.22",
     "@blake.regalia/tsconfig": "^0.3.7",
-    "@solar-republic/types": "^0.3.9",
-    "@types/diff": "^7.0.0",
+    "@solar-republic/types": "^0.3.13",
+    "@tsconfig/node22": "^22.0.2",
     "@types/google-protobuf": "^3.15.12",
-    "@types/node": "^22.10.7",
-    "@types/web": "^0.0.196",
-    "@typescript-eslint/parser": "^8.20.0",
-    "diff": "^5.2.0",
-    "eslint": "^9.18.0",
-    "eslint-plugin-unused-imports": "^4.1.4",
+    "@types/node": "^24.4.0",
+    "@types/web": "^0.0.267",
+    "@typescript-eslint/parser": "^8.43.0",
+    "diff": "^8.0.2",
+    "eslint": "^9.35.0",
+    "eslint-plugin-unused-imports": "^4.2.0",
     "proto-parser": "^0.0.9",
     "resolve-tspaths": "^0.8.23",
-    "ts-morph": "^24.0.0",
+    "ts-morph": "^27.0.0",
     "ts-node": "^10.9.2",
-    "ts-proto": "2.4.2",
+    "ts-proto": "2.7.7",
     "ts-toolbelt": "^9.6.0",
     "tsc-esm-fix": "^3.1.2",
-    "typescript": "5.6.2"
+    "typescript": "5.9.2"
   },
-  "packageManager": "pnpm@9.0.6+sha1.648f6014eb363abb36618f2ba59282a9eeb3e879"
+  "packageManager": "pnpm@10.16.1"
 }

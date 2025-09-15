@@ -258,7 +258,7 @@ export const plugin = async(
 	// parse stdin
 	let atu8_accumulate = new Uint8Array();
 	for await(const atu8_chunk of process.stdin) {
-		atu8_accumulate = concat2(atu8_accumulate, atu8_chunk as Uint8Array);
+		atu8_accumulate = concat2(atu8_accumulate, atu8_chunk as Uint8Array<ArrayBuffer>);
 	}
 
 	// deserialize and convert to object form

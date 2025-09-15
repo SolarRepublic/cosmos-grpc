@@ -146,9 +146,12 @@ export const fetcher_retryable = (
 
 	// retry loop
 	for(;;) {
+		// clone the request so it can be retried
+		const z_req_clone = z_req instanceof Request? z_req.clone(): z_req;
+
 		// attempt the request
 		// eslint-disable-next-line @typescript-eslint/no-loop-func
-		const [z_res, e_fail] = await try_async(() => (z_desc ?? fetch)(z_req, z_init, c_attempts++));
+		const [z_res, e_fail] = await try_async(() => (z_desc ?? fetch)(z_req_clone, z_init, c_attempts++));
 
 		// determine if retry is needed
 		const z_retry = e_fail
@@ -166,7 +169,7 @@ export const fetcher_retryable = (
 			// debug
 			if(import.meta.env?.DEV) {
 				// eslint-disable-next-line no-console
-				console.debug(`⚠️ Retrying request #${c_attempts} to ${z_req instanceof Request? z_req.url: z_req+''} after ${is_number(z_retry)? z_retry: 0}ms backoff`);
+				console.debug(`⚠️ Retrying request #${c_attempts} to ${z_req_clone instanceof Request? z_req_clone.url: z_req_clone+''} after ${is_number(z_retry)? z_retry: 0}ms backoff`);
 			}
 
 			// wait for given time

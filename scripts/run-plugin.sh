@@ -21,7 +21,7 @@ srd_dist="$srd_build/dist"
 
 
 # dirs to target proto files
-srd_chains=($srd_proto/{tendermint,cometbft,cosmos,ibc,cosmwasm,secret,akash,axelar,gaia,juno,osmosis,circle,noble,babylon})
+srd_chains=($srd_proto/{tendermint,cosmos,ibc,cosmwasm,secret,akash,axelar,gaia,juno,osmosis,circle,noble,babylon})
 
 # subdir to annotations to generate
 srd_annotations="$srd_gen/annotations"
@@ -124,7 +124,6 @@ info "generating module..."
 
 s_core="""
 tendermint.*
-cometbft.*
 cosmos.*
 ibc.*
 cosmwasm.*

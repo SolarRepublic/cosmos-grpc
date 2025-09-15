@@ -3,10 +3,11 @@ import type {Optional} from 'ts-toolbelt/out/Object/Optional';
 import type {AugmentedEnum, AugmentedField, AugmentedFile} from './env';
 import type {RpcImplementor} from './rpc-impl';
 import type {ProtoWriterMethod} from '../api/protobuf-writer';
+import type {Dict} from '@blake.regalia/belt';
 import type {FieldDescriptorProto} from 'google-protobuf/google/protobuf/descriptor_pb';
 import type {TypeNode, Identifier, Expression} from 'typescript';
 
-import {snake, type Dict} from '@blake.regalia/belt';
+import {cast, snake} from '@blake.regalia/belt';
 import {default as protobuf} from 'google-protobuf/google/protobuf/descriptor_pb';
 
 import {callExpr, ident, string, keyword, litType, typeRef, union, numericLit, tuple, not, arrayAccess} from './ts-factory';
@@ -125,11 +126,11 @@ type ThingDefMixin = Pick<TsThingBare, 'proto'> & Partial<Omit<TsThingBare, 'pro
 
 const temporal = (g_mixin: {calls?: Optional<TsThingBare['calls']>; json?: TsThingBare['json']}) => (g_field: AugmentedField, k_impl: RpcImplementor): ThingDefMixin => {
 	const s_ident = `xt_${snake(g_field.name!)}`;
-	return {
+	return cast({
 		calls: {
 			name: s_ident,
 			type: keyword('number'),
-			to_proto: yn_expr => callExpr('temporal', [yn_expr]),
+			to_proto: (yn_expr: Expression) => callExpr('temporal', [yn_expr]),
 			...g_mixin.calls,
 		},
 
@@ -149,7 +150,7 @@ const temporal = (g_mixin: {calls?: Optional<TsThingBare['calls']>; json?: TsThi
 			// parser: ident('reduce_temporal'),
 			parser: ident(`decode_temporal`),
 		},
-	} as TsThingBare;
+	});
 };
 
 // special overrides
@@ -260,7 +261,18 @@ const H_OVERRIDE_MIXINS: Dict<
 export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 	[H_FIELD_TYPES.TYPE_GROUP]: route_not_impl('group'),
 
-	[H_FIELD_TYPES.TYPE_FLOAT]: route_not_impl('float'),
+	// [H_FIELD_TYPES.TYPE_FLOAT]: route_not_impl('float'),
+
+	[H_FIELD_TYPES.TYPE_FLOAT]: si_field => ({
+		calls: {
+			name: `x_${si_field}`,
+			type: keyword('number'),
+		},
+
+		proto: {
+			writer: 'i',
+		},
+	}),
 	[H_FIELD_TYPES.TYPE_DOUBLE]: si_field => ({
 		calls: {
 			name: `x_${si_field}`,
@@ -409,7 +421,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 		else if(si_field.endsWith('_id')) {
 			si_name = `si_${si_field.replace(/_id$/, '')}`;
 		}
-		else if(/code_hash$/.test(si_field)) {
+		else if(si_field.endsWith('code_hash')) {
 			si_name = `sb16_${si_field}`;
 			yn_type = typeRef('NaiveHexLower');
 			yn_return = typeRef('CwHexLower');

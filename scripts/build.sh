@@ -60,23 +60,23 @@ copy wasmd/proto
 copy ibc/proto
 copy ics23/proto
 
-merge secret/third_party/proto/cosmos cosmos
+# merge secret/third_party/proto/cosmos cosmos
 
 copy gaia/proto/gaia gaia
 copy akash/proto/node/akash akash
 copy axelar/proto/axelar axelar
 copy juno/proto/juno juno
 copy osmosis/proto/osmosis osmosis
-copy noble/proto
+# copy noble/proto
 copy noble-cctp/proto/circle circle
 copy noble-authority/proto/noble noble
-copy noble-fiattokenfactory/proto/fiattokenfactory noble/fiattokenfactory
+copy noble-fiattokenfactory/proto/circle/fiattokenfactory circle/fiattokenfactory
 copy noble-forwarding/proto/noble/forwarding noble/forwarding
 copy secret/proto
 copy babylon/proto/babylon babylon
 
 merge juno/proto/gaia gaia
-merge juno/proto/osmosis osmosis
+# merge juno/proto/osmosis osmosis
 
 copy gogoproto
 
