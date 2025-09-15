@@ -173,7 +173,7 @@ export const fetcher_retryable = (
 			}
 
 			// no retry handler, or too many attempts
-			if(!f_retry || c_attempts > 128) throw Error('❌ Stopping infinite retry');
+			if(!f_retry || c_attempts > 128) throw Error('❌ Stopping infinite retry', {cause:e_fail});
 
 			// wait for given time
 			await timeout(is_number(z_retry)? z_retry: 0);
