@@ -219,14 +219,15 @@ eslint=./node_modules/eslint/bin/eslint.js
 lint_1() {
 	sr_target="$1"
 	info "running eslint 1st cycle on $sr_target..."
-	node --max_old_space_size=8192 "$eslint" --no-ignore --parser-options project:tsconfig.lib.json --color --fix "$sr_target" \
-		| grep -v "warning"  # ignore warnings from initial lint cycle
+	out=$(node --max_old_space_size=8192 "$eslint" --no-ignore --parser-options project:tsconfig.lib.json --color --fix "$sr_target")
 
 	if [ $? -ne 0 ]; then
 		>&2 echo "[ERROR] Errors encountered during linting"
 		inspect_lib
 		exit 1
 	fi
+
+	echo "$out" | grep -v "warning"  # ignore warnings from initial lint cycle
 
 	info " "
 	info "---- end of first lint cycle for $sr_target ----"

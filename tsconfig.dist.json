@@ -3,17 +3,123 @@
 	"extends": "@blake.regalia/tsconfig/tsconfig.node.json",
 
 	"compilerOptions": {
+		// --------------------------------
+		// code generation
+		// --------------------------------
+
+		// always generate `.d.ts` files
+		"declaration": true,
+
+		// source map back to original `.ts` source file
+		"declarationMap": true,
+
+		// generate sourcemaps and embed the source in the `.map.js` file
+		"sourceMap": true,
+		"inlineSources": true,
+
+		// ensure consistent build outputs for code hashes
+		"newLine": "lf",
+
+		
+		// --------------------------------
+		// import behavior
+		// --------------------------------
+
+		// allow bundlers to import files with arbitrary extensions, like *.txt, *.svg, etc.
+		"allowArbitraryExtensions": true,
+
+		// allow importing JSON modules
+		"resolveJsonModule": true,
+
+ 		// convenient for development sake
+		"allowSyntheticDefaultImports": true,
+
+		// case-sensitive file names
+		"forceConsistentCasingInFileNames": true,
+
+		// distinction between `import type {...}` and `import`{...}`
+		"verbatimModuleSyntax": true,
+
+		// --------------------------------
+		// transpilation
+		// --------------------------------
+
+		// always emit 'use strict'
+		"alwaysStrict": true,
+
+		// --------------------------------
+		// preferences
+		// --------------------------------
+
+		"skipLibCheck": true,
+
+		// ensure certain coding styles are not mishandled by compiler
+		"exactOptionalPropertyTypes": true,
+
+		// type checking and type safety
+		"noImplicitOverride": true,
+		"noImplicitReturns": false,
+		"noImplicitThis": true,
+		"noPropertyAccessFromIndexSignature": true,
+
+		// strong type safety enables:
+		// - strictNullChecks
+		// - strictBindCallApply
+		// - strictFunctionTypes
+		// - strictPropertyInitialization
+		// - noImplicitAny
+		// - noImplicitThis
+		// - useUnknownInCatchVariables
+		"strict": true,
+
+		// --------------------------------
+		// intentionally disabled
+		// --------------------------------
+
+		// too inconvenient for frequent use of dicts
+		"noUncheckedIndexedAccess": false,
+
+		// handled by linter
+		"noUnusedLocals": false,
+
+		// handled by linter
+		"noUnusedParameters": false,
+
+		// --------------------------------
+		// for intellisense and compilation performance
+		// --------------------------------
+
+		// prevent truncation of types in intellisense
+		"noErrorTruncation": true,
+
+		// incremental builds with .tsbuildinfo
+		"incremental": true,
+
+		// --------------------------------
+		// for intellisense and compilation performance
+		// --------------------------------
+
+		"lib": [
+			"es2024",
+			"ESNext.Array",
+			"ESNext.Collection",
+			"ESNext.Iterator",
+			"ESNext.Promise"
+		],
+
+		"module": "nodenext",
+		"target": "es2024",
+
+		"esModuleInterop": true,
+		"moduleResolution": "node16",
+	
+		// --------------------------------
 		"baseUrl": "./",
 
 		"outDir": "../dist",
 		"declarationDir": "../dist",
 
-		"declaration": true,
-		"noImplicitReturns": false,
-
 		"allowJs": false,
-
-		"module": "ESNext",
 
 		"paths": {
 			"#/*": ["./*"]
