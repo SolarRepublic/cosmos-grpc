@@ -156,7 +156,7 @@ export const fetcher_retryable = (
 		// determine if retry is needed
 		const z_retry = e_fail
 			// request failed, ask for retry
-			? await f_retry?.(e_fail, c_attempts) || 0
+			? await f_retry?.(e_fail, c_attempts)
 			// user returned retry params
 			: !(z_res instanceof Response)
 				// retry with returned params
@@ -190,8 +190,6 @@ export const fetcher_retryable = (
 	}
 };
 
-
-
 /**
  * Convenience method for creating a basic fetcher that retries on 429 and 501-599 with exponential backoff.
  * If exponential backoff params are omitted, fetcher defaults to waiting up to 30 seconds maximum between
@@ -201,8 +199,12 @@ export const fetcher_retryable = (
  */
 export const fetcher_retryable_basic = (
 	a_backoff: BackoffParams=[200, 30e3, 10],
-	f_fetch: typeof fetch=fetch
-) => fetcher_retryable(retry_when_response(response_is_429_or_501_thru_599(a_backoff), f_fetch));
+	f_fetch: typeof fetch=fetch,
+	f_retry?: RetryHandler
+) => fetcher_retryable(
+	retry_when_response(response_is_429_or_501_thru_599(a_backoff), f_fetch),
+	f_retry
+);
 
 
 
