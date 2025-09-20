@@ -172,9 +172,6 @@ export const fetcher_retryable = (
 				console.debug(`⚠️ Retrying request #${c_attempts} to ${z_req_clone instanceof Request? z_req_clone.url: z_req_clone+''} after ${is_number(z_retry)? z_retry: 0}ms backoff due to: `, e_fail);
 			}
 
-			// no retry handler, or too many attempts
-			if(!f_retry || c_attempts > 128) throw Error('❌ Stopping infinite retry', {cause:e_fail});
-
 			// wait for given time
 			await timeout(is_number(z_retry)? z_retry: 0);
 
