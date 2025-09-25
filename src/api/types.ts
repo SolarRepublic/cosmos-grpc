@@ -5,7 +5,7 @@ declare const INTERFACES: unique symbol;
 
 export type ImplementsInterfaces<
 	as_interfaces extends string,
-> = Uint8Array & {
+> = Uint8Array<ArrayBuffer> & {
 	[INTERFACES]: {
 		[si_interface in as_interfaces]: 1;
 	};

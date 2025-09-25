@@ -521,7 +521,7 @@ export const main = () => {
 					})), false, typeRef('Record', [
 						keyword('string'),
 						tuple([
-							funcType([param('g_msg', typeRef('JsonObject'))], typeRef('Uint8Array')),
+							funcType([param('g_msg', typeRef('JsonObject'))], typeRef('Uint8Array', [typeRef('ArrayBuffer')])),
 							typeRef('Expander'),
 							typeRef('Decoder'),
 						]),
@@ -529,7 +529,7 @@ export const main = () => {
 				].map(yn => print(yn)),
 
 				`
-					export const condenseJsonAny = (g_any: JsonAny | undefined, p_type: string|undefined=g_any?.['@type']): Uint8Array | undefined => g_any? encodeGoogleProtobufAny(p_type!, H_REGISTRY_ANY[p_type!][0](g_any)): __UNDEFINED;
+					export const condenseJsonAny = (g_any: JsonAny | undefined, p_type: string|undefined=g_any?.['@type']): Uint8Array<ArrayBuffer> | undefined => g_any? encodeGoogleProtobufAny(p_type!, H_REGISTRY_ANY[p_type!][0](g_any)): __UNDEFINED;
 
 					export const expandJsonAny = <
 						p_type extends string=string,

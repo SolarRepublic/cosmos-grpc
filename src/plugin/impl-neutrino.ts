@@ -6,12 +6,13 @@ import type {FileCategory} from './rpc-impl';
 import type {Dict} from '@blake.regalia/belt';
 
 
+import type {Statement, TypeNode, Expression, ImportSpecifier, ParameterDeclaration, ConciseBody, OmittedExpression, BindingElement, Identifier, ArrayBindingElement} from 'typescript';
+
 import {readFileSync} from 'node:fs';
 
 import {__UNDEFINED, fold, concat_entries, proper, snake, escape_regex, transform_values, map_entries, F_IDENTITY, keys, values, is_number, is_array} from '@blake.regalia/belt';
 
 import {ts} from 'ts-morph';
-import {type Statement, type TypeNode, type Expression, type ImportSpecifier, type ParameterDeclaration, type ConciseBody, type OmittedExpression, type BindingElement, type Identifier, type ArrayBindingElement} from 'typescript';
 
 import {H_FIELD_TYPES, H_FIELD_TYPE_TO_HUMAN_READABLE, field_router, map_proto_path} from './common';
 import {N_MAX_PROTO_FIELD_NUMBER_GAP} from './constants';
@@ -151,7 +152,6 @@ export class NeutrinoImpl extends RpcImplementor {
 
 
 
-	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 	protected pattern_string_to_ast_node(sx_pattern: string, g_input: AugmentedMessage) {
 		const {
 			_si_const,
@@ -946,7 +946,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		let b_continuous = true;
 
 		// determine whether the decoded values are processed before being returned
-		// eslint-disable-next-line prefer-const
+
 		let b_processed = false;
 
 		const a_types: [string, boolean, TypeNode][] = [];
@@ -1065,7 +1065,7 @@ export class NeutrinoImpl extends RpcImplementor {
 					v: 's' === g_thing.calls.name[0]? keyword('string'): keyword('number'),
 					g: keyword('string'),
 					s: keyword('string'),
-					b: H_FIELD_TYPES.TYPE_MESSAGE === g_field.type? keyword('any'): typeRef('Uint8Array'),
+					b: H_FIELD_TYPES.TYPE_MESSAGE === g_field.type? keyword('any'): typeRef('Uint8Array', [typeRef('ArrayBuffer')]),
 				}[g_thing.proto.writer.toLowerCase()] || keyword('unknown');
 
 				// add to generic type arg
@@ -1377,7 +1377,7 @@ export class NeutrinoImpl extends RpcImplementor {
 		}
 
 		// request object needs to be recast from intentionally weakened fields
-		const yn_body_casted = /Request$/.test(si_name)? castAs(yn_body, unknown()): yn_body;
+		const yn_body_casted = si_name.endsWith('Request')? castAs(yn_body, unknown()): yn_body;
 
 		// content
 		const yn_const = declareConst(`destruct${si_name}`, arrow([
@@ -1538,7 +1538,7 @@ export class NeutrinoImpl extends RpcImplementor {
 			const g_resolved = this.route(g_field);
 
 			// if the message is a "Request", then weaken the accessor's fields datatypes
-			const yn_type = /Request$/.test(g_msg.name || '')? g_resolved.json!.weak: g_resolved.json!.type;
+			const yn_type = (g_msg.name || '').endsWith('Request')? g_resolved.json!.weak: g_resolved.json!.type;
 
 			return {
 				[g_field.name!]: g_field.optional

@@ -555,7 +555,7 @@ export const field_router = (k_impl: RpcImplementor): FieldRouter => ({
 				// to_proto: yn_expr => callExpr(),
 
 				// type: typeRef('CwBase64'),
-				return_type: yn_type,
+				return_type: typeRef('Uint8Array', [typeRef('ArrayBuffer')]),
 			},
 
 			json: {
