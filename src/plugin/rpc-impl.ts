@@ -105,7 +105,7 @@ export abstract class RpcImplementor {
 		]);
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 	open(g_proto: Pick<AugmentedFile, 'name'>, b_clash_free=false): void {
 		this._g_opened = g_proto;
 		this._b_clash_free = b_clash_free;
@@ -333,7 +333,7 @@ export abstract class RpcImplementor {
 			},
 
 			get destruct_type(): TypeNode {
-				return g_calls.from_json !== F_IDENTITY? g_calls.type: yn_json;
+				return g_calls.from_json !== F_IDENTITY? g_calls.return_type || g_calls.type: yn_json;
 			},
 
 			nests: g_nests,
